@@ -1,0 +1,5 @@
+project(network)
+
+message(STATUS "${PROJECT_NAME} is building")
+
+find_package(asio REQUIRED)

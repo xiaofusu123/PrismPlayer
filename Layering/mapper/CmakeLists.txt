@@ -1,0 +1,3 @@
+project(mapper)
+
+message(STATUS "${PROJECT_NAME} is building")

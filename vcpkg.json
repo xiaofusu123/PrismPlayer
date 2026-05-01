@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "asio",
+    "ffmpeg",
+    "glfw3",
+    "vulkan",
+    "gtest"
+  ]
+}

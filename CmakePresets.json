@@ -1,0 +1,25 @@
+{
+    "version" : 10,
+    "configurePresets" : [
+        {
+            "name" : "x64-Debug",
+            "generator" : "Ninja",
+            "binaryDir" : "${sourceDir}/build",
+            "cacheVariables" : {
+                "CMAKE_TOOLCHAIN_FILE" : "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/bin/ninja.exe",
+                "VCPKG_PYTHON_EXECUTABLE": "$env{CLANG_ROOT}/bin/python.exe"
+            }
+        },
+        {
+            "name" : "x64-Release",
+            "generator" : "Ninja",
+            "binaryDir" : "${sourceDir}/build",
+            "cacheVariables" : {
+                "CMAKE_TOOLCHAIN_FILE" : "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/bin/ninja.exe",
+                "VCPKG_PYTHON_EXECUTABLE": "$env{CLANG_ROOT}/bin/python.exe"
+            }
+        }
+    ]
+}
