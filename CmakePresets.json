@@ -6,6 +6,7 @@
             "generator" : "Ninja",
             "binaryDir" : "${sourceDir}/build",
             "cacheVariables" : {
+                "CMAKE_BUILD_TYPE" : "Debug",
                 "CMAKE_TOOLCHAIN_FILE" : "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
                 "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/bin/ninja.exe",
                 "VCPKG_PYTHON_EXECUTABLE": "$env{CLANG_ROOT}/bin/python.exe"
@@ -16,6 +17,7 @@
             "generator" : "Ninja",
             "binaryDir" : "${sourceDir}/build",
             "cacheVariables" : {
+                "CMAKE_BUILD_TYPE" : "Release",
                 "CMAKE_TOOLCHAIN_FILE" : "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
                 "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/bin/ninja.exe",
                 "VCPKG_PYTHON_EXECUTABLE": "$env{CLANG_ROOT}/bin/python.exe"

@@ -2,3 +2,4 @@ add_subdirectory(mapper)
 add_subdirectory(business)
 add_subdirectory(service)
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)

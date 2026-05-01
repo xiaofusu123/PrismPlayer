@@ -5,3 +5,16 @@ message(STATUS "${PROJECT_NAME} is building")
 find_package(FFmpeg REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
+
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
+add_library(${PROJECT_NAME} SHARED ${SRC})
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE mapper
+    PRIVATE FFmpeg::avformat
+    PRIVATE FFmpeg::avcodec
+    PRIVATE FFmpeg::avutil
+    PRIVATE Vulkan::Vulkan
+    PRIVATE glfw
+)
