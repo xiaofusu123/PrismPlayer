@@ -3,7 +3,8 @@
     "asio",
     "ffmpeg",
     "glfw3",
+    "gtest",
     "vulkan",
-    "gtest"
+    "libdatachannel"
   ]
 }
