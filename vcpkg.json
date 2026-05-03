@@ -4,7 +4,8 @@
     "ffmpeg",
     "glfw3",
     "gtest",
+    "libdatachannel",
     "vulkan",
-    "libdatachannel"
+    "openssl"
   ]
 }

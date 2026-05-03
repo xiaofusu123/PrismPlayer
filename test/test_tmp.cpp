@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <asio.hpp>
+#include <libavutil/version.h>
 
-int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+TEST(AAsioTest, Version) {
+    int version = asio_version();
+    EXPECT_GE(version, ASIO_VERSION_INT(1, 0, 0));
 }
