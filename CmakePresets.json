@@ -1,25 +1,38 @@
 {
-    "version" : 10,
+    "version" : 11,
     "configurePresets" : [
         {
-            "name" : "x64-Debug",
+            "name" : "windows-x64-Debug",
             "generator" : "Ninja",
             "binaryDir" : "${sourceDir}/build",
             "cacheVariables" : {
                 "CMAKE_BUILD_TYPE" : "Debug",
-                "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/bin/ninja.exe",
+                "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/ninja.exe",
                 "CMAKE_TOOLCHAIN_FILE" : "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
             }
         },
+
         {
-            "name" : "x64-Release",
+            "name" : "windows-x64-Release",
             "generator" : "Ninja",
             "binaryDir" : "${sourceDir}/build",
             "cacheVariables" : {
                 "CMAKE_BUILD_TYPE" : "Release",
-                "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/bin/ninja.exe",
+                "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/ninja.exe",
                 "CMAKE_TOOLCHAIN_FILE" : "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
             }
+        }
+    ],
+
+    "buildPresets" : [
+        {
+            "name" : "windows-x64-Debug",
+            "configurePreset" : "windows-x64-Debug"
+        },
+        
+        {
+            "name" : "windows-x64-Release",
+            "configurePreset" : "windows-x64-Release"
         }
     ]
 }
