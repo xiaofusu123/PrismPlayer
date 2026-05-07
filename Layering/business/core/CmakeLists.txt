@@ -10,7 +10,12 @@ aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
 if(SRC)
     add_library(${PROJECT_NAME} SHARED ${SRC})
-    target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_include_directories(${PROJECT_NAME}
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../mapper/include
+    )
 
     target_link_libraries(${PROJECT_NAME}
     PRIVATE mapper
@@ -18,7 +23,7 @@ if(SRC)
     PRIVATE FFmpeg::avcodec
     PRIVATE FFmpeg::avutil
     PRIVATE Vulkan::Vulkan
-    PRIVATE glfw
+    PRIVATE glfw3
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")
