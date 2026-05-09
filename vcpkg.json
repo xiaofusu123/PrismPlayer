@@ -3,11 +3,12 @@
     "asio",
     "ffmpeg",
     "glfw3",
+    "glm",
     "gtest",
     "libdatachannel",
     "openssl",
     "spdlog",
     "vulkan",
-    "glm"
+    "shaderc"
   ]
 }
