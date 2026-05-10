@@ -19,9 +19,7 @@ if(SRC)
 
     target_link_libraries(${PROJECT_NAME}
     PRIVATE mapper
-    PRIVATE FFmpeg::avformat
-    PRIVATE FFmpeg::avcodec
-    PRIVATE FFmpeg::avutil
+    PRIVATE ${FFMPEG_LIBRARIES}
     PRIVATE Vulkan::Vulkan
     PRIVATE glfw3
     )
