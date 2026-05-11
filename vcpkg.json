@@ -1,4 +1,5 @@
 {
+  "builtin-baseline": "d68a18f57975d5fc80fc33a24c176bfc0801b344",
   "dependencies": [
     "asio",
     "ffmpeg",
@@ -8,7 +9,6 @@
     "libdatachannel",
     "openssl",
     "spdlog",
-    "vulkan",
-    "shaderc"
+    "vulkan"
   ]
 }
