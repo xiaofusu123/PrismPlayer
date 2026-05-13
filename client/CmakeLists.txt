@@ -1,3 +1,7 @@
+project(Prism-client VERSION 0.0.1)
+
+message(STATUS "${PROJECT_NAME} is building, version is ${PROJECT_VERSION}")
+
 add_subdirectory(mapper)
 add_subdirectory(business)
 add_subdirectory(service)

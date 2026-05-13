@@ -1,27 +1,24 @@
-project(core)
+project(client-service)
 
 message(STATUS "${PROJECT_NAME} is building")
-
-find_package(FFmpeg REQUIRED)
-find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
 if(SRC)
     add_library(${PROJECT_NAME} SHARED ${SRC})
     target_include_directories(${PROJECT_NAME}
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
 
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../mapper/include
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../business/core/include
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../business/network/include
     )
 
-    target_link_libraries(${PROJECT_NAME}
-    PRIVATE mapper
-    PRIVATE ${FFMPEG_LIBRARIES}
-    PRIVATE Vulkan::Vulkan
-    PRIVATE glfw3
+    target_link_directories(${PROJECT_NAME}
+    PRIVATE
+        client-mapper
+        client-core
+        client-network
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")
