@@ -1,14 +1,14 @@
-project(mapper)
+project(server-mapper)
 
 message(STATUS "${PROJECT_NAME} is building")
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
 if(SRC)
-    add_library(${PROJECT_NAME} SHARED ${SRC})
+    add_library(${PROJECT_NAME} ${SRC})
     target_include_directories(${PROJECT_NAME}
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")
