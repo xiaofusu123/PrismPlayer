@@ -3,7 +3,6 @@ project(server-network)
 message(STATUS "${PROJECT_NAME} is building")
 
 find_package(asio REQUIRED)
-find_package(libdatachannel REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
@@ -18,7 +17,6 @@ if(SRC)
     target_link_libraries(${PROJECT_NAME}
     PRIVATE
         asio::asio
-        libdatachannel
         nlohmann_json
     )
 else()
