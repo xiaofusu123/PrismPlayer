@@ -10,14 +10,13 @@ if(SRC)
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
 
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../business/core/include
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../business/av_sync/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../business/network/include
     )
 
     target_link_directories(${PROJECT_NAME}
     PRIVATE
-        client-mapper
-        client-core
+        client-av_sync
         client-network
     )
 else()
