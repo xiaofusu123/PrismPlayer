@@ -1,0 +1,20 @@
+project(Prism-client VERSION 0.0.1)
+
+message(STATUS "${PROJECT_NAME} is building, version is ${PROJECT_VERSION}")
+
+add_subdirectory(adapter)
+add_subdirectory(engine)
+add_subdirectory(business)
+add_subdirectory(service)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
+
+if(WIN32)
+    add_compile_definitions(_PRISM_EXPORTS)
+else()
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON
+    )
+    target_compile_options(${PROJECT_NAME} PRIVATE -fvisibility=hidden)
+endif()
