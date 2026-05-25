@@ -26,6 +26,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 else()
     add_compile_definitions(_RELEASE)
 endif()
+message(STATUS "")
 
 add_subdirectory(client)
 add_subdirectory(server)

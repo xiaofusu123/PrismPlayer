@@ -9,9 +9,6 @@ if(SRC)
     target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
-
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../business/av_sync/include
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../business/network/include
     )
 
     target_link_directories(${PROJECT_NAME}
