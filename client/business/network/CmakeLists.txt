@@ -9,19 +9,17 @@ find_package(ixwebsocket REQUIRED)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
 if(SRC)
-    add_library(${PROJECT_NAME} SHARED ${SRC})
+    add_library(${PROJECT_NAME} STATIC ${SRC})
     target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
-
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../adapter/include
     )
 
     target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        client-adapter
+        client-engine
         asio::asio
-        ixwebsocket
+        ixwebsocket::ixwebsocket
         nlohmann_json
     )
 else()

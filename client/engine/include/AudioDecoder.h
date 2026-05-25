@@ -2,7 +2,7 @@
 
 #include <libavcodec/avcodec.h>
 
-namespace Prism::core {
+namespace Prism::engine {
 
 /**
  * @struct audio_decoder_config
@@ -31,10 +31,32 @@ struct audio_decoder_config {
     AVSampleFormat sample_fmt;  /**< 采样格式（位深） */
 };
 
+/**
+ * @struct audio_status_info
+ * @brief 解码器状态信息，用于音频同步
+ */
+struct audio_decoder_info {
+    uint64_t current_pts;  /**< 当前帧解码时间戳（ms） */
+    uint16_t next_pts;     /**< 下一帧解码时间戳（ms） */
+    uint64_t start_time;   /**< 流开始的时间 */
+    uint64_t draution;     /**< 总时长 */
 
-class Audio_Decoder {
+    /**
+     * @enum Status
+     * @brief 解码器状态信息
+     */
+    enum class Status {
+        idle,              /**< 空闲 */
+        running,           /**< 运行中 */
+        stop               /**< 停止 */
+    };
+
+    Status status;         /**< 解码器状态 */
+};
+
+class AudioDecoder {
 public:
-    virtual ~Audio_Decoder() = default;
+    virtual ~AudioDecoder() = default;
 
     /**
     * @brief 音频解码器初始化
@@ -98,7 +120,11 @@ public:
     /**
     * @brief 获取音频解码器状态信息
     */
-    virtual audio_decoder_config get_status_info() const = 0;
+    virtual audio_decoder_info get_status_info() const = 0;
 };
 
 }
+
+typedef struct student_s {
+
+}student_t;

@@ -15,15 +15,17 @@ if(SRC)
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
 
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}../adapter/include
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../adapter/include
     )
 
     target_link_libraries(${PROJECT_NAME}
-    PRIVATE
+    PUBLIC
         client-adapter
-        ${FFMPEG_LIBRARIES}
-        Vulkan::Vulkan
+
+    PRIVATE
+        ffmpeg
         glfw3
+        Vulkan::Vulkan
         soundtouch
     )
 else()
