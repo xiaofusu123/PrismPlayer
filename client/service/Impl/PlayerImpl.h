@@ -35,6 +35,7 @@ struct PrismPlayerInternal {
 
     // 配置与回调
     PrismConfig        config_;
+    std::string        log_level_;
     PrismEventCallback callback_;
     void*              user_data_;
 
@@ -44,14 +45,14 @@ struct PrismPlayerInternal {
     // 音频属性
     std::atomic<float> volume_{1.0f};
     std::atomic<bool>  mute_{false};
-    float              volume_before_mute_{1.0f};
+    std::atomic<float> volume_before_mute_{1.0f};
 
     // 播放属性
     std::atomic<float> speed_{1.0f};
     std::atomic<bool>  loop_{false};
 
     // 视频窗口
-    void* video_window_{nullptr};
+    std::atomic<void*> video_window_{nullptr};
 
     // 错误诊断
     std::atomic<PrismErrorCode> last_error_{PRISM_OK};
@@ -60,7 +61,7 @@ struct PrismPlayerInternal {
     std::string media_uri_;
 
     // 是否已初始化引擎
-    bool engines_initialized_{false};
+    std::atomic<bool> engines_initialized_{false};
 };
 
 } // namespace Prism::Service

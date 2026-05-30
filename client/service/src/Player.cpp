@@ -28,11 +28,12 @@ PrismPlayerInternal::PrismPlayerInternal(const PrismConfig& cfg,
                                          PrismEventCallback cb,
                                          void* ud)
     : config_(cfg)
+    , log_level_(cfg.log_level ? cfg.log_level : "info")
     , callback_(cb)
     , user_data_(ud)
 {
     volume_.store(config_.default_volume);
-    spdlog::set_level(spdlog::level::from_str(config_.log_level ? config_.log_level : "info"));
+    spdlog::set_level(spdlog::level::from_str(log_level_));
     spdlog::info("[PrismPlayer] instance created");
 }
 
@@ -62,6 +63,7 @@ static bool init_engines(PrismPlayerInternal* p)
         p->audio_engine_ = p->audio_factory_.create_audio_engine();
         if (!p->audio_engine_ || !p->audio_engine_->init()) {
             spdlog::error("[PrismPlayer] failed to init audio engine");
+            p->audio_engine_.reset();
             p->last_error_.store(PRISM_ERROR_UNKNOWN);
             return false;
         }
@@ -71,6 +73,7 @@ static bool init_engines(PrismPlayerInternal* p)
         p->video_engine_ = p->video_factory_.create_audio_engine(); // VideoEngineFactory bug: method named create_audio_engine
         if (!p->video_engine_ || !p->video_engine_->init()) {
             spdlog::error("[PrismPlayer] failed to init video engine");
+            p->video_engine_.reset();
             p->last_error_.store(PRISM_ERROR_UNKNOWN);
             return false;
         }
@@ -240,7 +243,15 @@ int prism_player_seek(PrismPlayerHandle player, int64_t position_ms,
         target_pts = static_cast<uint64_t>(std::max<int64_t>(0, cur + position_ms));
     }
 
-    int seek_flag = (mode == PRISM_SEEK_ABSOLUTE) ? 0 : 1;
+    int seek_flag;
+    if (mode == PRISM_SEEK_ABSOLUTE) {
+        seek_flag = 0;
+    } else if (mode == PRISM_SEEK_RELATIVE) {
+        seek_flag = 1;
+    } else {
+        p->last_error_.store(PRISM_ERROR_INVALID_PARAM);
+        return PRISM_ERROR_INVALID_PARAM;
+    }
 
     if (p->audio_engine_) p->audio_engine_->seek(target_pts, seek_flag);
     if (p->video_engine_) p->video_engine_->seek(target_pts, seek_flag);
@@ -307,9 +318,9 @@ int prism_player_set_mute(PrismPlayerHandle player, bool mute)
 
     bool was_muted = p->mute_.exchange(mute);
     if (mute && !was_muted) {
-        p->volume_before_mute_ = p->volume_.load();
+        p->volume_before_mute_.store(p->volume_.load());
     } else if (!mute && was_muted) {
-        p->volume_.store(p->volume_before_mute_);
+        p->volume_.store(p->volume_before_mute_.load());
     }
 
     return PRISM_OK;
@@ -357,7 +368,7 @@ bool prism_player_get_loop(PrismPlayerHandle player)
 int prism_player_set_video_window(PrismPlayerHandle player, void* native_window)
 {
     if (!player) return PRISM_ERROR_INVALID_HANDLE;
-    static_cast<Prism::Service::PrismPlayerInternal*>(player)->video_window_ = native_window;
+    static_cast<Prism::Service::PrismPlayerInternal*>(player)->video_window_.store(native_window);
     return PRISM_OK;
 }
 
