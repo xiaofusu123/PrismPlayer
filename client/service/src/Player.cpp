@@ -229,6 +229,11 @@ int prism_player_seek(PrismPlayerHandle player, int64_t position_ms,
         return PRISM_ERROR_NO_MEDIA;
     }
 
+    if (mode == PRISM_SEEK_ABSOLUTE && position_ms < 0) {
+        p->last_error_.store(PRISM_ERROR_INVALID_PARAM);
+        return PRISM_ERROR_INVALID_PARAM;
+    }
+
     uint64_t target_pts = static_cast<uint64_t>(position_ms);
     if (mode == PRISM_SEEK_RELATIVE) {
         int64_t cur = prism_player_get_position(player);
@@ -270,6 +275,10 @@ int64_t prism_player_get_duration(PrismPlayerHandle player)
 {
     if (!player) return -1;
     auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+
+    PrismState s = p->state_.load();
+    if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) return -1;
+
     return p->media_info_.duration_ms;
 }
 
