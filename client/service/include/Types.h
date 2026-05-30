@@ -13,7 +13,7 @@ extern "C" {
 #define PRISM_VERSION_PATCH 1
 
 /* ========== 不透明句柄 ========== */
-typedef struct PrismPlayerInternal* PrismPlayerHandle;
+typedef void* PrismPlayerHandle;
 
 /* ========== 播放状态 ========== */
 typedef enum {
