@@ -11,8 +11,9 @@ if(SRC)
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
     )
 
-    target_link_directories(${PROJECT_NAME}
+    target_link_libraries(${PROJECT_NAME}
     PRIVATE
+        client-engine
         client-av_sync
         client-network
     )
