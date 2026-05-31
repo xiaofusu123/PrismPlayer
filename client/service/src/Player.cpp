@@ -100,7 +100,7 @@ PrismPlayerHandle prism_player_create(const PrismConfig* config,
                                       PrismEventCallback callback,
                                       void* user_data)
 {
-    Prism::Service::PrismConfig cfg = config ? *config : Prism::Service::default_config();
+    PrismConfig cfg = config ? *config : Prism::Service::default_config();
 
     auto* p = new (std::nothrow) Prism::Service::PrismPlayerInternal(cfg, callback, user_data);
     if (!p) return nullptr;
