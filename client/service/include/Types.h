@@ -1,5 +1,7 @@
 #pragma once
 
+#include "API.h"
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -56,23 +58,23 @@ typedef enum {
 } PrismSeekMode;
 
 /* ========== 播放配置 ========== */
-typedef struct {
-    int video_output_width;
-    int video_output_height;
-    int audio_sample_rate;
-    float default_volume;
-    bool enable_video;
-    bool enable_audio;
-    const char* log_level;
+typedef struct PrismConfig {
+    int video_output_width{0};
+    int video_output_height{0};
+    int audio_sample_rate{0};
+    float default_volume{1.0f};
+    bool enable_video{true};
+    bool enable_audio{true};
+    const char* log_level{nullptr};
 } PrismConfig;
 
 /* ========== 媒体信息 ========== */
-typedef struct {
-    int video_width;
-    int video_height;
-    int64_t duration_ms;
-    int audio_channels;
-    int audio_sample_rate;
+typedef struct PrismMediaInfo {
+    int video_width{0};
+    int video_height{0};
+    int64_t duration_ms{0};
+    int audio_channels{0};
+    int audio_sample_rate{0};
 } PrismMediaInfo;
 
 #ifdef __cplusplus

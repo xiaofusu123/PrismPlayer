@@ -1,6 +1,9 @@
 #pragma once
 
+#include "API.h"
 #include "Player.h"
+#include "av_synchronizer.h"
+
 #include "AudioEngine.h"
 #include "AudioEngineFactory.h"
 #include "AudioEngineWasapiSharedFactory.h"
@@ -11,16 +14,23 @@
 #include <memory>
 #include <atomic>
 #include <string>
+#include <chrono>
 
 namespace Prism::Service {
 
-struct PrismPlayerInternal {
+class PrismPlayerInternal {
+public:
     explicit PrismPlayerInternal(const PrismConfig& cfg,
                                  PrismEventCallback cb,
                                  void* ud);
     ~PrismPlayerInternal();
 
     void fire_event(PrismEventType type, const void* data = nullptr) const;
+
+    /**
+     * @brief 获取当前系统时间（毫秒），供同步器使用
+     */
+    static int64_t system_time_ms();
 
     // 引擎工厂
     Prism::Engine::AudioEngineWasapiSharedFactory audio_factory_;
@@ -30,14 +40,16 @@ struct PrismPlayerInternal {
     std::unique_ptr<Prism::Engine::AudioEngine> audio_engine_;
     std::unique_ptr<Prism::Engine::VideoEngine> video_engine_;
 
+    // 音视频同步器（业务层）
+    Prism::Business::SyncConfig  sync_config_;
+    Prism::Business::AVSynchronizer sync_;
+
     // 媒体信息缓存
     PrismMediaInfo media_info_;
 
-    // 配置与回调
-    PrismConfig        config_;
-    std::string        log_level_;
-    PrismEventCallback callback_;
-    void*              user_data_;
+    // 配置
+    PrismConfig config_;
+    std::string log_level_;
 
     // 播放状态
     std::atomic<PrismState> state_{PRISM_STATE_IDLE};
@@ -62,6 +74,10 @@ struct PrismPlayerInternal {
 
     // 是否已初始化引擎
     std::atomic<bool> engines_initialized_{false};
+
+private:
+    PrismEventCallback callback_;
+    void*              user_data_;
 };
 
 } // namespace Prism::Service

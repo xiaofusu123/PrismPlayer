@@ -17,12 +17,8 @@ message(STATUS "Current mode is ${CMAKE_BUILD_TYPE}")
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     enable_testing()
     add_compile_definitions(_DEBUG)
-
-    # add_executable(test test/test_tmp.cpp)
-
-    # target_link_directories(test
-    #     PRIVATE service
-    # )
+    add_subdirectory(googletest)
+    add_subdirectory(test)
 else()
     add_compile_definitions(_RELEASE)
 endif()
