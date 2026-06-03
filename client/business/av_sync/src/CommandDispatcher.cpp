@@ -1,4 +1,4 @@
-#include "CommandDispatcher.h"
+#include "../Impl/CommandDispatcher.h"
 
 #include <spdlog/spdlog.h>
 

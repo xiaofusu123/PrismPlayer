@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Types.h"
-#include "API.h"
+#include "../../common/API.h"
 
 #ifdef __cplusplus
 extern "C" {

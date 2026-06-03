@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ICommandDispatcher.h"
+#include "../include/ICommandDispatcher.h"
 
 namespace Prism::Business {
 

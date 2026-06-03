@@ -1,9 +1,9 @@
-#include "SyncFactory.h"
+#include "../include/SyncFactory.h"
 
-#include "PlaybackStateMachine.h"
-#include "SyncAlgorithm.h"
-#include "CommandDispatcher.h"
-#include "EngineObserver.h"
+#include "../Impl/PlaybackStateMachine.h"
+#include "../Impl/SyncAlgorithm.h"
+#include "../Impl/CommandDispatcher.h"
+#include "../Impl/EngineObserver.h"
 
 namespace Prism::Business {
 

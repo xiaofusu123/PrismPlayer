@@ -1,8 +1,8 @@
 #pragma once
 
-#include "IEngineObserver.h"
-#include "ISyncAlgorithm.h"
-#include "IPlaybackStateMachine.h"
+#include "../include/IEngineObserver.h"
+#include "../include/ISyncAlgorithm.h"
+#include "../include/IPlaybackStateMachine.h"
 
 namespace Prism::Business {
 
