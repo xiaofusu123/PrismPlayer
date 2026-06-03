@@ -1,6 +1,6 @@
 PrismPlayer 数据流图
 ====================
-基于项目实际架构 (2026-06-01)
+基于项目实际架构 (2026-06-04)
 
 
 ══════════════════════════════════════════════════════════════════════════════════════
@@ -8,8 +8,8 @@ PrismPlayer 数据流图
 ══════════════════════════════════════════════════════════════════════════════════════
 
   UI 层 (Flutter)         FFI 层 (待建)         Service 层             Business 层            Engine 层              Adapter 层
-  client/view/             client/FFI/          client/service/        client/business/       client/engine/         client/adapter/
-  (后续重命名 UI/)         (尚未创建)            (框架已搭好)           av_sync + network      Audio + Video          文件/数据库/网络
+  client/UI/             client/FFI/          client/service/        client/business/       client/engine/         client/adapter/
+           (占位文件)            (C API已实现)           av_sync(已实现) + network(占位)      Audio + Video          文件/数据库/网络
        │                       │                      │                      │                      │                      │
        │ 1. 用户点击登录       │                      │                      │                      │                      │
        │──────────────────────>│                      │                      │                      │                      │
@@ -108,5 +108,5 @@ PrismPlayer 数据流图
 
   ──────────────────────>  同步调用 / 直接传递
   <──────────────────────  回调 / 返回
-  (待建) / (尚未创建)      层已规划但代码未实现
-  (后续重命名)             目录即将更名
+  (待建) / (占位文件)      层已规划但代码未实现
+  

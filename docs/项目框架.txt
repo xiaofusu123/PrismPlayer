@@ -1,20 +1,20 @@
 PrismPlayer 项目架构
 ==================
-基于项目实际代码 (2026-06-01)
+基于项目实际代码 (2026-06-04)
 
 
 ╔══════════════════════════════════════════════════════════════════════════════════════╗
 ║                              UI Layer (Flutter)                                       ║
-║                        client/view/  →  后续重命名 client/UI/                         ║
+║                        client/UI/                         ║
 ║  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────────────┐             ║
 ║  │ Login Page │  │ Room List  │  │ Player UI  │  │ File Sharing UI    │             ║
 ║  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘  └─────────┬──────────┘             ║
 ╠════════▼════════════════▼════════════════▼══════════════════▼════════════════════════╣
-║                              FFI Layer (C ⇄ Dart)  【尚未创建】                      ║
+║                              FFI Layer (C ⇄ Dart)  【占位文件】                      ║
 ║                        client/FFI/  —  Dart FFI Bindings 层                          ║
 ╠══════════════════════════════════════════════════════════════════════════════════════╣
 ║                          Service Layer (服务门面)                                     ║
-║                        client/service/  —  框架已搭好                                 ║
+║                        client/service/  —  C API已实现                                 ║
 ║  ┌─────────────────────────────────────────────────────────────────────────────────┐ ║
 ║  │  API Facade: 组合 Business 层功能，对外提供统一 API                               │ ║
 ║  │  • login/logout  • 房间 join/leave  • play/pause/seek  • 文件传输 API            │ ║
@@ -24,7 +24,7 @@ PrismPlayer 项目架构
 ║                            Business Layer (业务逻辑)                                  ║
 ║                        client/business/  —  av_sync + network                         ║
 ║  ┌─────────────────────────┐  ┌─────────────────────────┐                            ║
-║  │  Module A: AV Sync       │  │  Module B: Network       │                            ║
+║  │  Module A: AV Sync(已实现)│  │  Module B: Network(占位)│                            ║
 ║  │  client/business/av_sync/│  │  client/business/network/│                            ║
 ║  │                          │  │                          │                            ║
 ║  │  • PlaybackStateMachine  │  │  • SignalingClient (WS)  │                            ║
