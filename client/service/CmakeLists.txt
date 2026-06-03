@@ -15,6 +15,7 @@ if(SRC)
     PRIVATE
         client-av_sync
         client-network
+        spdlog
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")
