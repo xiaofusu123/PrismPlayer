@@ -12,7 +12,7 @@ public:
     /**
     * @brief 创建Vulkan渲染视频引擎实例
     */
-    std::unique_ptr<VideoEngine> create_audio_engine() override {
+    std::unique_ptr<VideoEngine> create_video_engine() override {
         return std::make_unique<VideoEngineVulkan>();
     }
 };
