@@ -1,16 +1,16 @@
 #pragma once
 
-#include "Player.h"
+#include "../include/Player.h"
 
-#include "AudioEngine.h"
-#include "AudioEngineFactory.h"
-#include "VideoEngine.h"
-#include "VideoEngineFactory.h"
+#include "../../engine/include/AudioEngine.h"
+#include "../../engine/include/AudioEngineFactory.h"
+#include "../../engine/include/VideoEngine.h"
+#include "../../engine/include/VideoEngineFactory.h"
 
-#include "IPlaybackStateMachine.h"
-#include "ISyncAlgorithm.h"
-#include "ICommandDispatcher.h"
-#include "IEngineObserver.h"
+#include "../../business/av_sync/include/IPlaybackStateMachine.h"
+#include "../../business/av_sync/include/ISyncAlgorithm.h"
+#include "../../business/av_sync/include/ICommandDispatcher.h"
+#include "../../business/av_sync/include/IEngineObserver.h"
 #include "IServiceNetwork.h"
 
 #include <memory>

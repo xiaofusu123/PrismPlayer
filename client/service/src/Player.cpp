@@ -1,12 +1,12 @@
 #define STRINGIFY_IMPL(x) #x
 #define STRINGIFY(x) STRINGIFY_IMPL(x)
 
-#include "PlayerImpl.h"
+#include "../Impl/PlayerImpl.h"
 
-#include "AudioEngineWasapiSharedFactory.h"
-#include "VideoEngineVulkanFactory.h"
+#include "../../engine/include/AudioEngineWasapiSharedFactory.h"
+#include "../../engine/include/VideoEngineVulkanFactory.h"
 
-#include "SyncFactory.h"
+#include "../../business/av_sync/include/SyncFactory.h"
 
 #include <algorithm>
 #include <cstring>
