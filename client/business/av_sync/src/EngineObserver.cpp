@@ -32,16 +32,21 @@ void EngineObserver::on_video_frame(const Prism::Engine::VideoSyncInfo& info)
 
             SyncAction action = sync_algo_->calibrate(last_audio_pts_, video_pts);
 
-            switch (action) {
-            case SyncAction::RENDER:
+            if (s == SyncState::CALIBATING) {
+                // First sync point: always route through SYNCHRONIZED per state machine design
                 state_machine_->transition(SyncState::SYNCHRONIZED);
-                break;
-            case SyncAction::WAIT:
-                state_machine_->transition(SyncState::AHEAD);
-                break;
-            case SyncAction::DROP:
-                state_machine_->transition(SyncState::BEHIND);
-                break;
+            } else {
+                switch (action) {
+                case SyncAction::RENDER:
+                    state_machine_->transition(SyncState::SYNCHRONIZED);
+                    break;
+                case SyncAction::WAIT:
+                    state_machine_->transition(SyncState::AHEAD);
+                    break;
+                case SyncAction::DROP:
+                    state_machine_->transition(SyncState::BEHIND);
+                    break;
+                }
             }
         }
     }
