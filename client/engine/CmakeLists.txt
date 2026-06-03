@@ -6,6 +6,7 @@ find_package(ffmpeg REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(soundtouch REQUIRED)
+find_package(spdlog REQUIRED)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
@@ -14,8 +15,6 @@ if(SRC)
     target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
-
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../adapter/include
     )
 
     target_link_libraries(${PROJECT_NAME}
@@ -27,7 +26,7 @@ if(SRC)
         glfw3
         Vulkan::Vulkan
         soundtouch
-        spdlog
+        spdlog::spdlog
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

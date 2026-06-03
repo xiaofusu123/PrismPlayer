@@ -7,7 +7,7 @@ namespace Prism::Engine {
 
 class VideoEngineVulkanFactory : public VideoEngineFactory {
 public:
-    ~VideoEngineVulkanFactory() = default;
+    ~VideoEngineVulkanFactory() override = default;
 
     /**
     * @brief 创建Vulkan渲染视频引擎实例

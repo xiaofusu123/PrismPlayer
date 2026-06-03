@@ -5,6 +5,7 @@ message(STATUS "${PROJECT_NAME} is building")
 find_package(asio REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(ixwebsocket REQUIRED)
+find_package(spdlog REQUIRED)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
@@ -21,7 +22,7 @@ if(SRC)
         asio::asio
         ixwebsocket::ixwebsocket
         nlohmann_json
-        spdlog
+        spdlog::spdlog
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

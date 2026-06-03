@@ -2,6 +2,8 @@ project(client-adapter)
 
 message(STATUS "${PROJECT_NAME} is building")
 
+find_package(spdlog REQUIRED)
+
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
 if(SRC)
@@ -12,7 +14,7 @@ if(SRC)
     )
 
     target_link_libraries(${PROJECT_NAME}
-    PRIVATE spdlog
+    PRIVATE spdlog::spdlog
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

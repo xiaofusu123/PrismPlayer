@@ -2,6 +2,8 @@ project(client-service)
 
 message(STATUS "${PROJECT_NAME} is building")
 
+find_package(spdlog REQUIRED)
+
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
 if(SRC)
@@ -11,11 +13,14 @@ if(SRC)
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
     )
 
-    target_link_directories(${PROJECT_NAME}
+    target_link_libraries(${PROJECT_NAME}
+    PUBLIC
+        common
+
     PRIVATE
         client-av_sync
         client-network
-        spdlog
+        spdlog::spdlog
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

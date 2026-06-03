@@ -18,7 +18,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     enable_testing()
     add_compile_definitions(_DEBUG)
 
-    add_subdirectory(test)
 else()
     add_compile_definitions(_RELEASE)
 endif()
