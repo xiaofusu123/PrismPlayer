@@ -14,7 +14,7 @@ namespace Prism::Business {
  * - AHEAD: 音频时间超前
  * - BEHIND: 音频时间滞后
  * - DISABLE: 未启用同步控制（纯本地播放）
- * - ERROR: 错误状态
+ * - SYNC_ERROR: 错误状态
  */
 enum class SyncState {
     UNINIT,
@@ -23,7 +23,7 @@ enum class SyncState {
     AHEAD,
     BEHIND,
     DISABLE,
-    ERROR
+    SYNC_ERROR
 };
 
 /**

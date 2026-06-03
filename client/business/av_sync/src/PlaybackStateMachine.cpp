@@ -44,7 +44,7 @@ bool PlaybackStateMachine::can_play() const
 bool PlaybackStateMachine::can_seek() const
 {
     SyncState s = state_.load();
-    return s != SyncState::UNINIT && s != SyncState::ERROR;
+    return s != SyncState::UNINIT && s != SyncState::SYNC_ERROR;
 }
 
 void PlaybackStateMachine::reset()
@@ -69,7 +69,7 @@ bool PlaybackStateMachine::is_valid_transition(SyncState from, SyncState to) con
                from == SyncState::BEHIND;
     case SyncState::DISABLE:
         return from == SyncState::UNINIT;
-    case SyncState::ERROR:
+    case SyncState::SYNC_ERROR:
         return true;
     }
     return false;

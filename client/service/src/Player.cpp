@@ -113,7 +113,7 @@ void PrismPlayerInternal::fire_event(PrismEventType type, const void* data) cons
 
 /* ========== 引擎初始化辅助 ========== */
 
-static AudioEngineFactory& get_audio_factory(PrismPlayerInternal* p)
+static Prism::Engine::AudioEngineFactory& get_audio_factory(PrismPlayerInternal* p)
 {
     if (p->audio_factory_) return *p->audio_factory_;
 
@@ -121,7 +121,7 @@ static AudioEngineFactory& get_audio_factory(PrismPlayerInternal* p)
     return default_factory;
 }
 
-static VideoEngineFactory& get_video_factory(PrismPlayerInternal* p)
+static Prism::Engine::VideoEngineFactory& get_video_factory(PrismPlayerInternal* p)
 {
     if (p->video_factory_) return *p->video_factory_;
 

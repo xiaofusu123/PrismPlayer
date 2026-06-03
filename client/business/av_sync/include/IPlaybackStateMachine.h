@@ -11,7 +11,7 @@ namespace Prism::Business {
  * 控制播放/暂停/Seek 状态转换，校验转换合法性。
  * 状态流转：
  *   UNINIT → CALIBATING → SYNCHRONIZED ⇄ AHEAD/BEHIND
- *   DISABLE（单独播放模式）/ ERROR（错误）
+ *   DISABLE（单独播放模式）/ SYNC_ERROR（错误）
  */
 class IPlaybackStateMachine {
 public:
