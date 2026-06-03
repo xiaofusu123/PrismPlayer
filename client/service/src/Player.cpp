@@ -134,7 +134,7 @@ static bool init_engines(PrismPlayerInternal* p)
     if (p->engines_initialized_) return true;
 
     if (!p->audio_engine_) {
-        p->audio_engine_ = get_audio_factory(p).create_audio_engine();
+        p->audio_engine_ == get_audio_factory(p).create_audio_engine();
         if (!p->audio_engine_ || !p->audio_engine_->init()) {
             spdlog::error("[PrismPlayer] failed to init audio engine");
             p->audio_engine_.reset();
@@ -146,7 +146,7 @@ static bool init_engines(PrismPlayerInternal* p)
     }
 
     if (!p->video_engine_ && p->config_.enable_video) {
-        p->video_engine_ = get_video_factory(p).create_audio_engine();
+        p->video_engine_ == get_video_factory(p).create_audio_engine();
         if (!p->video_engine_ || !p->video_engine_->init()) {
             spdlog::error("[PrismPlayer] failed to init video engine");
             p->video_engine_.reset();
@@ -327,7 +327,7 @@ _API int prism_player_open(PrismPlayerHandle player, const char* uri)
 
     if (!Prism::Service::init_engines(p)) {
         p->state_.store(PRISM_STATE_ERROR);
-        p->sync_sm_->transition(Prism::Business::SyncState::ERROR);
+        p->sync_sm_->transition(Prism::Business::SyncState::SYNC_ERROR);
         spdlog::error("[PrismPlayer] open failed: engine init error");
         return PRISM_ERROR_OPEN_FAILED;
     }
