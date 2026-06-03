@@ -7,7 +7,7 @@ namespace Prism::Engine {
 
 class AudioEngineWasapiSharedFactory : public AudioEngineFactory {
 public:
-    virtual ~AudioEngineWasapiSharedFactory() = default;
+    virtual ~AudioEngineWasapiSharedFactory() override = default;
 
     /**
     * @brief 创建音频引擎实例，WasApi（共享模式）

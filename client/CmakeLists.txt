@@ -2,12 +2,16 @@ project(Prism-client VERSION 0.0.1)
 
 message(STATUS "${PROJECT_NAME} is building, version is ${PROJECT_VERSION}")
 
+add_library(common INTERFACE)
+target_include_directories(common
+    INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/common
+)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
+
 add_subdirectory(adapter)
 add_subdirectory(engine)
 add_subdirectory(business)
 add_subdirectory(service)
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
 
 if(WIN32)
     add_compile_definitions(_PRISM_EXPORTS)
