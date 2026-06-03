@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <cstdint>
 
 namespace Prism::Business {
@@ -42,9 +41,9 @@ enum class SyncAction {
  * @brief 音视频漂移信息
  */
 struct DriftInfo {
-    std::atomic<int64_t> drift_ms{0};       /**< 音视频漂移值（ms），正数=视频超前 */
-    std::atomic<uint64_t> audio_pts{0};     /**< 当前音频 PTS（ms） */
-    std::atomic<uint64_t> video_pts{0};     /**< 当前视频 PTS（ms） */
+    int64_t drift_ms{0};       /**< 音视频漂移值（ms），正数=视频超前 */
+    uint64_t audio_pts{0};     /**< 当前音频 PTS（ms） */
+    uint64_t video_pts{0};     /**< 当前视频 PTS（ms） */
 };
 
 /**
