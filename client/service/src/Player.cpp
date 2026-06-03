@@ -1,12 +1,9 @@
 #define STRINGIFY_IMPL(x) #x
 #define STRINGIFY(x) STRINGIFY_IMPL(x)
 
-#include "../Impl/PlayerImpl.h"
+#include "PlayerImpl.h"
 
-#include "../../engine/include/AudioEngineWasapiSharedFactory.h"
-#include "../../engine/include/VideoEngineVulkanFactory.h"
-
-#include "../../business/av_sync/include/SyncFactory.h"
+#include "SyncFactory.h"
 
 #include <algorithm>
 #include <cstring>
@@ -94,12 +91,7 @@ PrismPlayerInternal::PrismPlayerInternal(const PrismConfig& cfg,
 PrismPlayerInternal::~PrismPlayerInternal()
 {
     if (engines_initialized_) {
-        if (audio_engine_) {
-            audio_engine_->close();
-        }
-        if (video_engine_) {
-            video_engine_->close();
-        }
+        cmd_dispatcher_->shutdown_engines();
     }
     spdlog::info("[PrismPlayer] instance destroyed");
 }
@@ -113,48 +105,14 @@ void PrismPlayerInternal::fire_event(PrismEventType type, const void* data) cons
 
 /* ========== 引擎初始化辅助 ========== */
 
-static Prism::Engine::AudioEngineFactory& get_audio_factory(PrismPlayerInternal* p)
-{
-    if (p->audio_factory_) return *p->audio_factory_;
-
-    static Prism::Engine::AudioEngineWasapiSharedFactory default_factory;
-    return default_factory;
-}
-
-static Prism::Engine::VideoEngineFactory& get_video_factory(PrismPlayerInternal* p)
-{
-    if (p->video_factory_) return *p->video_factory_;
-
-    static Prism::Engine::VideoEngineVulkanFactory default_factory;
-    return default_factory;
-}
-
 static bool init_engines(PrismPlayerInternal* p)
 {
     if (p->engines_initialized_) return true;
 
-    if (!p->audio_engine_) {
-        p->audio_engine_ == get_audio_factory(p).create_audio_engine();
-        if (!p->audio_engine_ || !p->audio_engine_->init()) {
-            spdlog::error("[PrismPlayer] failed to init audio engine");
-            p->audio_engine_.reset();
-            p->last_error_.store(PRISM_ERROR_UNKNOWN);
-            return false;
-        }
-        p->cmd_dispatcher_->set_audio_engine(p->audio_engine_.get());
-        spdlog::info("[PrismPlayer] audio engine initialized");
-    }
-
-    if (!p->video_engine_ && p->config_.enable_video) {
-        p->video_engine_ == get_video_factory(p).create_audio_engine();
-        if (!p->video_engine_ || !p->video_engine_->init()) {
-            spdlog::error("[PrismPlayer] failed to init video engine");
-            p->video_engine_.reset();
-            p->last_error_.store(PRISM_ERROR_UNKNOWN);
-            return false;
-        }
-        p->cmd_dispatcher_->set_video_engine(p->video_engine_.get());
-        spdlog::info("[PrismPlayer] video engine initialized");
+    if (!p->cmd_dispatcher_->initialize_engines(p->audio_factory_, p->video_factory_, p->config_.enable_video)) {
+        spdlog::error("[PrismPlayer] failed to init engines");
+        p->last_error_.store(PRISM_ERROR_UNKNOWN);
+        return false;
     }
 
     p->engines_initialized_ = true;
@@ -212,7 +170,7 @@ _API int prism_player_set_audio_factory(PrismPlayerHandle player, void* factory)
 {
     if (!player || !factory) return PRISM_ERROR_INVALID_HANDLE;
     auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-    p->audio_factory_ = static_cast<Prism::Engine::AudioEngineFactory*>(factory);
+    p->audio_factory_ = factory;
     spdlog::info("[PrismPlayer] audio factory injected");
     return PRISM_OK;
 }
@@ -221,7 +179,7 @@ _API int prism_player_set_video_factory(PrismPlayerHandle player, void* factory)
 {
     if (!player || !factory) return PRISM_ERROR_INVALID_HANDLE;
     auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-    p->video_factory_ = static_cast<Prism::Engine::VideoEngineFactory*>(factory);
+    p->video_factory_ = factory;
     spdlog::info("[PrismPlayer] video factory injected");
     return PRISM_OK;
 }
@@ -345,12 +303,7 @@ _API int prism_player_close(PrismPlayerHandle player)
 
     auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
 
-    if (p->audio_engine_) {
-        p->audio_engine_->close();
-    }
-    if (p->video_engine_) {
-        p->video_engine_->close();
-    }
+    p->cmd_dispatcher_->shutdown_engines();
 
     p->engines_initialized_ = false;
     p->media_uri_.clear();
@@ -416,13 +369,7 @@ _API int prism_player_stop(PrismPlayerHandle player)
     spdlog::info("[PrismPlayer] stopping");
 
     p->cmd_dispatcher_->dispatch_pause();
-
-    if (p->audio_engine_) {
-        p->audio_engine_->close();
-    }
-    if (p->video_engine_) {
-        p->video_engine_->close();
-    }
+    p->cmd_dispatcher_->shutdown_engines();
 
     p->engines_initialized_ = false;
     p->sync_sm_->reset();

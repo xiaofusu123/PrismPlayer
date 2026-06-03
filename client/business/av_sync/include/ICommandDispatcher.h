@@ -55,6 +55,20 @@ public:
      * @param engine 视频引擎指针（不持有所有权）
      */
     virtual void set_video_engine(Prism::Engine::VideoEngine* engine) = 0;
+
+    /**
+     * @brief 从工厂创建并初始化引擎，接管引擎所有权
+     * @param audio_factory 音频引擎工厂指针（void* 解耦），nullptr 则不创建音频引擎
+     * @param video_factory 视频引擎工厂指针（void* 解耦），nullptr 则不创建视频引擎
+     * @param enable_video 是否启用视频引擎
+     * @return 成功返回 true
+     */
+    virtual bool initialize_engines(void* audio_factory, void* video_factory, bool enable_video) = 0;
+
+    /**
+     * @brief 关闭并销毁所有引擎实例
+     */
+    virtual void shutdown_engines() = 0;
 };
 
 } // namespace Prism::Business

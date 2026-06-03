@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../include/IPlaybackStateMachine.h"
+#include "IPlaybackStateMachine.h"
 
 #include <atomic>
 

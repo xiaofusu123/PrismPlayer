@@ -1,16 +1,11 @@
 #pragma once
 
-#include "../include/Player.h"
+#include "Player.h"
 
-#include "../../engine/include/AudioEngine.h"
-#include "../../engine/include/AudioEngineFactory.h"
-#include "../../engine/include/VideoEngine.h"
-#include "../../engine/include/VideoEngineFactory.h"
-
-#include "../../business/av_sync/include/IPlaybackStateMachine.h"
-#include "../../business/av_sync/include/ISyncAlgorithm.h"
-#include "../../business/av_sync/include/ICommandDispatcher.h"
-#include "../../business/av_sync/include/IEngineObserver.h"
+#include "IPlaybackStateMachine.h"
+#include "ISyncAlgorithm.h"
+#include "ICommandDispatcher.h"
+#include "IEngineObserver.h"
 #include "IServiceNetwork.h"
 
 #include <memory>
@@ -20,10 +15,11 @@
 namespace Prism::Service {
 
 /**
- * @struct PrismPlayerInternal
+ * @class PrismPlayerInternal
  * @brief 播放器内部状态，封装 C API 句柄背后的全部数据
  */
-struct PrismPlayerInternal {
+class PrismPlayerInternal {
+public:
     explicit PrismPlayerInternal(const PrismConfig& cfg,
                                  PrismEventCallback cb,
                                  void* ud);
@@ -31,13 +27,9 @@ struct PrismPlayerInternal {
 
     void fire_event(PrismEventType type, const void* data = nullptr) const;
 
-    /* ---- 引擎工厂（外部注入，不持有所有权） ---- */
-    Prism::Engine::AudioEngineFactory* audio_factory_{nullptr};
-    Prism::Engine::VideoEngineFactory* video_factory_{nullptr};
-
-    /* ---- 引擎实例（延迟创建：首次 open 或 play 时 init） ---- */
-    std::unique_ptr<Prism::Engine::AudioEngine> audio_engine_;
-    std::unique_ptr<Prism::Engine::VideoEngine> video_engine_;
+    /* ---- 引擎工厂（外部注入，不持有所有权，void* 解耦） ---- */
+    void* audio_factory_{nullptr};
+    void* video_factory_{nullptr};
 
     /* ---- AV Sync 组件 ---- */
     std::unique_ptr<Prism::Business::IPlaybackStateMachine> sync_sm_;

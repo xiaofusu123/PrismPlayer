@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../include/ISyncAlgorithm.h"
+#include "ISyncAlgorithm.h"
 
 namespace Prism::Business {
 

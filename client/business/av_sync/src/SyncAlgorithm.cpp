@@ -1,4 +1,4 @@
-#include "../Impl/SyncAlgorithm.h"
+#include "SyncAlgorithm.h"
 
 #include <spdlog/spdlog.h>
 
