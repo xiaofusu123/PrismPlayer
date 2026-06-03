@@ -85,7 +85,7 @@ public:
     * @brief 获取视频渲染结果
     * @return RenderMetadata 渲染元数据
     */
-    virtual RenderMetadata get_render_result();
+    virtual RenderMetadata get_render_result() = 0;
 };
 
 } // namespace Prism::Engine

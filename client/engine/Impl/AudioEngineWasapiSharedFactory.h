@@ -3,6 +3,8 @@
 #include "AudioEngineFactory.h"
 #include "AudioEngineWasapiShared.h"
 
+#include <memory>
+
 namespace Prism::Engine {
 
 class AudioEngineWasapiSharedFactory : public AudioEngineFactory {
