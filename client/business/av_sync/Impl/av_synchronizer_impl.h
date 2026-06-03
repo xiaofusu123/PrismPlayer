@@ -1,7 +1,6 @@
 #pragma once
 
-#include "API.h"
-#include "av_synchronizer.h"
+#include "sync_types.h"
 
 #include <algorithm>
 #include <cstdint>

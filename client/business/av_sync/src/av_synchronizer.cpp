@@ -1,8 +1,5 @@
-#include "API.h"
 #include "av_synchronizer.h"
 #include "av_synchronizer_impl.h"
-
-#include <spdlog/spdlog.h>
 
 namespace Prism::Business {
 
@@ -11,8 +8,6 @@ namespace Prism::Business {
 AVSynchronizer::AVSynchronizer(const SyncConfig& config)
     : config_(config)
 {
-    spdlog::info("[AVSynchronizer] created, mode={}, max_drift={}ms",
-                 static_cast<int>(config_.mode), config_.max_drift_ms);
 }
 
 void AVSynchronizer::reset()
@@ -21,7 +16,6 @@ void AVSynchronizer::reset()
     video_clock_  = SyncClock{};
     master_clock_ = SyncClock{};
     play_speed_   = 1.0;
-    spdlog::debug("[AVSynchronizer] reset");
 }
 
 void AVSynchronizer::pause_clock()
@@ -150,8 +144,6 @@ void AVSynchronizer::set_mode(SyncMode mode)
 {
     if (config_.mode == mode) return;
 
-    spdlog::info("[AVSynchronizer] mode switch: {} -> {}",
-                 static_cast<int>(config_.mode), static_cast<int>(mode));
     config_.mode = mode;
 
     switch (mode) {

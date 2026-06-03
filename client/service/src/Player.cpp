@@ -1,7 +1,8 @@
+#define NOMINMAX
 #define STRINGIFY_IMPL(x) #x
 #define STRINGIFY(x) STRINGIFY_IMPL(x)
 
-#include "API.h"
+#include "Player.h"
 #include "PlayerImpl.h"
 
 #include <algorithm>
@@ -12,15 +13,23 @@
 
 namespace Prism::Service {
 
-/* ========== PrismPlayerInternal 实现 ========== */
+/* ========== 辅助函数 ========== */
 
-static PrismConfig default_config() {
+static PrismConfig default_config()
+{
     PrismConfig c{};
     c.log_level = "info";
     return c;
 }
 
-int64_t PrismPlayerInternal::system_time_ms()
+static float clamp(float val, float lo, float hi)
+{
+    return std::max(lo, std::min(hi, val));
+}
+
+/* ========== PrismPlayer::Impl ========== */
+
+int64_t PrismPlayer::Impl::system_time_ms()
 {
     auto now = std::chrono::steady_clock::now();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -28,9 +37,9 @@ int64_t PrismPlayerInternal::system_time_ms()
     return ms.count();
 }
 
-PrismPlayerInternal::PrismPlayerInternal(const PrismConfig& cfg,
-                                         PrismEventCallback cb,
-                                         void* ud)
+PrismPlayer::Impl::Impl(const PrismConfig& cfg,
+                         PrismEventCallback cb,
+                         void* ud)
     : sync_config_()
     , sync_(sync_config_)
     , config_(cfg)
@@ -43,7 +52,7 @@ PrismPlayerInternal::PrismPlayerInternal(const PrismConfig& cfg,
     spdlog::info("[PrismPlayer] instance created");
 }
 
-PrismPlayerInternal::~PrismPlayerInternal()
+PrismPlayer::Impl::~Impl()
 {
     if (engines_initialized_) {
         if (audio_engine_) audio_engine_->close();
@@ -52,7 +61,7 @@ PrismPlayerInternal::~PrismPlayerInternal()
     spdlog::info("[PrismPlayer] instance destroyed");
 }
 
-void PrismPlayerInternal::fire_event(PrismEventType type, const void* data) const
+void PrismPlayer::Impl::fire_event(PrismEventType type, const void* data) const
 {
     if (callback_) {
         callback_(type, data, user_data_);
@@ -61,7 +70,7 @@ void PrismPlayerInternal::fire_event(PrismEventType type, const void* data) cons
 
 /* ========== 引擎初始化辅助 ========== */
 
-static bool init_engines(PrismPlayerInternal* p)
+static bool init_engines(PrismPlayer::Impl* p)
 {
     if (p->engines_initialized_) return true;
 
@@ -91,12 +100,9 @@ static bool init_engines(PrismPlayerInternal* p)
 
 /* ========== 同步状态推送到同步器 ========== */
 
-/**
- * @brief 将引擎层的同步信息推送到业务层同步器
- */
-static void push_sync_info(PrismPlayerInternal* p)
+static void push_sync_info(PrismPlayer::Impl* p)
 {
-    int64_t now_ms = PrismPlayerInternal::system_time_ms();
+    int64_t now_ms = PrismPlayer::Impl::system_time_ms();
 
     if (p->audio_engine_) {
         auto info = p->audio_engine_->get_sync_info();
@@ -115,343 +121,277 @@ static void push_sync_info(PrismPlayerInternal* p)
     }
 }
 
-/* ========== 值钳位辅助 ========== */
+/* ========== PrismPlayer 公开方法 ========== */
 
-static float clamp(float val, float lo, float hi)
+PrismPlayer::PrismPlayer(const PrismConfig& config)
+    : impl_(std::make_unique<Impl>(config, nullptr, nullptr))
 {
-    return std::max(lo, std::min(hi, val));
 }
 
-} // namespace Prism::Service
+PrismPlayer::~PrismPlayer() = default;
 
-/* ========== C API 实现 ========== */
-
-extern "C" {
-
-_API PrismPlayerHandle prism_player_create(const PrismConfig* config,
-                                            PrismEventCallback callback,
-                                            void* user_data)
+void PrismPlayer::set_event_callback(PrismEventCallback callback, void* user_data)
 {
-    PrismConfig cfg = config ? *config : Prism::Service::default_config();
-
-    auto* p = new (std::nothrow) Prism::Service::PrismPlayerInternal(cfg, callback, user_data);
-    if (!p) return nullptr;
-
-    return static_cast<PrismPlayerHandle>(p);
+    impl_->callback_ = callback;
+    impl_->user_data_ = user_data;
 }
 
-_API void prism_player_destroy(PrismPlayerHandle player)
+int PrismPlayer::open(const char* uri)
 {
-    if (!player) return;
-    delete static_cast<Prism::Service::PrismPlayerInternal*>(player);
-}
+    if (!uri) return PRISM_ERROR_INVALID_PARAM;
 
-_API int prism_player_open(PrismPlayerHandle player, const char* uri)
-{
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-    if (!uri)  return PRISM_ERROR_INVALID_PARAM;
-
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    p->state_.store(PRISM_STATE_LOADING);
-    p->media_uri_ = uri;
+    impl_->state_.store(PRISM_STATE_LOADING);
+    impl_->media_uri_ = uri;
 
     // 重置同步器状态
-    p->sync_.reset();
+    impl_->sync_.reset();
 
-    if (!Prism::Service::init_engines(p)) {
-        p->state_.store(PRISM_STATE_ERROR);
+    if (!init_engines(impl_.get())) {
+        impl_->state_.store(PRISM_STATE_ERROR);
         spdlog::error("[PrismPlayer] open failed for uri: {}", uri);
         return PRISM_ERROR_OPEN_FAILED;
     }
 
     spdlog::info("[PrismPlayer] open: {}", uri);
 
-    p->state_.store(PRISM_STATE_PAUSED);
-    p->fire_event(PRISM_EVENT_MEDIA_LOADED);
+    impl_->state_.store(PRISM_STATE_PAUSED);
+    impl_->fire_event(PRISM_EVENT_MEDIA_LOADED);
 
     return PRISM_OK;
 }
 
-_API int prism_player_close(PrismPlayerHandle player)
+int PrismPlayer::close()
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
+    if (impl_->audio_engine_) impl_->audio_engine_->close();
+    if (impl_->video_engine_) impl_->video_engine_->close();
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    if (p->audio_engine_) p->audio_engine_->close();
-    if (p->video_engine_) p->video_engine_->close();
-
-    p->sync_.reset();
-    p->engines_initialized_ = false;
-    p->media_uri_.clear();
-    p->state_.store(PRISM_STATE_IDLE);
+    impl_->sync_.reset();
+    impl_->engines_initialized_ = false;
+    impl_->media_uri_.clear();
+    impl_->state_.store(PRISM_STATE_IDLE);
 
     spdlog::info("[PrismPlayer] closed");
     return PRISM_OK;
 }
 
-_API int prism_player_play(PrismPlayerHandle player)
+int PrismPlayer::play()
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-    PrismState s = p->state_.load();
+    PrismState s = impl_->state_.load();
 
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) {
-        p->last_error_.store(PRISM_ERROR_NO_MEDIA);
+        impl_->last_error_.store(PRISM_ERROR_NO_MEDIA);
         return PRISM_ERROR_NO_MEDIA;
     }
 
     if (s == PRISM_STATE_PLAYING) return PRISM_OK;
 
-    if (!Prism::Service::init_engines(p)) {
-        p->state_.store(PRISM_STATE_ERROR);
+    if (!init_engines(impl_.get())) {
+        impl_->state_.store(PRISM_STATE_ERROR);
         return PRISM_ERROR_UNKNOWN;
     }
 
     // 恢复同步器时钟
-    int64_t now_ms = Prism::Service::PrismPlayerInternal::system_time_ms();
-    p->sync_.resume_clock(now_ms);
+    int64_t now_ms = Impl::system_time_ms();
+    impl_->sync_.resume_clock(now_ms);
 
-    if (p->audio_engine_) p->audio_engine_->play();
-    if (p->video_engine_) p->video_engine_->play();
+    if (impl_->audio_engine_) impl_->audio_engine_->play();
+    if (impl_->video_engine_) impl_->video_engine_->play();
 
-    p->state_.store(PRISM_STATE_PLAYING);
+    impl_->state_.store(PRISM_STATE_PLAYING);
     spdlog::info("[PrismPlayer] playing");
     return PRISM_OK;
 }
 
-_API int prism_player_pause(PrismPlayerHandle player)
+int PrismPlayer::pause()
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    if (p->state_.load() != PRISM_STATE_PLAYING) return PRISM_OK;
+    if (impl_->state_.load() != PRISM_STATE_PLAYING) return PRISM_OK;
 
     // 暂停同步器时钟，冻结当前 PTS
-    p->sync_.pause_clock();
+    impl_->sync_.pause_clock();
 
-    if (p->audio_engine_) p->audio_engine_->pause();
-    if (p->video_engine_) p->video_engine_->pause();
+    if (impl_->audio_engine_) impl_->audio_engine_->pause();
+    if (impl_->video_engine_) impl_->video_engine_->pause();
 
-    p->state_.store(PRISM_STATE_PAUSED);
+    impl_->state_.store(PRISM_STATE_PAUSED);
     spdlog::info("[PrismPlayer] paused");
     return PRISM_OK;
 }
 
-_API int prism_player_stop(PrismPlayerHandle player)
+int PrismPlayer::stop()
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    if (p->audio_engine_) {
-        p->audio_engine_->pause();
-        p->audio_engine_->close();
+    if (impl_->audio_engine_) {
+        impl_->audio_engine_->pause();
+        impl_->audio_engine_->close();
     }
-    if (p->video_engine_) {
-        p->video_engine_->pause();
-        p->video_engine_->close();
+    if (impl_->video_engine_) {
+        impl_->video_engine_->pause();
+        impl_->video_engine_->close();
     }
 
-    p->sync_.reset();
-    p->engines_initialized_ = false;
-    p->state_.store(PRISM_STATE_STOPPED);
+    impl_->sync_.reset();
+    impl_->engines_initialized_ = false;
+    impl_->state_.store(PRISM_STATE_STOPPED);
     spdlog::info("[PrismPlayer] stopped");
     return PRISM_OK;
 }
 
-_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms,
-                            PrismSeekMode mode)
+int PrismPlayer::seek(int64_t position_ms, PrismSeekMode mode)
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    PrismState s = p->state_.load();
+    PrismState s = impl_->state_.load();
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) {
-        p->last_error_.store(PRISM_ERROR_NO_MEDIA);
+        impl_->last_error_.store(PRISM_ERROR_NO_MEDIA);
         return PRISM_ERROR_NO_MEDIA;
     }
 
     if (mode == PRISM_SEEK_ABSOLUTE && position_ms < 0) {
-        p->last_error_.store(PRISM_ERROR_INVALID_PARAM);
+        impl_->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
 
     uint64_t target_pts = static_cast<uint64_t>(position_ms);
     if (mode == PRISM_SEEK_RELATIVE) {
-        int64_t cur = prism_player_get_position(player);
+        int64_t cur = get_position();
         target_pts = static_cast<uint64_t>(std::max<int64_t>(0, cur + position_ms));
     }
 
     int seek_flag = static_cast<int>(mode);
 
-    if (p->audio_engine_) p->audio_engine_->seek(target_pts, seek_flag);
-    if (p->video_engine_) p->video_engine_->seek(target_pts, seek_flag);
+    if (impl_->audio_engine_) impl_->audio_engine_->seek(target_pts, seek_flag);
+    if (impl_->video_engine_) impl_->video_engine_->seek(target_pts, seek_flag);
 
     // Seek 后同步器以新的目标位置作为基准，重新校准
-    int64_t now_ms = Prism::Service::PrismPlayerInternal::system_time_ms();
-    p->sync_.update_audio_clock(static_cast<int64_t>(target_pts), now_ms);
-    p->sync_.update_video_clock(static_cast<int64_t>(target_pts), now_ms);
+    int64_t now_ms = Impl::system_time_ms();
+    impl_->sync_.update_audio_clock(static_cast<int64_t>(target_pts), now_ms);
+    impl_->sync_.update_video_clock(static_cast<int64_t>(target_pts), now_ms);
 
-    p->fire_event(PRISM_EVENT_SEEK_COMPLETED);
+    impl_->fire_event(PRISM_EVENT_SEEK_COMPLETED);
     spdlog::info("[PrismPlayer] seek to {}ms (flag={})", target_pts, seek_flag);
     return PRISM_OK;
 }
 
-_API PrismState prism_player_get_state(PrismPlayerHandle player)
+PrismState PrismPlayer::get_state() const
 {
-    if (!player) return PRISM_STATE_ERROR;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->state_.load();
+    return impl_->state_.load();
 }
 
-_API int64_t prism_player_get_position(PrismPlayerHandle player)
+int64_t PrismPlayer::get_position() const
 {
-    if (!player) return -1;
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    PrismState s = p->state_.load();
+    PrismState s = impl_->state_.load();
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) return -1;
 
     // 优先推送引擎同步信息到同步器
-    Prism::Service::push_sync_info(p);
+    push_sync_info(impl_.get());
 
     // 从业务层同步器获取主时钟 PTS
-    int64_t pos = p->sync_.get_master_pts();
+    int64_t pos = impl_->sync_.get_master_pts();
     if (pos > 0) return pos;
 
     // 回退：直接从音频引擎读取
-    if (p->audio_engine_) {
-        auto info = p->audio_engine_->get_sync_info();
+    if (impl_->audio_engine_) {
+        auto info = impl_->audio_engine_->get_sync_info();
         return static_cast<int64_t>(info.current_pts.load());
     }
     return -1;
 }
 
-_API int64_t prism_player_get_duration(PrismPlayerHandle player)
+int64_t PrismPlayer::get_duration() const
 {
-    if (!player) return -1;
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    PrismState s = p->state_.load();
+    PrismState s = impl_->state_.load();
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) return -1;
 
-    return p->media_info_.duration_ms;
+    return impl_->media_info_.duration_ms;
 }
 
-_API int prism_player_set_volume(PrismPlayerHandle player, float volume)
+int PrismPlayer::set_volume(float volume)
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-    float clamped = Prism::Service::clamp(volume, 0.0f, 1.0f);
-    p->volume_.store(clamped);
+    float clamped_v = clamp(volume, 0.0f, 1.0f);
+    impl_->volume_.store(clamped_v);
 
     return PRISM_OK;
 }
 
-_API float prism_player_get_volume(PrismPlayerHandle player)
+float PrismPlayer::get_volume() const
 {
-    if (!player) return 0.0f;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->volume_.load();
+    return impl_->volume_.load();
 }
 
-_API int prism_player_set_mute(PrismPlayerHandle player, bool mute)
+int PrismPlayer::set_mute(bool mute)
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    bool was_muted = p->mute_.exchange(mute);
+    bool was_muted = impl_->mute_.exchange(mute);
     if (mute && !was_muted) {
-        p->volume_before_mute_.store(p->volume_.load());
+        impl_->volume_before_mute_.store(impl_->volume_.load());
     } else if (!mute && was_muted) {
-        p->volume_.store(p->volume_before_mute_.load());
+        impl_->volume_.store(impl_->volume_before_mute_.load());
     }
 
     return PRISM_OK;
 }
 
-_API bool prism_player_get_mute(PrismPlayerHandle player)
+bool PrismPlayer::get_mute() const
 {
-    if (!player) return false;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->mute_.load();
+    return impl_->mute_.load();
 }
 
-_API int prism_player_set_playback_speed(PrismPlayerHandle player, float speed)
+int PrismPlayer::set_playback_speed(float speed)
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-    float clamped = Prism::Service::clamp(speed, 0.5f, 2.0f);
-    p->speed_.store(clamped);
+    float clamped_v = clamp(speed, 0.5f, 2.0f);
+    impl_->speed_.store(clamped_v);
 
     // 同步速度到引擎和同步器
-    if (p->audio_engine_) p->audio_engine_->set_play_speed();
-    if (p->video_engine_) p->video_engine_->set_play_speed(clamped);
-    p->sync_.set_play_speed(static_cast<double>(clamped));
+    if (impl_->audio_engine_) impl_->audio_engine_->set_play_speed();
+    if (impl_->video_engine_) impl_->video_engine_->set_play_speed(clamped_v);
+    impl_->sync_.set_play_speed(static_cast<double>(clamped_v));
 
-    spdlog::info("[PrismPlayer] playback speed set to {}x", clamped);
+    spdlog::info("[PrismPlayer] playback speed set to {}x", clamped_v);
     return PRISM_OK;
 }
 
-_API float prism_player_get_playback_speed(PrismPlayerHandle player)
+float PrismPlayer::get_playback_speed() const
 {
-    if (!player) return 1.0f;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->speed_.load();
+    return impl_->speed_.load();
 }
 
-_API int prism_player_set_loop(PrismPlayerHandle player, bool loop)
+int PrismPlayer::set_loop(bool loop)
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-    static_cast<Prism::Service::PrismPlayerInternal*>(player)->loop_.store(loop);
+    impl_->loop_.store(loop);
     return PRISM_OK;
 }
 
-_API bool prism_player_get_loop(PrismPlayerHandle player)
+bool PrismPlayer::get_loop() const
 {
-    if (!player) return false;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->loop_.load();
+    return impl_->loop_.load();
 }
 
-_API int prism_player_set_video_window(PrismPlayerHandle player, void* native_window)
+int PrismPlayer::set_video_window(void* native_window)
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-    static_cast<Prism::Service::PrismPlayerInternal*>(player)->video_window_.store(native_window);
+    impl_->video_window_.store(native_window);
     return PRISM_OK;
 }
 
-_API int prism_player_get_media_info(PrismPlayerHandle player, PrismMediaInfo* info)
+int PrismPlayer::get_media_info(PrismMediaInfo* info) const
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-    if (!info)  return PRISM_ERROR_INVALID_PARAM;
+    if (!info) return PRISM_ERROR_INVALID_PARAM;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
-
-    PrismState s = p->state_.load();
+    PrismState s = impl_->state_.load();
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) {
-        p->last_error_.store(PRISM_ERROR_NO_MEDIA);
+        impl_->last_error_.store(PRISM_ERROR_NO_MEDIA);
         return PRISM_ERROR_NO_MEDIA;
     }
 
-    *info = p->media_info_;
+    *info = impl_->media_info_;
     return PRISM_OK;
 }
 
-_API PrismErrorCode prism_player_get_last_error(PrismPlayerHandle player)
+PrismErrorCode PrismPlayer::get_last_error() const
 {
-    if (!player) return PRISM_ERROR_INVALID_HANDLE;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.load();
+    return impl_->last_error_.load();
 }
 
-_API const char* prism_player_get_version(void)
+const char* PrismPlayer::get_version()
 {
     return "PrismPlayer " STRINGIFY(PRISM_VERSION_MAJOR) "."
            STRINGIFY(PRISM_VERSION_MINOR) "."
            STRINGIFY(PRISM_VERSION_PATCH);
 }
 
-} // extern "C"
+} // namespace Prism::Service

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "API.h"
 #include "Player.h"
 #include "av_synchronizer.h"
 
@@ -18,12 +17,19 @@
 
 namespace Prism::Service {
 
-class PrismPlayerInternal {
+/**
+ * @class PrismPlayer::Impl
+ * @brief PrismPlayer 的内部实现（PIMPL 模式）
+ *
+ * 持有引擎实例、同步器和所有播放状态。对外通过 PrismPlayer
+ * 的公开方法间接访问，实现 ABI 隔离。
+ */
+class PrismPlayer::Impl {
 public:
-    explicit PrismPlayerInternal(const PrismConfig& cfg,
-                                 PrismEventCallback cb,
-                                 void* ud);
-    ~PrismPlayerInternal();
+    explicit Impl(const PrismConfig& cfg,
+                  PrismEventCallback cb,
+                  void* ud);
+    ~Impl();
 
     void fire_event(PrismEventType type, const void* data = nullptr) const;
 
@@ -75,9 +81,9 @@ public:
     // 是否已初始化引擎
     std::atomic<bool> engines_initialized_{false};
 
-private:
-    PrismEventCallback callback_;
-    void*              user_data_;
+    // 事件回调
+    PrismEventCallback callback_{nullptr};
+    void*              user_data_{nullptr};
 };
 
 } // namespace Prism::Service

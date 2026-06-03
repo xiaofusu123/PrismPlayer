@@ -1,6 +1,5 @@
 #pragma once
 
-#include "API.h"
 #include "sync_types.h"
 
 #include <cstdint>
