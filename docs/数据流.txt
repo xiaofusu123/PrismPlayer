@@ -9,7 +9,7 @@ PrismPlayer 数据流图
 
   UI 层 (Flutter)         FFI 层 (待建)         Service 层             Business 层            Engine 层              Adapter 层
   client/UI/             client/FFI/          client/service/        client/business/       client/engine/         client/adapter/
-           (占位文件)            (C API已实现)           av_sync(已实现) + network(占位)      Audio + Video          文件/数据库/网络
+           (占位文件)            (C API完整实现(27个API))           av_sync(完整实现) + network(占位)      Audio(Video(抽象接口+工厂骨架          文件/数据库/网络
        │                       │                      │                      │                      │                      │
        │ 1. 用户点击登录       │                      │                      │                      │                      │
        │──────────────────────>│                      │                      │                      │                      │
