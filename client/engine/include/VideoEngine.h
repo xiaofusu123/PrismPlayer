@@ -28,7 +28,7 @@ struct VideoSyncInfo {
  */
 struct RenderMetadata {
     RENDER_RESULT_HANDLE handle;  /**< 渲染结果句柄 */
-    bool vaild;                   /**< 句柄是否有效 */
+    bool valid;                   /**< 句柄是否有效 */
 
     uint32_t width;               /**< 渲染宽度 */
     uint32_t height;              /**< 渲染高度 */

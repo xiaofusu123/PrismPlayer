@@ -1,7 +1,6 @@
 #pragma once
 
 #include "VideoEngineFactory.h"
-#include "VideoEngineVulkan.h"
 
 namespace Prism::Engine {
 
@@ -12,9 +11,7 @@ public:
     /**
     * @brief 创建Vulkan渲染视频引擎实例
     */
-    std::unique_ptr<VideoEngine> create_video_engine() override {
-        return std::make_unique<VideoEngineVulkan>();
-    }
+    std::unique_ptr<VideoEngine> create_video_engine() override;
 };
 
 } // namespace Prism::Engine

@@ -12,7 +12,7 @@ struct AudioSyncInfo {
     std::atomic<uint64_t> current_pts{0};  /**< 当前音频帧解码时间戳（ms） */
     std::atomic<uint64_t> next_pts{0};     /**< 下一帧音频解码时间戳（ms） */
     std::atomic<uint32_t> start_time{0};   /**< 流开始的时间 */
-    std::atomic<uint64_t> draution{0};     /**< 音频总时长 */
+    std::atomic<uint64_t> duration{0};     /**< 音频总时长 */
 };
 
 
