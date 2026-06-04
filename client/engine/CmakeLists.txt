@@ -22,10 +22,10 @@ if(SRC)
         client-adapter
 
     PRIVATE
-        ffmpeg
-        glfw3
+        ${FFMPEG_LIBRARIES}
+        glfw
         Vulkan::Vulkan
-        soundtouch
+        SoundTouch::SoundTouch
         spdlog::spdlog
     )
 else()

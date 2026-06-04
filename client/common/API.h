@@ -1,7 +1,7 @@
 #pragma once
 
 #if _WIN32
-    #ifdef LAYERING_EXPORTS
+    #ifdef _PRISM_EXPORTS
         #define _API __declspec(dllexport)
     #else
         #define _API __declspec(dllimport)

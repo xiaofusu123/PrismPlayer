@@ -9,14 +9,14 @@ public:
     VideoEngineVulkan();
     ~VideoEngineVulkan() override;
 
-    virtual bool init() override;
-    virtual bool play() override;
-    virtual bool pause() override;
-    virtual bool close() override;
-    virtual bool set_play_speed(float speed) override;
-    virtual bool seek(uint64_t pts, int seek_mode) override;
-    virtual VideoSyncInfo get_sync_info() override;
-    virtual RenderMetadata get_render_result() override;
+    bool init() override;
+    bool play() override;
+    bool pause() override;
+    bool close() override;
+    bool set_play_speed(float speed) override;
+    bool seek(uint64_t pts, int seek_mode) override;
+    VideoSyncInfo get_sync_info() override;
+    RenderMetadata get_render_result() override;
 private:
 };
 
