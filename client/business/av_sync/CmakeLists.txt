@@ -14,8 +14,10 @@ if(SRC)
     )
 
     target_link_libraries(${PROJECT_NAME}
-    PRIVATE
+    PUBLIC
         client-engine
+    
+    PRIVATE
         spdlog::spdlog
     )
 else()
