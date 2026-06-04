@@ -1,9 +1,6 @@
 #pragma once
 
 #include "AudioEngineFactory.h"
-#include "AudioEngineWasapiShared.h"
-
-#include <memory>
 
 namespace Prism::Engine {
 
@@ -14,9 +11,7 @@ public:
     /**
     * @brief 创建音频引擎实例，WasApi（共享模式）
     */
-    std::unique_ptr<AudioEngine> create_audio_engine() override {
-        return std::make_unique<AudioEngineWasapiShared>();
-    }
+    std::unique_ptr<AudioEngine> create_audio_engine() override;
 };
 
 } // namespace Prism::Engine
