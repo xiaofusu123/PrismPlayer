@@ -28,7 +28,7 @@ struct VideoSyncInfo {
  */
 struct RenderMetadata {
     RENDER_RESULT_HANDLE handle;  /**< 渲染结果句柄 */
-    bool vaild;                   /**< 句柄是否有效 */
+    bool valid;                   /**< 句柄是否有效 */
 
     uint32_t width;               /**< 渲染宽度 */
     uint32_t height;              /**< 渲染高度 */
@@ -85,7 +85,7 @@ public:
     * @brief 获取视频渲染结果
     * @return RenderMetadata 渲染元数据
     */
-    virtual RenderMetadata get_render_result();
+    virtual RenderMetadata get_render_result() = 0;
 };
 
 } // namespace Prism::Engine
