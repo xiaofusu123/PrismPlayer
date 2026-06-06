@@ -9,8 +9,8 @@ public:
     virtual ~AudioEngineWasapiSharedFactory() override = default;
 
     /**
-    * @brief 创建音频引擎实例，WasApi（共享模式）
-    */
+     * @brief 创建音频引擎实例，WasApi（共享模式）
+     */
     std::unique_ptr<AudioEngine> create_audio_engine() override;
 };
 

@@ -2,7 +2,7 @@ project(client-engine)
 
 message(STATUS "${PROJECT_NAME} is building")
 
-find_package(ffmpeg REQUIRED)
+find_package(FFMPEG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(soundtouch REQUIRED)
@@ -22,7 +22,7 @@ if(SRC)
         client-adapter
 
     PRIVATE
-        ${FFMPEG_LIBRARIES}
+        FFMPEG
         glfw
         Vulkan::Vulkan
         SoundTouch::SoundTouch
