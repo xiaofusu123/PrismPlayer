@@ -9,8 +9,8 @@ public:
     ~VideoEngineVulkanFactory() override = default;
 
     /**
-    * @brief 创建Vulkan渲染视频引擎实例
-    */
+     * @brief 创建Vulkan渲染视频引擎实例
+     */
     std::unique_ptr<VideoEngine> create_video_engine() override;
 };
 

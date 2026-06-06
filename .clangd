@@ -1,3 +1,11 @@
 Diagnostics:
   Suppress:
     - "-Wpragma-once-outside-header"
+  UnusedIncludes: None
+  MissingIncludes: None
+InlayHints:
+  Enabled: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+Index:
+  Background: Build
