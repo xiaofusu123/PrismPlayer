@@ -2,10 +2,11 @@ project(client-engine)
 
 message(STATUS "${PROJECT_NAME} is building")
 
-find_package(ffmpeg REQUIRED)
+find_package(FFMPEG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(soundtouch REQUIRED)
+find_package(spdlog REQUIRED)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
@@ -13,9 +14,7 @@ if(SRC)
     add_library(${PROJECT_NAME} SHARED ${SRC})
     target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
-        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Impl
-
-        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../adapter/include
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/internal
     )
 
     target_link_libraries(${PROJECT_NAME}
@@ -23,11 +22,11 @@ if(SRC)
         client-adapter
 
     PRIVATE
-        ffmpeg
-        glfw3
+        FFMPEG
+        glfw
         Vulkan::Vulkan
-        soundtouch
-        spdlog
+        SoundTouch::SoundTouch
+        spdlog::spdlog
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

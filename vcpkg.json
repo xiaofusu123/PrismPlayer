@@ -1,16 +1,38 @@
 {
-  "builtin-baseline": "2b65c20fc66eda893aa15a15a453c3cf09500b19",
-  "dependencies": [
-    "asio",
-    "ffmpeg",
-    "glfw3",
-    "glm",
-    "gtest",
-    "nlohmann-json",
-    "openssl",
-    "soundtouch",
-    "spdlog",
-    "vulkan",
-    "ixwebsocket"
-  ]
+  "name": "prism-player",
+  "version": "0.0.1",
+  "default-features": ["client"],
+  "features": {
+    "client": {
+      "description": "客户端依赖",
+      "dependencies": [
+        "asio",
+        "ffmpeg",
+        "glfw3",
+        "glm",
+        "ixwebsocket",
+        "nlohmann-json",
+        "openssl",
+        "soundtouch",
+        "spdlog",
+        "vulkan"
+      ]
+    },
+
+    "server": {
+      "description": "服务端依赖",
+      "dependencies": [
+        "asio",
+        "ixwebsocket",
+        "nlohmann-json",
+        "openssl",
+        "spdlog"
+      ]
+    },
+
+    "test": {
+      "description": "单元测试 (GTest)",
+      "dependencies": ["gtest"]
+    }
+  }
 }

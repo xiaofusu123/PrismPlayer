@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_COMPILER "clang++")
-
-project(Prism)
+project(PrismPlayer)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -16,15 +13,10 @@ message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "Current mode is ${CMAKE_BUILD_TYPE}")
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     enable_testing()
-    add_compile_definitions(_DEBUG)
+    add_compile_definitions(PRISM_DEBUG)
 
-    # add_executable(test test/test_tmp.cpp)
-
-    # target_link_directories(test
-    #     PRIVATE service
-    # )
 else()
-    add_compile_definitions(_RELEASE)
+    add_compile_definitions(PRISM_RELEASE)
 endif()
 message(STATUS "")
 

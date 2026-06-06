@@ -2,3 +2,6 @@ build
 practice
 */build
 .vscode
+.cache
+vendor/*/bin
+vendor/*/lib

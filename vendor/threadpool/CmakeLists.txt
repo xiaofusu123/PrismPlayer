@@ -1,9 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
 
-set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_COMPILER "clang++")
-set(CMAKE_GENERATOR "Ninja")
-
 project(ThreadPool
     VERSION 1.0.0
     DESCRIPTION "实现异步和多线程的线程池"
