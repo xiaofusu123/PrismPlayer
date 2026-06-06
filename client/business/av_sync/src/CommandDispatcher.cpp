@@ -112,7 +112,7 @@ bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_fact
 
     auto* video_fac = static_cast<Prism::Engine::VideoEngineFactory*>(video_factory);
     if (video_fac && enable_video) {
-        video_owned_ = video_fac->create_audio_engine();
+        video_owned_ = video_fac->create_video_engine();
         video_engine_ = video_owned_.get();
         if (!video_engine_ || !video_engine_->init()) {
             spdlog::error("[CommandDispatcher] failed to init video engine");

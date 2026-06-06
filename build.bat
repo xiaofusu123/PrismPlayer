@@ -16,6 +16,7 @@ if "%preset%"=="1" (
     cmake --preset !build_preset!
 ) else (
     echo 无效的预设选项，默认使用 Release。
+    set "build_preset=windows-x64-Release"
     cmake --preset windows-x64-Release
 )
 
