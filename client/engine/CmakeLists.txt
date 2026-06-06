@@ -22,7 +22,7 @@ if(SRC)
         client-adapter
 
     PRIVATE
-        FFMPEG
+        ${FFMPEG_LIBRARIES}
         glfw
         Vulkan::Vulkan
         SoundTouch::SoundTouch
