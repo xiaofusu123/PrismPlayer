@@ -16,8 +16,9 @@
         "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
       },
       "environment": {
+        "CC": "clang",
         "CXX": "clang++",
-        "CC": "clang"
+        "VCPKG_BINARY_SOURCES": "clear;files,${sourceDir}/.vcpkg-cache,readwrite"
       }
     },
 
