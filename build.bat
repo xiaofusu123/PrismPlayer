@@ -9,15 +9,15 @@ echo build directory: %PROJECT_ROOT%build
 set /p "preset=请输入你要构建的预设(1.windows-x64-Debug 2.windows-x64-Release): "
 
 if "%preset%"=="1" (
-    set "build_preset=windows-x64-Debug"
+    set "build_preset=windows-clang-x64-Debug"
     cmake --preset !build_preset!
 ) else if "%preset%"=="2" (
-    set "build_preset=windows-x64-Release"
+    set "build_preset=windows-clang-x64-Release"
     cmake --preset !build_preset!
 ) else (
     echo 无效的预设选项，默认使用 Release。
-    set "build_preset=windows-x64-Release"
-    cmake --preset windows-x64-Release
+    set "build_preset=windows-clang-x64-Releasee"
+    cmake --preset windows-clang-x64-Release
 )
 
 if errorlevel 1 (
