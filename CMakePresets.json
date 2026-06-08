@@ -7,6 +7,10 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
+        "CMAKE_C_COMPILER": "$env{CLANG_ROOT}/clang.exe",
+        "CMAKE_CXX_COMPILER": "$env{CLANG_ROOT}/clang++.exe",
+        "CMAKE_C_COMPILER_TARGET": "x86_64-w64-mingw32",
+        "CMAKE_CXX_COMPILER_TARGET": "x86_64-w64-mingw32",
         "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/ninja.exe",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
