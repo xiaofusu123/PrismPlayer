@@ -5,3 +5,4 @@ practice
 .cache
 vendor/*/bin
 vendor/*/lib
+.vcpkg-cache
