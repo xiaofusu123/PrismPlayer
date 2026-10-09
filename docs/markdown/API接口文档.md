@@ -1,7 +1,11 @@
 # PrismPlayer API 接口文档
 
-> 基于项目实际代码生成，最后更新：2026-06-08
+> 基于项目实际代码生成，最后更新：2026-10-09
 > 版本：0.0.1
+>
+> **本文档记录的是「接口的形状」，每个接口的实现状态见各节标题下的「状态」行。** 完整的实现状态汇总见 `项目计划书.md` §11；术语以根目录 `GLOSSARY.md` 为准。
+>
+> 修复说明：§1 与 §6 原先都写「27 个 C API」，实测 `client/service/include/Player.h` 中 `_API` 宏出现 **32** 次，与 `Player.cpp:135-572` 的 32 个 `extern "C"` 定义一一对应，已改为 32。本文档的 API 覆盖是完整的：32 个函数名与头文件逐一比对后**无遗漏、无多余**。
 
 ---
 
@@ -10,7 +14,8 @@
 > 头文件：`client/service/include/Player.h`、`client/service/include/Types.h`
 > 命名空间：`extern "C"`
 > 构建产物：动态库 (`client-service`)
-> 状态：完整实现（27 个 C API）
+> 状态：✅ **完整实现**（**32** 个 C API + 6 个结构体 + 5 个枚举；`Player.cpp` 448 行，全仓最大实现文件）
+> ⚠️ 其中涉及网络/认证/房间的 API（§1.5 用户认证、§1.6 房间管理）当前由 `IServiceNetwork` 的**默认桩实现**兜底，返回成功但无真实网络行为 —— 见 §5。
 
 ### 1.1 版本
 
@@ -229,7 +234,7 @@
 
 > 命名空间：`Prism::Engine`
 > 头文件：`client/engine/include/`
-> 状态：抽象接口 + 工厂骨架完成，解码模块待实现
+> 状态：🟡 **仅骨架** —— 抽象接口与工厂已定义，`src/` 下只有 4 个 `.cpp` 共 **75 行**（`AudioEngineWasapiShared.cpp` 29 / `AudioEngineWasapiSharedFactory.cpp` 7 / `VideoEngineVulkan.cpp` 32 / `VideoEngineVulkanFactory.cpp` 7）。**没有真实的 WASAPI 调用、没有 Vulkan 初始化/交换链/纹理上传，`src/` 下没有任何 FFmpeg 源文件。** 因此 §2.1 的同步结构体目前没有任何地方会真正返回它们。
 > 调用方：Business 层
 
 ### 2.1 同步数据结构
@@ -322,7 +327,7 @@
 
 > 命名空间：`Prism::Business`
 > 头文件：`client/business/{av_sync,network}/include/`
-> 状态：AV Sync 完整实现，Network 接口已定义
+> 状态：§3.1 AV Sync ✅ **完整实现**（`src/` 5 个 `.cpp` 共 323 行）；§3.2 Network ⛔ **占位（接口已定义，无实现）**（`internal/NetImpl.h` 与 `src/tmp.cpp` 均为 0 字节，`libclient-network.a` 是 832 B 空归档）
 > 调用方：Service 层
 
 ### 3.1 AV Sync 模块 — 音视频同步
@@ -533,9 +538,10 @@
 ## 4. Adapter 层 API
 
 > 命名空间：`Prism::Adapter`
-> 头文件：`client/adapter/include/`
+> 头文件：`client/adapter/include/`（抽象接口）+ `client/adapter/internal/`（平台实现）
 > 构建产物：静态库 (`client-adapter`)
-> 状态：框架已搭好，代码待编写
+> 状态：🟡 **仅骨架** —— 5 个接口与 5 个平台实现（`WinFileAdapter` / `SQLiteDBAdapter` / `ASIONetworkAdapter` / `JSONConfigAdapter` / `OpenSSLCryptoAdapter`）都只有类声明，`src/tmp.cpp` 是 **0 字节**（该模块唯一的 `.cpp`），`libclient-adapter.a` 是 **832 B 空归档**。两处 `// TODO`：`internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`。
+> ⚠️ 本节各接口的签名取自 `include/` 下的抽象接口；`internal/` 下的实现类与之一一对应，命名更具体（如 `DBAdapter` 的实现叫 `SQLiteDBAdapter`）。对照表见根目录 `GLOSSARY.md`。
 
 ### 4.1 FileAdapter — 文件 I/O 与媒体元数据提取
 
@@ -692,9 +698,15 @@
 
 | 层级 | 命名空间 | 接口数 | 头文件目录 |
 |------|----------|--------|------------|
-| Service (C API) | `extern "C"` | 27 个函数 + 6 个结构体 + 5 个枚举 | `client/service/include/` |
-| Service (内部) | `Prism::Service` | 1 个接口 | `client/service/internal/` |
-| Business (AV Sync) | `Prism::Business` | 4 个接口 + 4 个工厂 | `client/business/av_sync/include/` |
-| Business (Network) | `Prism::Business` | 3 个接口 + 1 个观察者 + 3 个工厂 | `client/business/network/include/` |
-| Engine | `Prism::Engine` | 2 个接口 + 2 个工厂 + 3 个结构体 | `client/engine/include/` |
-| Adapter | `Prism::Adapter` | 5 个接口 | `client/adapter/include/` |
+| Service (C API) | `extern "C"` | **32** 个函数 + 6 个结构体 + 5 个枚举 | `client/service/include/` |
+| Service (内部) | `Prism::Service` | 1 个接口 + 1 个实现头 | `client/service/internal/` |
+| Business (AV Sync) | `Prism::Business` | 4 个接口 + 1 个工厂 + 1 个类型头 | `client/business/av_sync/include/` |
+| Business (Network) | `Prism::Business` | 4 个接口 + 1 个工厂 + 1 个类型头 | `client/business/network/include/` |
+| Engine | `Prism::Engine` | 2 个接口 + 4 个工厂 + 3 个结构体 | `client/engine/include/` |
+| Adapter | `Prism::Adapter` | 5 个接口（+ 5 个平台实现） | `client/adapter/include/` |
+
+> ⚠️ 本表旧版有三处计数错误，已按 `include/` 下的实际文件重数：
+> - Service (C API)：27 → **32**；
+> - Business (AV Sync)：写成「4 个接口 + 4 个工厂」，实际 `include/` 下是 4 个接口 + `SyncFactory.h` + `SyncTypes.h`；
+> - Business (Network)：写成「3 个接口 + 1 个观察者 + 3 个工厂」，实际 `include/` 下是 4 个接口（`ISignalingClient` / `IRoomManager` / `IAccountManager` / `INetworkObserver`）+ `NetworkFactory.h` + `NetworkTypes.h`（§3.2 正文内容本身是对的，错的只是本表这一行）；
+> - Engine：写成「2 个接口 + 2 个工厂」，实际 `include/` 下是 2 个抽象接口 + 4 个工厂（2 个抽象工厂 + 2 个具体工厂）；

@@ -4,9 +4,11 @@ How the engineering skills should consume this repo's domain documentation when 
 
 ## Before exploring, read these
 
-- **`GLOSSARY.md`** at the repo root, or
-- **`GLOSSARY-MAP.md`** at the repo root if it exists: it points at one `GLOSSARY.md` per context. Read each one relevant to the topic.
-- **`docs/adr/`**: read ADRs that touch the area you're about to work in. In multi-context repos, also check `src/<context>/docs/adr/` for context-scoped decisions.
+- **`GLOSSARY.md`** at the repo root.
+  <!-- This repo is single-context: there is no `GLOSSARY-MAP.md`, and no per-context `GLOSSARY.md`. All terminology lives in the one root file. -->
+- **`docs/adr/`**: read ADRs that touch the area you're about to work in. This repo is single-context, so there are no context-scoped `src/<context>/docs/adr/` directories.
+
+Also relevant to this repo specifically: **`docs/markdown/*.md` is the single source of truth for design documents** (see `docs/adr/0003-文档真源.md`). `docs/archive/` holds superseded Word documents — read them only for history, never as current fact.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
