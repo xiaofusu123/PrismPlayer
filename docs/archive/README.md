@@ -6,8 +6,10 @@
 
 | 文件 | 大小 | 内容冻结于 | 说明 |
 |---|---|---|---|
-| `代码规范.docx` | 17,546 B | 2026-05-25 | 更早的 **Word 手写版**《代码规范》 |
-| `项目计划书.docx` | 20,970 B | 2026-06-01 | 更早的 **Word 手写版**《项目计划书》 |
+| `代码规范.docx` | 18,447 B | 2026-05-25 | 更早的 **Word 手写版**《代码规范》 |
+| `项目计划书.docx` | 23,705 B | 2026-06-01 | 更早的 **Word 手写版**《项目计划书》 |
+
+> 上面的字节数是**脱敏后**的大小；原始字节数是 17,546 B 与 20,970 B。差别来自归档入库时对成员真名做的替换，见下面「归档时对内容做过的改动」。
 
 ## 为什么它们在这里
 
@@ -19,8 +21,8 @@
 docx 内部的 `docProps/core.xml` 与 git 提交日期交叉印证：
 
 ```xml
-<dc:creator>炎杰 周</dc:creator>
-<cp:lastModifiedBy>炎杰 周</cp:lastModifiedBy>
+<dc:creator>xiaofusu123</dc:creator>
+<cp:lastModifiedBy>xiaofusu123</cp:lastModifiedBy>
 <cp:revision>21</cp:revision>          <!-- 代码规范.docx -->
 <dcterms:created>2026-04-29T11:37:00Z</dcterms:created>
 <dcterms:modified>2026-05-25T14:07:00Z</dcterms:modified>
@@ -37,6 +39,17 @@ docx 内部的 `docProps/core.xml` 与 git 提交日期交叉印证：
 ## 为什么不直接删掉
 
 它们带 **md 无法表达的封面页与中文 `Normal.dotm` 样式**，可能是课程/答辩的 Word 交付材料。删除是破坏性的、且没有替代物，所以选择归档而不是删除。
+
+## 归档时对内容做过的改动：真名脱敏
+
+仓库是 **PUBLIC**，而这两份 Word 手写稿里写的是成员真名。归档入库时统一替换为对应的 GitHub 登录名，只动了两处 XML 文本：
+
+| 位置 | 改动 |
+|---|---|
+| `word/document.xml`（仅 `项目计划书.docx`） | 分工表里的 5 个真名 → `xiaofusu123` / `RickeyDeung` / `ambulance001` / `Rikka2-aa` / `kuailede110`，共 17 处 |
+| `docProps/core.xml`（两份都有） | `<dc:creator>` 与 `<cp:lastModifiedBy>` → `xiaofusu123`，共 4 处 |
+
+除文本外**什么都没改**：两份文件仍是 12 个 zip entry，`word/styles.xml`、封面页、版式全部原样，Word 能正常打开。**原始未脱敏的字节仍留在 git 历史里**（`9a21f8a` 及其之前）——脱敏只保证 `HEAD` 不含真名；要连历史一起清掉必须重写历史，代价过大，不做。
 
 ## 它们里面有什么是 md 没有的
 

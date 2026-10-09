@@ -80,17 +80,17 @@
 | `22.1.8` | `最新版`、`随便一个 clang-format` | 门禁工具版本钉死在此，见 `docs/adr/0002-代码门禁.md` |
 | clang 工具链根目录 | `PATH 里的 clang` | 走**机器级**环境变量 `CLANG_ROOT`（默认 `D:\Program\App\msys64\clang64\bin`）、`VCPKG_ROOT`；这两个变量是 Machine 级、用户级为空 |
 | `x64-mingw-dynamic` | `x64-windows`、`x64-windows-static` | 本项目的 vcpkg triplet |
-| GitHub 登录名（`xiaofusu123`、`RickeyDeung`、`Rikka2-aa`、`ambulance001`、`kuailede110`） | **真名**（周炎杰、邓志鸿、梁兴邦、吴圹钛、辜垂沛） | 仓库是 **PUBLIC**。文档与 issue 中一律用 GitHub 登录名，真名不再出现在仓库里 |
+| GitHub 登录名（`xiaofusu123`、`RickeyDeung`、`Rikka2-aa`、`ambulance001`、`kuailede110`） | 成员真名；旧提交里的作者显示名 `xiaofusu`、`QuaSar`、`Rikka--aa`、`天才奇男子` | 仓库是 **PUBLIC**：文档、代码注释与 issue 里**一律**用 GitHub 登录名。`git log` 里看到的 `xiaofusu` / `QuaSar` / `Rikka--aa` / `天才奇男子` 是历史提交的作者显示名，**不是**登录名，也不代表成员还叫这个名字；本文档不再收录真名 |
 
 ## 成员 ↔ 模块（用于指派工单）
 
 | GitHub 登录名 | 负责方向 |
 |---|---|
-| `xiaofusu123` | 文档与规范、门禁、Service 层、Server 端 |
+| `xiaofusu123` | 文档与规范、门禁、构建与基线、Service 层、Server 端、Engine 层 |
 | `RickeyDeung` | 见 issue 指派 |
-| `Rikka2-aa` | 见 issue 指派 |
+| `Rikka2-aa` | 数据库设计、Adapter 层（历史上 2 次提交都在 `client/adapter/`） |
 | `ambulance001` | Network 方向（历史上 3 次提交都在 `client/business/network/`） |
-| `kuailede110` | 构建与基线方向（无历史提交） |
+| `kuailede110` | UI 层 (Flutter) 方向（无历史提交；已退出本仓库协作，分工不变） |
 
 ## 文档
 

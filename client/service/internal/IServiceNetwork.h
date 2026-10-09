@@ -8,7 +8,7 @@ namespace Prism::Service {
  * @class IServiceNetwork
  * @brief 网络操作抽象接口
  *
- * 隔离 Service 层与具体网络实现（client-network 由吴圹钛负责）。
+ * 隔离 Service 层与具体网络实现（client-network 由 ambulance001 负责）。
  * Service 层持有此接口指针，在 login/room 操作时委托调用。
  * 当前阶段提供默认桩实现，后续替换为真实网络模块。
  */
