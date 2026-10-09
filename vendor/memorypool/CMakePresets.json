@@ -7,25 +7,30 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
+        "CMAKE_C_COMPILER": "$env{CLANG_ROOT}/clang.exe",
+        "CMAKE_CXX_COMPILER": "$env{CLANG_ROOT}/clang++.exe",
+        "CMAKE_C_COMPILER_TARGET": "x86_64-w64-mingw32",
+        "CMAKE_CXX_COMPILER_TARGET": "x86_64-w64-mingw32",
         "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/ninja.exe",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
       },
       "environment": {
+        "CC": "clang",
         "CXX": "clang++",
-        "CC": "clang"
+        "VCPKG_BINARY_SOURCES": "clear;files,${sourceDir}/.vcpkg-cache,readwrite"
       }
     },
 
     {
-      "name": "windows-x64-Debug",
+      "name": "windows-clang-x64-Debug",
       "inherits": "windows-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug"
       }
     },
     {
-      "name": "windows-x64-Release",
+      "name": "windows-clang-x64-Release",
       "inherits": "windows-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
@@ -35,12 +40,12 @@
 
   "buildPresets": [
     {
-      "name": "windows-x64-Debug",
-      "configurePreset": "windows-x64-Debug"
+      "name": "windows-clang-x64-Debug",
+      "configurePreset": "windows-clang-x64-Debug"
     },
     {
-      "name": "windows-x64-Release",
-      "configurePreset": "windows-x64-Release"
+      "name": "windows-clang-x64-Release",
+      "configurePreset": "windows-clang-x64-Release"
     }
   ]
 }

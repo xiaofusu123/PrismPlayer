@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.20)
+
+# Benchmark test
+add_executable(benchmark_test benchmark_test.cpp)
+target_link_libraries(benchmark_test PRIVATE ThreadPool_static)
+target_include_directories(benchmark_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Load test
+add_executable(load_test load_test.cpp)
+target_link_libraries(load_test PRIVATE ThreadPool_static)
+target_include_directories(load_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Stress test
+add_executable(stress_test stress_test.cpp)
+target_link_libraries(stress_test PRIVATE ThreadPool_static)
+target_include_directories(stress_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Register with CTest
+add_test(NAME benchmark_test COMMAND benchmark_test)
+add_test(NAME load_test COMMAND load_test)
+add_test(NAME stress_test COMMAND stress_test)
