@@ -7,6 +7,13 @@ find_package(spdlog REQUIRED)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
 if(SRC)
+    message(STATUS "The ${PROJECT_NAME} of source file include:")
+    foreach(file ${SRC})
+        get_filename_component(name ${file} NAME)
+        message(STATUS "${name}")
+    endforeach()
+    message(STATUS "")
+
     add_library(${PROJECT_NAME} STATIC ${SRC})
     target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -14,7 +21,7 @@ if(SRC)
     )
 
     target_link_libraries(${PROJECT_NAME}
-    PRIVATE spdlog::spdlog
+        PRIVATE spdlog::spdlog
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

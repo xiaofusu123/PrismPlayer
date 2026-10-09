@@ -18,7 +18,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
-        server-adapter
-        server-network
-        server-business
+        $<$<TARGET_EXISTS:server-adapter>:server-adapter>
+        $<$<TARGET_EXISTS:server-network>:server-network>
+        $<$<TARGET_EXISTS:server-business>:server-business>
 )

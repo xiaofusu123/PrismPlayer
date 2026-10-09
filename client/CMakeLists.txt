@@ -12,12 +12,17 @@ add_subdirectory(engine)
 add_subdirectory(business)
 add_subdirectory(service)
 
+if(NOT TARGET client-service)
+    message(FATAL_ERROR "The target(client-service) doesn't exist: client/service/src is empty")
+endif()
+
 if(WIN32)
     target_compile_definitions(client-service PRIVATE _PRISM_EXPORTS)
 else()
-    set_target_properties(${PROJECT_NAME} PROPERTIES
+    set_target_properties(client-service PROPERTIES
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON
     )
-    target_compile_options(${PROJECT_NAME} PRIVATE -fvisibility=hidden)
+    
+    target_compile_options(client-service PRIVATE -fvisibility=hidden)
 endif()
