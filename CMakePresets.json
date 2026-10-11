@@ -5,7 +5,7 @@
       "name": "windows-base",
       "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
+      "binaryDir": "${sourceDir}/build/Windows",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "$env{CLANG_ROOT}/clang.exe",
         "CMAKE_CXX_COMPILER": "$env{CLANG_ROOT}/clang++.exe",
@@ -14,6 +14,24 @@
         "CMAKE_MAKE_PROGRAM": "$env{CLANG_ROOT}/ninja.exe",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
         "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic"
+      },
+      "environment": {
+        "CC": "clang",
+        "CXX": "clang++",
+        "VCPKG_BINARY_SOURCES": "clear;files,${sourceDir}/.vcpkg-cache,readwrite"
+      }
+    },
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/Linux",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_MAKE_PROGRAM": "ninja",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
       },
       "environment": {
         "CC": "clang",
@@ -37,6 +55,23 @@
         "CMAKE_BUILD_TYPE": "Release",
         "VCPKG_MANIFEST_FEATURES": "client;server"
       }
+    },
+
+    {
+      "name": "linux-clang-x64-Debug",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_MANIFEST_FEATURES": "client;server;test"
+      }
+    },
+    {
+      "name": "linux-clang-x64-Release",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VCPKG_MANIFEST_FEATURES": "client;server"
+      }
     }
   ],
 
@@ -48,6 +83,15 @@
     {
       "name": "windows-clang-x64-Release",
       "configurePreset": "windows-clang-x64-Release"
+    },
+
+    {
+      "name": "linux-clang-x64-Debug",
+      "configurePreset": "linux-clang-x64-Debug"
+    },
+    {
+      "name": "linux-clang-x64-Release",
+      "configurePreset": "linux-clang-x64-Release"
     }
   ]
 }

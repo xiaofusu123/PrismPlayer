@@ -25,7 +25,7 @@ if(SRC)
         $<$<TARGET_EXISTS:client-engine>:client-engine>
     
     PRIVATE
-        spdlog::spdlog
+        spdlog::spdlog_header_only
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

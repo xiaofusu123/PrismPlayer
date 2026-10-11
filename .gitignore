@@ -1,8 +1,12 @@
 build
-practice
 */build
+*/*/build
+
+practice
+
 .vscode
 .cache
+
 vendor/*/bin
 vendor/*/lib
 .vcpkg-cache
