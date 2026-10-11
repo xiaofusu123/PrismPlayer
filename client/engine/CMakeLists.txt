@@ -2,6 +2,10 @@ project(client-engine)
 
 message(STATUS "${PROJECT_NAME} is building")
 
+if(POLICY CMP0174)
+    cmake_policy(SET CMP0174 NEW)
+endif()
+
 find_package(FFMPEG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)

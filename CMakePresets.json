@@ -5,7 +5,6 @@
       "name": "windows-base",
       "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "$env{CLANG_ROOT}/clang.exe",
         "CMAKE_CXX_COMPILER": "$env{CLANG_ROOT}/clang++.exe",
@@ -21,9 +20,27 @@
         "VCPKG_BINARY_SOURCES": "clear;files,${sourceDir}/.vcpkg-cache,readwrite"
       }
     },
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_MAKE_PROGRAM": "ninja",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
+      },
+      "environment": {
+        "CC": "clang",
+        "CXX": "clang++",
+        "VCPKG_BINARY_SOURCES": "clear;files,${sourceDir}/.vcpkg-cache,readwrite"
+      }
+    },
 
     {
       "name": "windows-clang-x64-Debug",
+      "binaryDir": "${sourceDir}/build/Windows/debug",
       "inherits": "windows-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -32,7 +49,27 @@
     },
     {
       "name": "windows-clang-x64-Release",
+      "binaryDir": "${sourceDir}/build/Windows/release",
       "inherits": "windows-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "VCPKG_MANIFEST_FEATURES": "client;server"
+      }
+    },
+
+    {
+      "name": "linux-clang-x64-Debug",
+      "binaryDir": "${sourceDir}/build/Linux/debug",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_MANIFEST_FEATURES": "client;server;test"
+      }
+    },
+    {
+      "name": "linux-clang-x64-Release",
+      "binaryDir": "${sourceDir}/build/Linux/release",
+      "inherits": "linux-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "VCPKG_MANIFEST_FEATURES": "client;server"
@@ -48,6 +85,15 @@
     {
       "name": "windows-clang-x64-Release",
       "configurePreset": "windows-clang-x64-Release"
+    },
+
+    {
+      "name": "linux-clang-x64-Debug",
+      "configurePreset": "linux-clang-x64-Debug"
+    },
+    {
+      "name": "linux-clang-x64-Release",
+      "configurePreset": "linux-clang-x64-Release"
     }
   ]
 }

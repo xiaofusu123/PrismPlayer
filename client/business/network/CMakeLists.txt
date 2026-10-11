@@ -31,7 +31,7 @@ if(SRC)
         asio::asio
         ixwebsocket::ixwebsocket
         nlohmann_json
-        spdlog::spdlog
+        spdlog::spdlog_header_only
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

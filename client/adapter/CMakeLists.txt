@@ -21,7 +21,8 @@ if(SRC)
     )
 
     target_link_libraries(${PROJECT_NAME}
-        PRIVATE spdlog::spdlog
+        PRIVATE
+            spdlog::spdlog_header_only
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")
