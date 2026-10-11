@@ -327,7 +327,7 @@
 
 > 命名空间：`Prism::Business`
 > 头文件：`client/business/{av_sync,network}/include/`
-> 状态：§3.1 AV Sync ✅ **完整实现**（`src/` 5 个 `.cpp` 共 323 行）；§3.2 Network ⛔ **占位（接口已定义，无实现）**（`internal/NetImpl.h` 与 `src/tmp.cpp` 均为 0 字节，`libclient-network.a` 是 832 B 空归档）
+> 状态：§3.1 AV Sync ✅ **完整实现**（`src/` 5 个 `.cpp` 共 323 行）；§3.2 Network ⛔ **占位（接口已定义，无实现）**（`internal/NetImpl.h` 是 0 字节，`src/tmp.cpp` 已于 2026-10-11 删除，`client-network` 目标不再生成）
 > 调用方：Service 层
 
 ### 3.1 AV Sync 模块 — 音视频同步
@@ -540,7 +540,7 @@
 > 命名空间：`Prism::Adapter`
 > 头文件：`client/adapter/include/`（抽象接口）+ `client/adapter/internal/`（平台实现）
 > 构建产物：静态库 (`client-adapter`)
-> 状态：🟡 **仅骨架** —— 5 个接口与 5 个平台实现（`WinFileAdapter` / `SQLiteDBAdapter` / `ASIONetworkAdapter` / `JSONConfigAdapter` / `OpenSSLCryptoAdapter`）都只有类声明，`src/tmp.cpp` 是 **0 字节**（该模块唯一的 `.cpp`），`libclient-adapter.a` 是 **832 B 空归档**。两处 `// TODO`：`internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`。
+> 状态：🟡 **仅骨架** —— 5 个接口与 5 个平台实现（`WinFileAdapter` / `SQLiteDBAdapter` / `ASIONetworkAdapter` / `JSONConfigAdapter` / `OpenSSLCryptoAdapter`）都只有类声明；模块现在**已无任何 `.cpp`**（`src/tmp.cpp` 这个 0 字节占位已于 2026-10-11 删除，`client-adapter` 目标不再生成）。两处 `// TODO`：`internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`。
 > ⚠️ 本节各接口的签名取自 `include/` 下的抽象接口；`internal/` 下的实现类与之一一对应，命名更具体（如 `DBAdapter` 的实现叫 `SQLiteDBAdapter`）。对照表见根目录 `GLOSSARY.md`。
 
 ### 4.1 FileAdapter — 文件 I/O 与媒体元数据提取
