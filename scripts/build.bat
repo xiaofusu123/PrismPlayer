@@ -4,16 +4,19 @@ setlocal enabledelayedexpansion
 
 set "PROJECT_ROOT=%~dp0.."
 echo project root: %PROJECT_ROOT%
-echo build directory: %PROJECT_ROOT%build
 
-cd %PROJECT_ROOT%
+cd "%PROJECT_ROOT%"
 
-set /p "choice=请输入你要构建的预设(1.windows-clang-x64-Debug 2.windows-clang-x64-Release): "
+if "%~1"=="" (
+    set /p "choice=请输入你要构建的预设(1.windows-clang-x64-Debug 2.windows-clang-x64-Release): "
+) else (
+    set "choice=%~1"
+)
 
 if "%choice%"=="1" (
     set "preset=windows-clang-x64-Debug"
     cmake --preset !preset!
-) else if "%preset%"=="2" (
+) else if "%choice%"=="2" (
     set "preset=windows-clang-x64-Release"
     cmake --preset !preset!
 ) else (

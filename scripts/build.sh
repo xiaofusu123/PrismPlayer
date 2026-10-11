@@ -2,14 +2,17 @@
 
 set -euo pipefail
 
-PROJECT_ROOT=$(cd .. && pwd)
+PROJECT_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 echo "project root: ${PROJECT_ROOT}"
-echo "build directory: ${PROJECT_ROOT}/build"
 
-cd ${PROJECT_ROOT}
+cd "${PROJECT_ROOT}"
 
-echo "请输入你要构建的预设(1.linux-clang-x64-Debug 2.linux-clang-x64-Release):"
-read -r choice
+if [ $# -gt 0 ]; then
+    choice=$1
+else
+    echo "请输入你要构建的预设(1.linux-clang-x64-Debug 2.linux-clang-x64-Release):"
+    read -r choice
+fi
 
 case "${choice}" in
     1) preset="linux-clang-x64-Debug";;

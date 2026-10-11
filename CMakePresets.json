@@ -5,7 +5,6 @@
       "name": "windows-base",
       "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/Windows",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "$env{CLANG_ROOT}/clang.exe",
         "CMAKE_CXX_COMPILER": "$env{CLANG_ROOT}/clang++.exe",
@@ -25,7 +24,6 @@
       "name": "linux-base",
       "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/Linux",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
@@ -42,6 +40,7 @@
 
     {
       "name": "windows-clang-x64-Debug",
+      "binaryDir": "${sourceDir}/build/Windows/debug",
       "inherits": "windows-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -50,6 +49,7 @@
     },
     {
       "name": "windows-clang-x64-Release",
+      "binaryDir": "${sourceDir}/build/Windows/release",
       "inherits": "windows-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
@@ -59,6 +59,7 @@
 
     {
       "name": "linux-clang-x64-Debug",
+      "binaryDir": "${sourceDir}/build/Linux/debug",
       "inherits": "linux-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -67,6 +68,7 @@
     },
     {
       "name": "linux-clang-x64-Release",
+      "binaryDir": "${sourceDir}/build/Linux/release",
       "inherits": "linux-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",

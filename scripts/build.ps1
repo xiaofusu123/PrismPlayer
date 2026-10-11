@@ -1,9 +1,10 @@
 #!/usr/bin/env pwsh
 
-$PROJECT_ROOT = Split-Path -Parent(Get-Location).Path
+$ErrorActionPreference = "Stop"
+
+$PROJECT_ROOT = Split-Path -Parent $PSScriptRoot
 
 Write-Host "project root: $PROJECT_ROOT"
-Write-Host "build directory: $PROJECT_ROOT\build"
 
 Set-Location $PROJECT_ROOT
 
@@ -17,7 +18,11 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
 
 Write-Host "compilation platform: $platform"
 
-$choice = Read-Host "请输入你要构建的预设(1.clang-x64-Debug 2.clang-x64-Release)"
+if ($args.Count -gt 0) {
+    $choice = $($args[0])
+} else {
+    $choice = Read-Host "请输入你要构建的预设(1.clang-x64-Debug 2.clang-x64-Release)"
+}
 
 if ($choice -eq 1) {
     $preset = "$platform-clang-x64-Debug"
