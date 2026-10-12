@@ -1,7 +1,9 @@
 {
   "name": "prism-player",
   "version": "0.0.1",
-  "default-features": ["client"],
+  "default-features": [
+    "client"
+  ],
   "features": {
     "client": {
       "description": "客户端依赖",
@@ -18,7 +20,6 @@
         "vulkan"
       ]
     },
-
     "server": {
       "description": "服务端依赖",
       "dependencies": [
@@ -29,10 +30,11 @@
         "spdlog"
       ]
     },
-
     "test": {
       "description": "单元测试 (GTest)",
-      "dependencies": ["gtest"]
+      "dependencies": [
+        "gtest"
+      ]
     }
   }
 }

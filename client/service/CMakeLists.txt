@@ -27,7 +27,8 @@ if(SRC)
     PRIVATE
         $<$<TARGET_EXISTS:client-av_sync>:client-av_sync>
         $<$<TARGET_EXISTS:client-network>:client-network>
-        spdlog::spdlog
+
+        spdlog::spdlog_header_only
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

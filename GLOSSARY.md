@@ -27,8 +27,8 @@
 | `client-av_sync` | `client-avsync`、`client-av-sync`、`av_sync` 目标 | 下划线，与目录名一致 |
 | `client-network` | `client-net`、`network` 目标 | |
 | `client-adapter` | `client-adapters`、`adapter` 目标 | |
-| `CMakeLists.txt` | **`CmakeLists.txt`**（小写 `m`） | 大小写敏感文件系统上 `add_subdirectory()` 找不到小写版本；Server 端目标平台是 Ubuntu，本机 Windows 永远测不出来。历史上 `server/` 与 `vendor/` 下 6 个文件是小写 |
-| `windows-clang-x64-Debug` / `windows-clang-x64-Release` | `windows-x64-Debug`、`windows-Debug`、`windows-clang-x64-Releasee` | 预设全名带 `clang`；`Releasee` 是 `build.bat` 非法输入分支里的拼写错误 |
+| `CMakeLists.txt` | **`CmakeLists.txt`**（小写 `m`） | 大小写敏感文件系统上 `add_subdirectory()` 找不到小写版本。历史上 `server/` 与 `vendor/` 下共 6 个文件是小写：**`server/` 下 3 个已于 2026-10-11 改为大写**，`vendor/` 下剩余的仍是小写，**已决定暂不处理**（`vendor/` 不在根构建中；门禁的防回归检查必须对它例外） |
+| `windows-clang-x64-Debug` / `windows-clang-x64-Release` / `linux-clang-x64-Debug` / `linux-clang-x64-Release` | `windows-x64-Debug`、`windows-Debug`、`windows-clang-x64-Releasee` | 预设全名带平台前缀与 `clang`；现共 **4 配置 + 4 构建预设**，各自 `binaryDir`（`build/{Windows,Linux}/{debug,release}`），**没有 `testPresets`**。后两个是历史名字：`Releasee` 是旧 `build.bat` 非法输入分支里的拼写错误，**已于 2026-10-11 修正，不再是当前仓库的写法** |
 | `windows-base` | — | hidden 预设，上面两个继承它 |
 | `test/` | **`tests/`** | 目录是单数。`代码规范.docx`（已归档）写的是 `tests`，以规范 §7 与实际目录为准 |
 | `include/` + `internal/` + `src/` | `include/`+`src/`（两层）、`Impl/` | 每模块三层；历史上的 `Impl/` 目录已全部改名 `internal/` |
@@ -56,7 +56,7 @@
 | `INetworkObserver` | `NetworkObserver`、`NetworkCallback` | |
 | `NetworkFactory` | `NetworkClientFactory` | |
 | `NetworkTypes` | `NetworkDefs`、`Types` | |
-| Network 的状态表述 | 「已实现」「未开始」「空模块」 | 统一写 **「占位（接口已定义，无实现）」**：`include/` 下 6 个头是真的，`internal/NetImpl.h` 与 `src/tmp.cpp` 是 0 字节 |
+| Network 的状态表述 | 「已实现」「未开始」「空模块」 | 统一写 **「占位（接口已定义，无实现）」**：`include/` 下 6 个头是真的，`internal/NetImpl.h` 是 0 字节（`src/tmp.cpp` 这个占位文件已于 2026-10-11 删除，`client-network` 目标不再生成） |
 | `FileTransferManager`、`P2PConnectionManager` | — | ⚠️ **这两个组件在磁盘上不存在**，`项目框架.md` 曾把它们列为 Network 的 5 个组件之一。实际组件以 `include/` 下的 6 个头文件为准 |
 | `ixwebsocket` | `websocketpp`、`IXWebSocket` | `websocketpp` 是 2026-06-01 冻结的 Word 旧版里的选型，已改 |
 
@@ -70,15 +70,15 @@
 | `ConfigAdapter`（接口） / `JSONConfigAdapter`（实现） | `SettingsAdapter`、`ConfigManager` | 同上 |
 | `NetworkAdapter`（接口） / `ASIONetworkAdapter`（实现） | `SocketAdapter`、`NetAdapter` | 同上 |
 
-> ⚠️ 说「适配器」时**指明是接口还是实现**：文档里列组件清单时用左边的接口名（这也是 `项目框架.md` 的做法，它没错），说具体实现时才用右边的名字。当前这两个名字的文件**都只有声明骨架**，`client/adapter/src/tmp.cpp` 是 0 字节。
+> ⚠️ 说「适配器」时**指明是接口还是实现**：文档里列组件清单时用左边的接口名（这也是 `项目框架.md` 的做法，它没错），说具体实现时才用右边的名字。当前这些文件**都只有声明骨架**；`client/adapter/src/tmp.cpp`（0 字节占位）已于 2026-10-11 删除，`client-adapter` 目标不再生成。
 
 ## 版本、数值与标识
 
 | 用这个 | 不要写成 | 说明 |
 |---|---|---|
 | **32 个 C API** | 27 个 API、30 个接口 | `client/service/include/Player.h` 里 `_API` 出现 **32** 次，`Player.cpp` 里 32 个定义。`项目计划书.md` 与 `项目框架.md` 曾三处写「27 个」，是笔误 |
-| `22.1.8` | `最新版`、`随便一个 clang-format` | 门禁工具版本钉死在此，见 `docs/adr/0002-代码门禁.md` |
-| clang 工具链根目录 | `PATH 里的 clang` | 走**机器级**环境变量 `CLANG_ROOT`（默认 `D:\Program\App\msys64\clang64\bin`）、`VCPKG_ROOT`；这两个变量是 Machine 级、用户级为空 |
+| `23.1.3` | `最新版`、`随便一个 clang-format` | 门禁工具版本钉死在此（2026-10-12 起；此前为 `22.1.8`，随工具链从 clang64 迁到 mingw64 而变），见 `docs/adr/0002-代码门禁.md` |
+| clang 工具链根目录 | `PATH 里的 clang` | 走**机器级**环境变量 `CLANG_ROOT`（默认 **`D:\Program\App\msys64\mingw64\bin`**；2026-10-12 起，此前为 `clang64\bin`）、`VCPKG_ROOT`；这两个变量是 Machine 级、用户级为空 |
 | `x64-mingw-dynamic` | `x64-windows`、`x64-windows-static` | 本项目的 vcpkg triplet |
 | GitHub 登录名（`xiaofusu123`、`RickeyDeung`、`Rikka2-aa`、`ambulance001`、`kuailede110`） | 成员真名；旧提交里的作者显示名 `xiaofusu`、`QuaSar`、`Rikka--aa`、`天才奇男子` | 仓库是 **PUBLIC**：文档、代码注释与 issue 里**一律**用 GitHub 登录名。`git log` 里看到的 `xiaofusu` / `QuaSar` / `Rikka--aa` / `天才奇男子` 是历史提交的作者显示名，**不是**登录名，也不代表成员还叫这个名字；本文档不再收录真名 |
 
