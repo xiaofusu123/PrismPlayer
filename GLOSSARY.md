@@ -77,7 +77,7 @@
 | 用这个 | 不要写成 | 说明 |
 |---|---|---|
 | **32 个 C API** | 27 个 API、30 个接口 | `client/service/include/Player.h` 里 `_API` 出现 **32** 次，`Player.cpp` 里 32 个定义。`项目计划书.md` 与 `项目框架.md` 曾三处写「27 个」，是笔误 |
-| `23.1.3` | `最新版`、`随便一个 clang-format` | 门禁工具版本钉死在此（2026-10-12 起；此前为 `22.1.8`，随工具链从 clang64 迁到 mingw64 而变），见 `docs/adr/0002-代码门禁.md` |
+| `23.1.3` | `最新版`、`随便一个 clang-format` | 门禁工具版本钉死在此（2026-10-12 起；此前为 `22.1.8`，随工具链从 clang64 迁到 mingw64 而变）。WSL 侧 clang 是 `23.1.2`（前缀 `23.1` 相同），但 WSL 还没装 `clang-format` / `clang-tidy`，见 `docs/adr/0002-代码门禁.md` 与 `docs/markdown/项目框架.md` 7.1 |
 | clang 工具链根目录 | `PATH 里的 clang` | 走**机器级**环境变量 `CLANG_ROOT`（默认 **`D:\Program\App\msys64\mingw64\bin`**；2026-10-12 起，此前为 `clang64\bin`）、`VCPKG_ROOT`；这两个变量是 Machine 级、用户级为空 |
 | `x64-mingw-dynamic` | `x64-windows`、`x64-windows-static` | 本项目的 vcpkg triplet |
 | GitHub 登录名（`xiaofusu123`、`RickeyDeung`、`Rikka2-aa`、`ambulance001`、`kuailede110`） | 成员真名；旧提交里的作者显示名 `xiaofusu`、`QuaSar`、`Rikka--aa`、`天才奇男子` | 仓库是 **PUBLIC**：文档、代码注释与 issue 里**一律**用 GitHub 登录名。`git log` 里看到的 `xiaofusu` / `QuaSar` / `Rikka--aa` / `天才奇男子` 是历史提交的作者显示名，**不是**登录名，也不代表成员还叫这个名字；本文档不再收录真名 |
