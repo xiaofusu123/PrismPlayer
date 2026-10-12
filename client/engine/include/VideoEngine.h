@@ -6,7 +6,7 @@
     #include <windows.h>
     typedef HANDLE RENDER_RESULT_HANDLE;
 #else
-    typedef int32_t RESULTHANDLE;
+    typedef int32_t RENDER_RESULT_HANDLE;
 #endif
 
 namespace Prism::Engine {
