@@ -59,9 +59,17 @@ if (-not $env:VCPKG_ROOT) {
 $env:VCPKG_ROOT = $vcpkgRoot
 Write-Host "vcpkg root: $vcpkgRoot"
 
-if ($args.Count -gt 0) {
-    $choice = $($args[0])
-} else {
+$clean = $false
+$choice = $null
+foreach ($arg in $args) {
+    if ($arg -eq "--clean") {
+        $clean = $true
+    } elseif ($arg -match "^[12]$" -and -not $choice) {
+        $choice = $arg
+    }
+}
+
+if (-not $choice) {
     $choice = Read-Host "请输入你要构建的预设(1.clang-x64-Debug 2.clang-x64-Release)"
 }
 
@@ -75,6 +83,19 @@ if ($choice -eq 1) {
 }
 
 Write-Host "使用的预设为 $preset"
+
+if ($clean) {
+    $platformDir = if ($platform -eq "windows") { "Windows" } else { "Linux" }
+    $configDir = if ($preset -like "*Debug") { "debug" } else { "release" }
+    $buildDir = Join-Path $PROJECT_ROOT "build/$platformDir/$configDir"
+    if (Test-Path $buildDir) {
+        Write-Host "清空构建目录（含依赖安装树 vcpkg_installed）：$buildDir"
+        Remove-Item -Recurse -Force $buildDir
+    } else {
+        Write-Host "构建目录不存在，无需清空：$buildDir"
+    }
+    Write-Host "（.vcpkg-cache 作为本机加速缓存予以保留，见 $PREREQUISITE_DOC）"
+}
 
 cmake --preset $preset
 if ($LASTEXITCODE -ne 0) {
