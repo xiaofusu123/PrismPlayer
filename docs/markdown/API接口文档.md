@@ -5,7 +5,7 @@
 >
 > **本文档记录的是「接口的形状」，每个接口的实现状态见各节标题下的「状态」行。** 完整的实现状态汇总见 `项目计划书.md` §11；术语以根目录 `GLOSSARY.md` 为准。
 >
-> 修复说明：§1 与 §6 原先都写「27 个 C API」，实测 `client/service/include/Player.h` 中 `_API` 宏出现 **32** 次，与 `Player.cpp:135-572` 的 32 个 `extern "C"` 定义一一对应，已改为 32。本文档的 API 覆盖是完整的：32 个函数名与头文件逐一比对后**无遗漏、无多余**。
+> 修复说明：§1 与 §6 原先都写「27 个 C API」，实测 `client/service/include/Player.h` 中 `PRISM_API` 宏出现 **32** 次，与 `Player.cpp:135-572` 的 32 个 `extern "C"` 定义一一对应，已改为 32。本文档的 API 覆盖是完整的：32 个函数名与头文件逐一比对后**无遗漏、无多余**。
 
 ---
 
@@ -261,7 +261,7 @@
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `handle` | `RENDER_RESULT_HANDLE` | 渲染结果句柄（Windows: HANDLE） |
+| `handle` | `RenderResultHandle` | 渲染结果句柄（Windows: HANDLE） |
 | `valid` | `bool` | 句柄是否有效 |
 | `width` | `uint32_t` | 渲染宽度 |
 | `height` | `uint32_t` | 渲染高度 |

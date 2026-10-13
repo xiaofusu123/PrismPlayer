@@ -4,9 +4,9 @@
 
 #ifdef _WIN32
 #include <windows.h>
-typedef HANDLE RENDER_RESULT_HANDLE;
+typedef HANDLE RenderResultHandle;
 #else
-typedef int32_t RENDER_RESULT_HANDLE;
+typedef int32_t RenderResultHandle;
 #endif
 
 namespace Prism::Engine {
@@ -27,8 +27,8 @@ struct VideoSyncInfo {
  * @brief 渲染元数据
  */
 struct RenderMetadata {
-    RENDER_RESULT_HANDLE handle; /**< 渲染结果句柄 */
-    bool valid;                  /**< 句柄是否有效 */
+    RenderResultHandle handle; /**< 渲染结果句柄 */
+    bool valid;                /**< 句柄是否有效 */
 
     uint32_t width;     /**< 渲染宽度 */
     uint32_t height;    /**< 渲染高度 */

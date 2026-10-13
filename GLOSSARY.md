@@ -76,7 +76,7 @@
 
 | 用这个 | 不要写成 | 说明 |
 |---|---|---|
-| **32 个 C API** | 27 个 API、30 个接口 | `client/service/include/Player.h` 里 `_API` 出现 **32** 次，`Player.cpp` 里 32 个定义。`项目计划书.md` 与 `项目框架.md` 曾三处写「27 个」，是笔误 |
+| **32 个 C API** | 27 个 API、30 个接口 | `client/service/include/Player.h` 里 `PRISM_API` 出现 **32** 次，`Player.cpp` 里 32 个定义。`项目计划书.md` 与 `项目框架.md` 曾三处写「27 个」，是笔误 |
 | `23.1.3` | `最新版`、`随便一个 clang-format` | 门禁工具版本钉死在此（2026-10-12 起；此前为 `22.1.8`，随工具链从 clang64 迁到 mingw64 而变）。WSL 侧的 clang 与 `clang-format` / `clang-tidy` 都是 `23.1.2`（前缀 `23.1` 相同），见 `docs/adr/0002-代码门禁.md` 与 `docs/markdown/项目框架.md` 7.1 |
 | clang 工具链根目录 | `PATH 里的 clang` | 走**机器级**环境变量 `CLANG_ROOT`（默认 **`D:\Program\App\msys64\mingw64\bin`**；2026-10-12 起，此前为 `clang64\bin`）、`VCPKG_ROOT`；这两个变量是 Machine 级、用户级为空 |
 | `x64-mingw-dynamic` | `x64-windows`、`x64-windows-static` | 本项目的 vcpkg triplet |
