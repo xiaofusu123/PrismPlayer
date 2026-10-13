@@ -9,8 +9,8 @@ PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=.githooks/common.sh
 . "${PRISM_HOOK_DIR}/common.sh"
 
-# 耗时预算，与 AGENTS.md 记录的值保持一致。
-PRISM_TIME_BUDGET_SECONDS=900
+# 耗时预算，可用环境变量覆盖（默认与 AGENTS.md 记录的值一致，超了只提示不拒绝）。
+PRISM_TIME_BUDGET_SECONDS=${PRISM_TIME_BUDGET_SECONDS:-900}
 
 prism_blank
 prism_info "pre-push 门禁：Debug 构建 + 本次改动文件的 clang-tidy"
@@ -21,7 +21,7 @@ if ! PRISM_CLANG_TIDY=$(prism_require_tool clang-tidy); then
 fi
 
 PRISM_ROOT=$(prism_repo_root) || {
-    prism_error "不在 Git 仓库里，跳过 pre-push 检查。"
+    prism_error "不在 Git 仓库里，无法执行 pre-push 检查（拒绝推送，避免静默放行）。"
     exit 1
 }
 cd "${PRISM_ROOT}" || exit 1
@@ -153,7 +153,7 @@ if ! "${PRISM_HOOK_DIR}/check-clang-tidy.sh" "${PRISM_BUILD_DIR}" "${PRISM_BASE}
     prism_blank
     prism_error "推送被拒绝：静态检查未通过（详见上）。"
     prism_error "规则集：.clang-tidy（三条规则，均为致命错误）；规范映射：docs/markdown/代码规范.md §0。"
-    prism_error "确实无法改的地方，只允许就地加 NOLINTNEXTLINE 并注明原因（ADR 决策 13）。"
+    prism_error "确实无法改的地方，只允许就地加 NOLINTNEXTLINE 并注明原因（#64 实现决策 13）。"
     exit 1
 fi
 

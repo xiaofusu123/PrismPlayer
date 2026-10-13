@@ -18,10 +18,11 @@ if (-not (Get-Command $gitExe -ErrorAction SilentlyContinue)) {
     }
 }
 
-$hooks = @("pre-commit", "pre-push", "check-clang-tidy.sh", "common.sh")
+# 四个文件只列一次：存在性检查与 CRLF 自检都从它派生。
+$hooks = @("common.sh", "pre-commit", "pre-push", "check-clang-tidy.sh")
 
 $missing = @()
-foreach ($hook in @("pre-commit", "pre-push")) {
+foreach ($hook in $hooks) {
     if (-not (Test-Path (Join-Path ".githooks" $hook))) { $missing += $hook }
 }
 if ($missing.Count -gt 0) {
@@ -50,11 +51,19 @@ if ($crlf.Count -gt 0) {
     Write-Host "      .gitattributes 已声明 .githooks/* text eol=lf，重新 checkout 即可修正。" -ForegroundColor Yellow
 }
 
+# 版本要求从钩子自己的常量读，不在安装脚本里再写一遍（避免两处各说一套）。
+$commonSh = Get-Content -Raw (Join-Path ".githooks" "common.sh")
+if ($commonSh -match 'PRISM_CLANG_VERSION_PREFIX="([^"]+)"') {
+    $versionRequirement = "$($Matches[1]).x"
+} else {
+    $versionRequirement = "见 .githooks/common.sh 的 PRISM_CLANG_VERSION_PREFIX"
+}
+
 Write-Host "门禁已装上：core.hooksPath = $hooksPath（写在本仓库 .git/config，不进版本控制）"
 Write-Host ""
-Write-Host "pre-commit  staged 的 C/C++ 文件必须 clang-format 过；文件名不得是 CmakeLists.txt（vendor/** 例外）。"
+Write-Host "pre-commit  staged 的 C/C++ 文件必须 clang-format 过；文件名不得是 CmakeLists.txt（vendor/** 只豁免这一条）。"
 Write-Host "pre-push    先跑 windows-clang-x64-Debug 构建，再对本次推送改动的 C/C++ 文件跑 clang-tidy。"
-Write-Host "版本要求     clang-format / clang-tidy 必须 23.1.x，不符时钩子在动手前就报错退出（ADR 决策 6）。"
+Write-Host "版本要求     clang-format / clang-tidy 必须 $versionRequirement，不符时钩子在动手前就报错退出（ADR 决策 6）。"
 Write-Host "唯一绕过场景 一次性格式批量整理，且必须在 PR 描述里说明：git commit/push --no-verify"
 
 exit 0

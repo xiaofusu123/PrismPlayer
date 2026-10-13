@@ -39,12 +39,20 @@ PRISM_TMP=$(prism_tmpdir) || {
 }
 trap 'rm -rf "${PRISM_TMP}"' EXIT HUP INT TERM
 
-# -z + tr：避开 core.quotePath 对非 ASCII 文件名的转义。
+# -z + tr：避开 core.quotePath 对非 ASCII 文件名的转义。退出码要判：git 失败留下空文件，
+# 会被下面的「没有 C/C++ 改动」当成放行（fail-open）。
 if [ -n "${PRISM_BASE}" ]; then
-    git diff --name-only --diff-filter=ACMR -z "${PRISM_BASE}...HEAD" | tr '\0' '\n' > "${PRISM_TMP}/raw"
+    if ! git diff --name-only --diff-filter=ACMR -z "${PRISM_BASE}...HEAD" > "${PRISM_TMP}/raw.z"; then
+        prism_error "取改动文件失败（git diff ${PRISM_BASE}...HEAD 返回非零），检查无法完成。"
+        exit 1
+    fi
 else
-    git ls-files -z | tr '\0' '\n' > "${PRISM_TMP}/raw"
+    if ! git ls-files -z > "${PRISM_TMP}/raw.z"; then
+        prism_error "取 tracked 文件失败（git ls-files 返回非零），检查无法完成。"
+        exit 1
+    fi
 fi
+tr '\0' '\n' < "${PRISM_TMP}/raw.z" > "${PRISM_TMP}/raw"
 
 # ---- 本次改动的 C/C++ 文件 ----
 : > "${PRISM_TMP}/changed_c"
@@ -73,7 +81,11 @@ if [ ! -f "${PRISM_DB}" ]; then
 fi
 
 # ---- 仓库里所有跟踪的 C/C++ 文件（用于追溯 include 链）----
-git ls-files -z | tr '\0' '\n' > "${PRISM_TMP}/all_tracked"
+if ! git ls-files -z > "${PRISM_TMP}/all_tracked.z"; then
+    prism_error "取 tracked 文件失败（git ls-files 返回非零），无法追溯 include 链。"
+    exit 1
+fi
+tr '\0' '\n' < "${PRISM_TMP}/all_tracked.z" > "${PRISM_TMP}/all_tracked"
 : > "${PRISM_TMP}/all_c"
 while IFS= read -r PRISM_F; do
     prism_is_c_source "${PRISM_F}" || continue
@@ -98,16 +110,10 @@ if [ ! -s "${PRISM_TMP}/db_sources" ]; then
 fi
 
 # 仓库内相对路径 f 是否为一个编译单元：数据库存绝对路径，故用带斜杠的后缀匹配。
+# -i：Windows 路径大小写不敏感，数据库里的盘符/目录大小写可能与 git 给的写法不同。
 prism_is_tu() {
     grep -q -i -F -- "/$1" "${PRISM_TMP}/db_sources"
 }
-
-: > "${PRISM_TMP}/tus"
-while IFS= read -r PRISM_F; do
-    if prism_is_tu "${PRISM_F}"; then
-        printf '%s\n' "${PRISM_F}" >> "${PRISM_TMP}/tus"
-    fi
-done < "${PRISM_TMP}/changed_c"
 
 # ---- 向上找「谁 include 了改动的头文件」，最多 3 层（实测本仓库深度为 2），得到要分析的编译单元 ----
 cp "${PRISM_TMP}/changed_c" "${PRISM_TMP}/frontier"
@@ -119,10 +125,10 @@ while [ "${PRISM_ROUND}" -lt 3 ] && [ -s "${PRISM_TMP}/frontier" ]; do
     while IFS= read -r PRISM_F; do
         PRISM_BASE_NAME=$(basename -- "${PRISM_F}")
         # 固定字符串匹配（只按基名，本项目无重名头文件）：不用正则，省掉转义，
-        # 也避开不同 sed 对 `\\&` 的处理差异。
-        # shellcheck disable=SC2046
-        grep -l -F -e "#include \"${PRISM_BASE_NAME}\"" -e "#include <${PRISM_BASE_NAME}>" \
-            $(cat "${PRISM_TMP}/all_c") 2>/dev/null >> "${PRISM_TMP}/found"
+        # 也避开不同 sed 对 `\\&` 的处理差异。文件名经 xargs -0 传入，避免空格被拆词。
+        tr '\n' '\0' < "${PRISM_TMP}/all_c" \
+            | xargs -0 -r grep -l -F -e "#include \"${PRISM_BASE_NAME}\"" -e "#include <${PRISM_BASE_NAME}>" \
+                2>/dev/null >> "${PRISM_TMP}/found"
     done < "${PRISM_TMP}/frontier"
     sort -u -o "${PRISM_TMP}/found" "${PRISM_TMP}/found"
 
@@ -237,7 +243,7 @@ if [ "${PRISM_DIAG_COUNT}" -ne 0 ]; then
     done < "${PRISM_TMP}/diags"
     prism_blank
     prism_error "处理：按 docs/markdown/代码规范.md 对应章节改代码（§1.1-1.3 命名、§4.6 虚析构、§5.1 函数长度）。"
-    prism_error "      确实改不了的只允许就地 NOLINTNEXTLINE 并注明原因（ADR 决策 13），不允许关规则或降级。"
+    prism_error "      确实改不了的只允许就地 NOLINTNEXTLINE 并注明原因（#64 实现决策 13），不允许关规则或降级。"
     exit 1
 fi
 

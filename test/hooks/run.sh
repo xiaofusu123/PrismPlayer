@@ -16,6 +16,7 @@ PRISM_RUN_SH=$(command -v sh) || PRISM_RUN_SH=/bin/sh
 # （`export` 也一样），用 env 才能确实生效。真实钩子由 git 用自带 sh 调起，不受这条影响。
 PRISM_CLANG_FORMAT_REAL=$(prism_find_tool clang-format || :)
 PRISM_CLANGXX_REAL=$(prism_find_tool clang++ || :)
+PRISM_CLANG_TIDY_REAL=$(prism_find_tool clang-tidy || :)
 
 # 受限环境（本机沙箱）里，从 sh 起的 pwsh 拿不到原生命令的 stdout：`git --version` 会是空字符串，
 # $LASTEXITCODE 也是空。install-hooks.ps1 的自校验因此必然误判，探测出来就只校验「钩子真装上了」。
@@ -128,8 +129,29 @@ EOF
 
 stage() { git -C "${PRISM_REPO}" add "$@"; }
 
+# 桩工具：只回答 --version，用来在不动真实工具链的前提下测版本前缀检查。
+# 文件名带 .exe：prism_find_tool 先找 $CLANG_ROOT/<名>.exe，本机（Windows）走的正是这条。
+install_fake_tool() {
+    mkdir -p "${PRISM_REPO}/fake-clang/bin"
+    {
+        printf '#!/bin/sh\n'
+        printf 'echo "%s version %s"\n' "$1" "$2"
+    } > "${PRISM_REPO}/fake-clang/bin/$1"
+    chmod +x "${PRISM_REPO}/fake-clang/bin/$1"
+}
+
+# 把当前工作区全部提交成基线提交，并回显它的 hash（供 check-clang-tidy 的 diff 基线用）。
+commit_base() {
+    git -C "${PRISM_REPO}" add -A
+    git -C "${PRISM_REPO}" commit -q -m "$1"
+    git -C "${PRISM_REPO}" rev-parse HEAD
+}
+
 printf '门禁自测：仓库根 %s\n' "${PRISM_TEST_ROOT}"
 printf 'clang-format: %s\n' "${PRISM_CLANG_FORMAT_REAL:-未找到}"
+if [ -z "${PRISM_CLANG_TIDY_REAL}" ]; then
+    printf '警告：找不到 clang-tidy，check-clang-tidy 的用例会 SKIP。\n' >&2
+fi
 
 if [ -z "${PRISM_CLANG_FORMAT_REAL}" ]; then
     printf '错误：找不到 clang-format，无法自测（见 docs/markdown/项目框架.md 7.1）。\n' >&2
@@ -183,6 +205,7 @@ bad_cpp > "${PRISM_REPO}/untracked.cpp"
 stage staged.cpp
 run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/pre-commit
 expect_status 0 "只 stage 了合规文件，提交放行"
+expect_out_has "通过：1 个 staged C/C++ 文件" "只统计了 staged 的那 1 个文件"
 expect_out_lacks "untracked.cpp" "报错里不出现未 staged 的文件"
 
 start_case "pre-commit：CmakeLists.txt 被拦，报错指出正确命名"
@@ -206,13 +229,35 @@ stage vendor/memorypool/CmakeLists.txt
 run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/pre-commit
 expect_status 0 "vendor/ 下的 CmakeLists.txt 放行"
 
+start_case "pre-commit：vendor/** 只豁免文件名，格式检查照做"
+mkdir -p "${PRISM_REPO}/vendor/third_party"
+bad_cpp > "${PRISM_REPO}/vendor/third_party/thing.cc"
+stage vendor/third_party/thing.cc
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/pre-commit
+expect_status_nonzero "vendor/ 下的 C/C++ 格式违规被拦"
+expect_out_has "vendor/third_party/thing.cc" "报错点名 vendor 下的文件"
+
+start_case "pre-commit：git mv 改名后的文件不会被漏掉（--diff-filter 必须带 R）"
+# 先提交一个「内容坏、名字对」的文件：改名的相似度是 100%，index 里记成 R100。
+bad_cpp > "${PRISM_REPO}/before.cpp"
+git -C "${PRISM_REPO}" add before.cpp
+git -C "${PRISM_REPO}" commit -q -m base
+git -C "${PRISM_REPO}" mv before.cpp after.cpp
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/pre-commit
+expect_status_nonzero "改名后的坏文件仍然被拦"
+expect_out_has "after.cpp" "报错点名改名后的新路径"
+
+start_case "pre-commit：git mv 改成 CmakeLists.txt 同样被拦（#67 AC 的改名路径）"
+printf 'cmake_minimum_required(VERSION 3.20)\n' > "${PRISM_REPO}/CMakeLists.txt"
+git -C "${PRISM_REPO}" add CMakeLists.txt
+git -C "${PRISM_REPO}" commit -q -m base
+git -C "${PRISM_REPO}" mv CMakeLists.txt CmakeLists.txt
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/pre-commit
+expect_status_nonzero "改名成 CmakeLists.txt 被拦"
+expect_out_has "CmakeLists.txt" "报错点名改名后的错误命名"
+
 start_case "pre-commit：工具版本不匹配时在动手之前就报错退出"
-mkdir -p "${PRISM_REPO}/fake-clang/bin"
-cat > "${PRISM_REPO}/fake-clang/bin/clang-format.exe" <<'EOF'
-#!/bin/sh
-echo "clang-format version 22.1.8"
-EOF
-chmod +x "${PRISM_REPO}/fake-clang/bin/clang-format.exe"
+install_fake_tool clang-format.exe 22.1.8
 good_cpp > "${PRISM_REPO}/sample.cpp"
 stage sample.cpp
 PRISM_OUT=$(cd "${PRISM_REPO}" && env CLANG_ROOT="${PRISM_REPO}/fake-clang/bin" \
@@ -231,6 +276,7 @@ start_case "install-hooks.sh：设好 core.hooksPath 并校验生效"
 run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/install-hooks.sh
 expect_status 0 "安装脚本成功"
 expect_out_has "门禁已装上" "打印安装结果"
+expect_out_has "${PRISM_CLANG_VERSION_PREFIX}" "版本要求从 common.sh 读出，不在安装脚本里硬写"
 run_in "${PRISM_REPO}" git config --get core.hooksPath
 expect_status 0 "能读回 hooksPath"
 case "${PRISM_OUT}" in
@@ -276,22 +322,25 @@ fi
 # ============================================================
 
 start_case "check-clang-tidy：没有 C/C++ 改动时直接跳过，不产生额外耗时"
+if [ -z "${PRISM_CLANG_TIDY_REAL}" ]; then
+    printf '    [SKIP] 本机没有 clang-tidy\n'
+else
 printf '# 只改文档\n' > "${PRISM_REPO}/README.md"
-git -C "${PRISM_REPO}" add README.md
-git -C "${PRISM_REPO}" commit -q -m base
-PRISM_BASE_REF=$(git -C "${PRISM_REPO}" rev-parse HEAD)
+PRISM_BASE_REF=$(commit_base base)
 printf '# 又改文档\n' > "${PRISM_REPO}/README.md"
 git -C "${PRISM_REPO}" add README.md
 git -C "${PRISM_REPO}" commit -q -m doc-only
 run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
 expect_status 0 "没有 C/C++ 改动时通过"
 expect_out_has "跳过 clang-tidy" "明确说明跳过"
+fi
 
 start_case "check-clang-tidy：缺编译数据库时给出可读报错，不含糊通过"
+if [ -z "${PRISM_CLANG_TIDY_REAL}" ]; then
+    printf '    [SKIP] 本机没有 clang-tidy\n'
+else
 bad_cpp > "${PRISM_REPO}/sample.cpp"
-git -C "${PRISM_REPO}" add sample.cpp
-git -C "${PRISM_REPO}" commit -q -m base
-PRISM_BASE_REF=$(git -C "${PRISM_REPO}" rev-parse HEAD)
+PRISM_BASE_REF=$(commit_base base)
 printf 'int  PrismOther( ) { return 2; }\n' > "${PRISM_REPO}/sample.cpp"
 git -C "${PRISM_REPO}" add sample.cpp
 git -C "${PRISM_REPO}" commit -q -m change
@@ -299,11 +348,12 @@ run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${
 expect_status_nonzero "缺数据库时失败"
 expect_out_has "找不到编译数据库" "报错说明缺数据库"
 expect_out_has "CMAKE_EXPORT_COMPILE_COMMANDS" "报错指向修复方式"
+fi
 
 # 端到端：手写一个最小编译数据库，让改变的头文件里的命名违规被查出来。
 start_case "check-clang-tidy：改动头文件里的命名违规被查出来（真跑 clang-tidy）"
-if [ -z "${PRISM_CLANGXX_REAL}" ] || ! command -v cygpath >/dev/null 2>&1; then
-    printf '    [SKIP] 需要 clang++ 与 cygpath\n'
+if [ -z "${PRISM_CLANGXX_REAL}" ] || [ -z "${PRISM_CLANG_TIDY_REAL}" ] || ! command -v cygpath >/dev/null 2>&1; then
+    printf '    [SKIP] 需要 clang++、clang-tidy 与 cygpath\n'
 else
     mkdir -p "${PRISM_REPO}/include" "${PRISM_REPO}/src" "${PRISM_REPO}/build"
     cat > "${PRISM_REPO}/include/Naming.h" <<'EOF'
@@ -339,9 +389,7 @@ EOF
 ]
 EOF
 
-    git -C "${PRISM_REPO}" add -A
-    git -C "${PRISM_REPO}" commit -q -m base
-    PRISM_BASE_REF=$(git -C "${PRISM_REPO}" rev-parse HEAD)
+    PRISM_BASE_REF=$(commit_base base)
 
     # 第二笔提交只改头文件：把 typedef 改成不合规的名字。
     cat > "${PRISM_REPO}/include/Naming.h" <<'EOF'
@@ -377,12 +425,7 @@ fi
 # ============================================================
 
 start_case "pre-push：前置条件不满足时给可读提示，不倒一堆 CMake 输出"
-mkdir -p "${PRISM_REPO}/fake-clang/bin"
-cat > "${PRISM_REPO}/fake-clang/bin/clang-tidy.exe" <<'EOF'
-#!/bin/sh
-echo "LLVM version 23.1.3"
-EOF
-chmod +x "${PRISM_REPO}/fake-clang/bin/clang-tidy.exe"
+install_fake_tool clang-tidy.exe 23.1.3
 PRISM_OUT=$(cd "${PRISM_REPO}" && env CLANG_ROOT="${PRISM_REPO}/fake-clang/bin" \
     "${PRISM_RUN_SH}" .githooks/pre-push origin 2>&1 < /dev/null)
 PRISM_STATUS=$?
@@ -392,12 +435,7 @@ expect_out_has "项目框架.md" "指向文档"
 expect_out_lacks "CMake Error" "没有把 CMake 的原始报错倒给用户"
 
 start_case "pre-push：clang-tidy 版本不匹配时在动手之前就报错退出"
-mkdir -p "${PRISM_REPO}/fake-clang/bin"
-cat > "${PRISM_REPO}/fake-clang/bin/clang-tidy.exe" <<'EOF'
-#!/bin/sh
-echo "LLVM version 22.1.8"
-EOF
-chmod +x "${PRISM_REPO}/fake-clang/bin/clang-tidy.exe"
+install_fake_tool clang-tidy.exe 22.1.8
 PRISM_OUT=$(cd "${PRISM_REPO}" && env CLANG_ROOT="${PRISM_REPO}/fake-clang/bin" \
     "${PRISM_RUN_SH}" .githooks/pre-push origin 2>&1 < /dev/null)
 PRISM_STATUS=$?

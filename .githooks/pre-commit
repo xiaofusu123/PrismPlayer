@@ -1,6 +1,6 @@
 #!/bin/sh
 # pre-commit：只查本次提交 staged 的内容（index，不是工作区）。
-#   ① 文件名不得是 CmakeLists.txt（vendor/** 例外，#39 决策 29）；
+#   ① 文件名不得是 CmakeLists.txt（#52；vendor/** 只豁免这一条，#39 决策 29）；
 #   ② staged 的 C/C++ 文件必须已经 clang-format 过。
 # 不跑 clang-tidy（要编译数据库且慢，ADR 决策 3）。绕过只允许一次性格式批量整理，且须在 PR 里说明。
 
@@ -16,8 +16,8 @@ if ! PRISM_CLANG_FORMAT=$(prism_require_tool clang-format); then
 fi
 
 PRISM_ROOT=$(prism_repo_root) || {
-    prism_error "不在 Git 仓库里，跳过 pre-commit 检查。"
-    exit 0
+    prism_error "不在 Git 仓库里，无法执行 pre-commit 检查（拒绝提交，避免静默放行）。"
+    exit 1
 }
 cd "${PRISM_ROOT}" || exit 1
 
@@ -28,7 +28,13 @@ PRISM_TMP=$(prism_tmpdir) || {
 trap 'rm -rf "${PRISM_TMP}"' EXIT HUP INT TERM
 
 # -z + tr：文件名含非 ASCII 时避免 core.quotePath 转义，否则 basename/git show 全会错。
-git diff --cached --name-only --diff-filter=ACM -z | tr '\0' '\n' > "${PRISM_TMP}/staged"
+# 必须带 R：git 默认开重命名检测，`git mv a.cpp CmakeLists.txt` 在 index 里是 R100，
+# 漏掉 R 就会让改名后的文件整条绕过门禁。
+if ! git diff --cached --name-only --diff-filter=ACMR -z > "${PRISM_TMP}/staged.z"; then
+    prism_error "读取 staged 文件列表失败（git diff --cached 返回非零），无法判定，拒绝提交。"
+    exit 1
+fi
+tr '\0' '\n' < "${PRISM_TMP}/staged.z" > "${PRISM_TMP}/staged"
 
 if [ ! -s "${PRISM_TMP}/staged" ]; then
     exit 0
@@ -44,13 +50,13 @@ PRISM_CHECKED=0
 while IFS= read -r PRISM_FILE; do
     [ -n "${PRISM_FILE}" ] || continue
 
-    # vendor/ 不参与构建，保留上游目录结构与那 3 个 CmakeLists.txt。
-    case "${PRISM_FILE}" in
-        vendor/*) continue ;;
-    esac
-
+    # vendor/ 不参与构建，那 3 个 CmakeLists.txt 永久保留（#39 决策 29）：只豁免文件名检查，
+    # 格式检查照做 —— vendor 里的 C/C++ 也是要提交的代码（AGENTS.md「只做格式检查」）。
     if [ "$(basename -- "${PRISM_FILE}")" = "CmakeLists.txt" ]; then
-        printf '%s\n' "${PRISM_FILE}" >> "${PRISM_TMP}/bad_names"
+        case "${PRISM_FILE}" in
+            vendor/*) ;;
+            *) printf '%s\n' "${PRISM_FILE}" >> "${PRISM_TMP}/bad_names" ;;
+        esac
     fi
 
     prism_is_c_source "${PRISM_FILE}" || continue
@@ -58,8 +64,20 @@ while IFS= read -r PRISM_FILE; do
     PRISM_CHECKED=$((PRISM_CHECKED + 1))
 
     # cwd 已是仓库根，--assume-filename 用仓库内相对路径，clang-format 靠它找 .clang-format 并判语言。
-    PRISM_FMT_OUT=$(git show ":${PRISM_FILE}" 2>/dev/null \
-        | "${PRISM_CLANG_FORMAT}" --dry-run --Werror --assume-filename="${PRISM_FILE}" - 2>&1)
+    # 先落到文件再喂进去：命令替换会吃掉结尾换行，那本身就会被 clang-format 判成不合规。
+    if ! git show ":${PRISM_FILE}" > "${PRISM_TMP}/blob" 2>"${PRISM_TMP}/show_err"; then
+        # 读不到 index 内容就判不合规：空输入会让 clang-format 以 0 退出，静默放行是最坏的失败方式。
+        printf '%s\n' "${PRISM_FILE}" >> "${PRISM_TMP}/bad_format"
+        {
+            printf '%s\n' "----- ${PRISM_FILE}"
+            printf '%s\n' "无法从 index 读取该文件（git show :${PRISM_FILE} 失败）："
+            cat "${PRISM_TMP}/show_err"
+        } >> "${PRISM_TMP}/format_log"
+        continue
+    fi
+
+    PRISM_FMT_OUT=$("${PRISM_CLANG_FORMAT}" --dry-run --Werror --assume-filename="${PRISM_FILE}" - \
+        < "${PRISM_TMP}/blob" 2>&1)
     PRISM_FMT_STATUS=$?
 
     if [ "${PRISM_FMT_STATUS}" -ne 0 ]; then

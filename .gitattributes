@@ -4,6 +4,11 @@
 
 * text=auto eol=lf
 
+# 显式写出来（ADR 0002 决策 4 把它当地基，install-hooks 的告警文案也指向它）：
+# 钩子文件没有扩展名，一旦被检出成 CRLF，`#!/bin/sh` 在 Linux/WSL 上直接 bad interpreter。
+.githooks/* text eol=lf
+*.sh text eol=lf
+
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
