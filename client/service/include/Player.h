@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Types.h"
 #include "API.h"
+#include "Types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,16 +16,15 @@ extern "C" {
  * @param user_data 回调透传的用户数据
  * @return 播放器句柄，失败返回 NULL
  */
-_API PrismPlayerHandle prism_player_create(const PrismConfig* config,
-                                           PrismEventCallback callback,
-                                           void* user_data);
+PRISM_API PrismPlayerHandle prism_player_create(const PrismConfig* config,
+                                                PrismEventCallback callback, void* user_data);
 
 /**
  * @brief 销毁播放器实例，释放所有资源
  *        自动断开网络连接并离开房间
  * @param player 播放器句柄（传入 NULL 无操作）
  */
-_API void prism_player_destroy(PrismPlayerHandle player);
+PRISM_API void prism_player_destroy(PrismPlayerHandle player);
 
 /* ========== 用户认证 ========== */
 
@@ -36,7 +35,7 @@ _API void prism_player_destroy(PrismPlayerHandle player);
  * @param params 登录参数（用户名、密码、服务器地址）
  * @return PRISM_OK 成功发起登录请求
  */
-_API int prism_player_login(PrismPlayerHandle player, const PrismLoginParams* params);
+PRISM_API int prism_player_login(PrismPlayerHandle player, const PrismLoginParams* params);
 
 /**
  * @brief 登出并断开与服务器的连接
@@ -44,7 +43,7 @@ _API int prism_player_login(PrismPlayerHandle player, const PrismLoginParams* pa
  * @param player 播放器句柄
  * @return PRISM_OK
  */
-_API int prism_player_logout(PrismPlayerHandle player);
+PRISM_API int prism_player_logout(PrismPlayerHandle player);
 
 /* ========== 房间管理 ========== */
 
@@ -56,7 +55,7 @@ _API int prism_player_logout(PrismPlayerHandle player);
  * @param room_id 房间 ID 字符串
  * @return PRISM_OK，未登录返回 PRISM_ERROR_NETWORK
  */
-_API int prism_player_join_room(PrismPlayerHandle player, const char* room_id);
+PRISM_API int prism_player_join_room(PrismPlayerHandle player, const char* room_id);
 
 /**
  * @brief 离开当前房间，断开房间级 WebSocket
@@ -64,7 +63,7 @@ _API int prism_player_join_room(PrismPlayerHandle player, const char* room_id);
  * @param player 播放器句柄
  * @return PRISM_OK
  */
-_API int prism_player_leave_room(PrismPlayerHandle player);
+PRISM_API int prism_player_leave_room(PrismPlayerHandle player);
 
 /**
  * @brief 获取当前房间信息
@@ -72,14 +71,14 @@ _API int prism_player_leave_room(PrismPlayerHandle player);
  * @param info [out] 输出参数，调用方分配内存
  * @return PRISM_OK，未在房间中返回 PRISM_ERROR_NETWORK
  */
-_API int prism_player_get_room_info(PrismPlayerHandle player, PrismRoomInfo* info);
+PRISM_API int prism_player_get_room_info(PrismPlayerHandle player, PrismRoomInfo* info);
 
 /**
  * @brief 获取当前房间连接状态
  * @param player 播放器句柄
  * @return 当前 PrismRoomState
  */
-_API PrismRoomState prism_player_get_room_state(PrismPlayerHandle player);
+PRISM_API PrismRoomState prism_player_get_room_state(PrismPlayerHandle player);
 
 /* ========== 媒体源 ========== */
 
@@ -91,7 +90,7 @@ _API PrismRoomState prism_player_get_room_state(PrismPlayerHandle player);
  * @param uri 文件路径或网络 URL
  * @return PRISM_OK 成功开始加载，否则返回错误码
  */
-_API int prism_player_open(PrismPlayerHandle player, const char* uri);
+PRISM_API int prism_player_open(PrismPlayerHandle player, const char* uri);
 
 /**
  * @brief 关闭当前媒体，释放解码资源
@@ -99,7 +98,7 @@ _API int prism_player_open(PrismPlayerHandle player, const char* uri);
  * @param player 播放器句柄
  * @return PRISM_OK
  */
-_API int prism_player_close(PrismPlayerHandle player);
+PRISM_API int prism_player_close(PrismPlayerHandle player);
 
 /* ========== 播放控制 ========== */
 
@@ -110,7 +109,7 @@ _API int prism_player_close(PrismPlayerHandle player);
  * @param player 播放器句柄
  * @return PRISM_OK，未加载媒体返回 PRISM_ERROR_NO_MEDIA
  */
-_API int prism_player_play(PrismPlayerHandle player);
+PRISM_API int prism_player_play(PrismPlayerHandle player);
 
 /**
  * @brief 暂停播放，保留解码资源
@@ -118,7 +117,7 @@ _API int prism_player_play(PrismPlayerHandle player);
  * @param player 播放器句柄
  * @return PRISM_OK
  */
-_API int prism_player_pause(PrismPlayerHandle player);
+PRISM_API int prism_player_pause(PrismPlayerHandle player);
 
 /**
  * @brief 停止播放并释放解码资源
@@ -127,7 +126,7 @@ _API int prism_player_pause(PrismPlayerHandle player);
  * @param player 播放器句柄
  * @return PRISM_OK
  */
-_API int prism_player_stop(PrismPlayerHandle player);
+PRISM_API int prism_player_stop(PrismPlayerHandle player);
 
 /**
  * @brief 跳转到指定位置
@@ -138,8 +137,7 @@ _API int prism_player_stop(PrismPlayerHandle player);
  * @return PRISM_OK，未加载媒体返回 PRISM_ERROR_NO_MEDIA，
  *         不可 seek 返回 PRISM_ERROR_SEEK_FAILED
  */
-_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms,
-                           PrismSeekMode mode);
+PRISM_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms, PrismSeekMode mode);
 
 /* ========== 状态查询 ========== */
 
@@ -148,21 +146,21 @@ _API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms,
  * @param player 播放器句柄
  * @return 当前 PrismState，player 为 NULL 返回 PRISM_STATE_ERROR
  */
-_API PrismState prism_player_get_state(PrismPlayerHandle player);
+PRISM_API PrismState prism_player_get_state(PrismPlayerHandle player);
 
 /**
  * @brief 获取当前播放位置
  * @param player 播放器句柄
  * @return 当前位置（毫秒），无媒体返回 -1
  */
-_API int64_t prism_player_get_position(PrismPlayerHandle player);
+PRISM_API int64_t prism_player_get_position(PrismPlayerHandle player);
 
 /**
  * @brief 获取媒体总时长
  * @param player 播放器句柄
  * @return 总时长（毫秒），直播流/无媒体返回 -1
  */
-_API int64_t prism_player_get_duration(PrismPlayerHandle player);
+PRISM_API int64_t prism_player_get_duration(PrismPlayerHandle player);
 
 /* ========== 音量控制 ========== */
 
@@ -172,14 +170,14 @@ _API int64_t prism_player_get_duration(PrismPlayerHandle player);
  * @param volume 音量 0.0-1.0，超出范围自动钳位
  * @return PRISM_OK
  */
-_API int prism_player_set_volume(PrismPlayerHandle player, float volume);
+PRISM_API int prism_player_set_volume(PrismPlayerHandle player, float volume);
 
 /**
  * @brief 获取当前音量
  * @param player 播放器句柄
  * @return 音量值 0.0-1.0，无效句柄返回 0.0
  */
-_API float prism_player_get_volume(PrismPlayerHandle player);
+PRISM_API float prism_player_get_volume(PrismPlayerHandle player);
 
 /**
  * @brief 设置静音状态
@@ -187,14 +185,14 @@ _API float prism_player_get_volume(PrismPlayerHandle player);
  * @param mute true=静音 false=取消静音
  * @return PRISM_OK
  */
-_API int prism_player_set_mute(PrismPlayerHandle player, bool mute);
+PRISM_API int prism_player_set_mute(PrismPlayerHandle player, bool mute);
 
 /**
  * @brief 获取静音状态
  * @param player 播放器句柄
  * @return 是否静音，无效句柄返回 false
  */
-_API bool prism_player_get_mute(PrismPlayerHandle player);
+PRISM_API bool prism_player_get_mute(PrismPlayerHandle player);
 
 /* ========== 播放属性 ========== */
 
@@ -205,14 +203,14 @@ _API bool prism_player_get_mute(PrismPlayerHandle player);
  *              超出范围自动钳位
  * @return PRISM_OK
  */
-_API int prism_player_set_playback_speed(PrismPlayerHandle player, float speed);
+PRISM_API int prism_player_set_playback_speed(PrismPlayerHandle player, float speed);
 
 /**
  * @brief 获取播放速度
  * @param player 播放器句柄
  * @return 当前速度倍率，无效句柄返回 1.0
  */
-_API float prism_player_get_playback_speed(PrismPlayerHandle player);
+PRISM_API float prism_player_get_playback_speed(PrismPlayerHandle player);
 
 /**
  * @brief 设置循环播放
@@ -220,14 +218,14 @@ _API float prism_player_get_playback_speed(PrismPlayerHandle player);
  * @param loop true=单曲循环 false=播完停止
  * @return PRISM_OK
  */
-_API int prism_player_set_loop(PrismPlayerHandle player, bool loop);
+PRISM_API int prism_player_set_loop(PrismPlayerHandle player, bool loop);
 
 /**
  * @brief 获取循环状态
  * @param player 播放器句柄
  * @return 是否循环播放，无效句柄返回 false
  */
-_API bool prism_player_get_loop(PrismPlayerHandle player);
+PRISM_API bool prism_player_get_loop(PrismPlayerHandle player);
 
 /* ========== 视频窗口 ========== */
 
@@ -238,7 +236,7 @@ _API bool prism_player_get_loop(PrismPlayerHandle player);
  *                      传入 NULL 可解除绑定
  * @return PRISM_OK
  */
-_API int prism_player_set_video_window(PrismPlayerHandle player, void* native_window);
+PRISM_API int prism_player_set_video_window(PrismPlayerHandle player, void* native_window);
 
 /* ========== 媒体信息 ========== */
 
@@ -249,7 +247,7 @@ _API int prism_player_set_video_window(PrismPlayerHandle player, void* native_wi
  * @param info [out] 输出参数，调用方分配内存
  * @return PRISM_OK，未加载媒体返回 PRISM_ERROR_NO_MEDIA
  */
-_API int prism_player_get_media_info(PrismPlayerHandle player, PrismMediaInfo* info);
+PRISM_API int prism_player_get_media_info(PrismPlayerHandle player, PrismMediaInfo* info);
 
 /* ========== 诊断工具 ========== */
 
@@ -258,13 +256,13 @@ _API int prism_player_get_media_info(PrismPlayerHandle player, PrismMediaInfo* i
  * @param player 播放器句柄
  * @return PrismErrorCode
  */
-_API PrismErrorCode prism_player_get_last_error(PrismPlayerHandle player);
+PRISM_API PrismErrorCode prism_player_get_last_error(PrismPlayerHandle player);
 
 /**
  * @brief 获取 SDK 版本字符串
  * @return 版本号，格式 "PrismPlayer x.y.z"
  */
-_API const char* prism_player_get_version(void);
+PRISM_API const char* prism_player_get_version(void);
 
 /* ========== 依赖注入（可选，不调用则使用默认实现） ========== */
 
@@ -275,7 +273,7 @@ _API const char* prism_player_get_version(void);
  * @param factory AudioEngineFactory 指针（void* 以保持 C ABI 纯净）
  * @return PRISM_OK
  */
-_API int prism_player_set_audio_factory(PrismPlayerHandle player, void* factory);
+PRISM_API int prism_player_set_audio_factory(PrismPlayerHandle player, void* factory);
 
 /**
  * @brief 注入视频引擎工厂
@@ -284,7 +282,7 @@ _API int prism_player_set_audio_factory(PrismPlayerHandle player, void* factory)
  * @param factory VideoEngineFactory 指针（void* 以保持 C ABI 纯净）
  * @return PRISM_OK
  */
-_API int prism_player_set_video_factory(PrismPlayerHandle player, void* factory);
+PRISM_API int prism_player_set_video_factory(PrismPlayerHandle player, void* factory);
 
 /**
  * @brief 注入网络客户端实现
@@ -293,7 +291,7 @@ _API int prism_player_set_video_factory(PrismPlayerHandle player, void* factory)
  * @param network IServiceNetwork 指针（void* 以保持 C ABI 纯净）
  * @return PRISM_OK
  */
-_API int prism_player_set_network_client(PrismPlayerHandle player, void* network);
+PRISM_API int prism_player_set_network_client(PrismPlayerHandle player, void* network);
 
 #ifdef __cplusplus
 }
