@@ -1,0 +1,166 @@
+#!/bin/sh
+# pre-push：先跑 Debug 预设构建（#70），成功后对本次推送改动的 C/C++ 文件跑 clang-tidy（#69）。
+# 顺序不能反：clang-tidy 依赖构建产出的 compile_commands.json。只跑 Debug，不跑 ctest/Release（ADR 决策 3）。
+# Git 传入 $1=远端名 $2=远端 URL；stdin 每行 <local ref> <local oid> <remote ref> <remote oid>。
+
+set -u
+
+PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck source=.githooks/common.sh
+. "${PRISM_HOOK_DIR}/common.sh"
+
+# 耗时预算，可用环境变量覆盖（默认与 AGENTS.md 记录的值一致，超了只提示不拒绝）。
+PRISM_TIME_BUDGET_SECONDS=${PRISM_TIME_BUDGET_SECONDS:-900}
+
+prism_blank
+prism_info "pre-push 门禁：Debug 构建 + 本次改动文件的 clang-tidy"
+
+# 第一件事：校验工具版本前缀（#67 AC）。
+if ! PRISM_CLANG_TIDY=$(prism_require_tool clang-tidy); then
+    exit 1
+fi
+
+PRISM_ROOT=$(prism_repo_root) || {
+    prism_error "不在 Git 仓库里，无法执行 pre-push 检查（拒绝推送，避免静默放行）。"
+    exit 1
+}
+cd "${PRISM_ROOT}" || exit 1
+
+PRISM_REMOTE=${1:-}
+
+PRISM_TMP=$(prism_tmpdir) || {
+    prism_error "创建临时目录失败，无法执行检查。"
+    exit 1
+}
+trap 'rm -rf "${PRISM_TMP}"' EXIT HUP INT TERM
+
+# stdin 是管道；手动执行钩子时是终端，读了会卡住。
+: > "${PRISM_TMP}/push-info"
+if [ ! -t 0 ]; then
+    cat > "${PRISM_TMP}/push-info" 2>/dev/null || :
+fi
+
+# 平台 → 预设，与 scripts/build.ps1|build.sh 同一套命名。
+case "$(uname -s)" in
+    Linux)
+        PRISM_PLATFORM=linux
+        PRISM_BUILD_DIR=build/Linux/debug
+        ;;
+    Darwin)
+        prism_error "macOS 不在本项目的可复现边界内（见 AGENTS.md「本阶段可复现的边界」）。"
+        prism_error "请在 Linux 或 Windows 上推送，或让那台机器跑构建门禁。"
+        exit 1
+        ;;
+    *)
+        PRISM_PLATFORM=windows
+        PRISM_BUILD_DIR=build/Windows/debug
+        ;;
+esac
+PRISM_PRESET="${PRISM_PLATFORM}-clang-x64-Debug"
+
+prism_info "平台：${PRISM_PLATFORM}，构建预设：${PRISM_PRESET}"
+
+if ! prism_check_build_prerequisites "${PRISM_PLATFORM}" "${PRISM_ROOT}"; then
+    prism_blank
+    prism_error "推送被拒绝：构建前置条件不满足 —— 这是环境问题，不是代码问题。"
+    prism_error "修好后重新 push；临时绕过：git push --no-verify（见 AGENTS.md）。"
+    exit 1
+fi
+
+PRISM_LOG_DIR="${PRISM_BUILD_DIR}/gate-logs"
+if ! mkdir -p "${PRISM_LOG_DIR}"; then
+    prism_error "无法创建日志目录：${PRISM_LOG_DIR}"
+    exit 1
+fi
+
+PRISM_START=$(date +%s)
+
+# 命令在流水线左侧跑，退出码写进文件：既能看输出、留日志，又不依赖 bash 的 PIPESTATUS。
+# 不要把本函数的 stdout 捕获进变量，否则构建输出会被一起吞掉。
+# 用法：prism_run_logged <日志> <退出码文件> <命令...>
+prism_run_logged() {
+    _prism_log=$1
+    _prism_status_file=$2
+    shift 2
+    { "$@" 2>&1; printf '%s\n' "$?" > "${_prism_status_file}"; } | tee "${_prism_log}"
+    return 0
+}
+
+# 读 prism_run_logged 写的退出码；文件不存在（命令没起来）按失败处理。
+prism_read_status() {
+    _prism_st=$(cat "$1" 2>/dev/null || :)
+    case "${_prism_st}" in
+        ''|*[!0-9]*) printf '1\n' ;;
+        *) printf '%s\n' "${_prism_st}" ;;
+    esac
+}
+
+# ---- 配置：只在缺 CMakeCache 或缺编译数据库时做，顺带自愈旧树 ----
+if [ ! -f "${PRISM_BUILD_DIR}/CMakeCache.txt" ] || [ ! -f "${PRISM_BUILD_DIR}/compile_commands.json" ]; then
+    prism_info "构建目录未配置或没有编译数据库，先执行：cmake --preset ${PRISM_PRESET}"
+    prism_info "（首次配置要装 vcpkg 依赖，可能要几分钟；之后走 .vcpkg-cache 快很多）"
+    prism_run_logged \
+        "${PRISM_LOG_DIR}/configure.log" "${PRISM_TMP}/configure.status" \
+        cmake --preset "${PRISM_PRESET}"
+    PRISM_CFG_STATUS=$(prism_read_status "${PRISM_TMP}/configure.status")
+    if [ "${PRISM_CFG_STATUS}" -ne 0 ]; then
+        prism_blank
+        prism_error "推送被拒绝：构建目录配置失败（cmake --preset ${PRISM_PRESET}）。"
+        prism_error "完整日志：${PRISM_LOG_DIR}/configure.log"
+        prism_error "常见原因：CLANG_ROOT / VCPKG_ROOT 指向的工具链或依赖树不完整。"
+        prism_error "带 error 的行："
+        grep -n -i "error" "${PRISM_LOG_DIR}/configure.log" | head -n 30 | sed 's/^/       /' >&2
+        prism_error "前置条件见 ${PRISM_PREREQUISITE_DOC}；需要清空重装时加 --clean，见 AGENTS.md。"
+        exit 1
+    fi
+    prism_info "配置完成。"
+fi
+
+# ---- 构建 ----
+prism_info "构建中：cmake --build --preset ${PRISM_PRESET}（输出同时写入 ${PRISM_LOG_DIR}/build.log）"
+prism_run_logged \
+    "${PRISM_LOG_DIR}/build.log" "${PRISM_TMP}/build.status" \
+    cmake --build --preset "${PRISM_PRESET}"
+PRISM_BUILD_STATUS=$(prism_read_status "${PRISM_TMP}/build.status")
+
+if [ "${PRISM_BUILD_STATUS}" -ne 0 ]; then
+    prism_blank
+    prism_error "推送被拒绝：Debug 构建失败 —— 这是代码编译不过，不是钩子故障。"
+    prism_error "预设：${PRISM_PRESET}；完整日志：${PRISM_LOG_DIR}/build.log"
+    prism_error "带 error 的行："
+    grep -n -i "error" "${PRISM_LOG_DIR}/build.log" | head -n 30 | sed 's/^/       /' >&2
+    prism_blank
+    prism_error "本地复现：pwsh -File scripts/build.ps1 1（Windows）或 bash scripts/build.sh 1（WSL/Linux）。"
+    exit 1
+fi
+
+PRISM_BUILD_END=$(date +%s)
+prism_info "Debug 构建通过（$((PRISM_BUILD_END - PRISM_START)) 秒）。"
+
+# ---- clang-tidy：只针对本次推送相对默认分支改动的文件 ----
+PRISM_BASE=$(prism_merge_base_with_default "${PRISM_REMOTE}" || :)
+if [ -z "${PRISM_BASE}" ]; then
+    PRISM_REMOTE_OID=$(awk 'NR==1 { print $4 }' "${PRISM_TMP}/push-info" 2>/dev/null || :)
+    if [ -n "${PRISM_REMOTE_OID}" ] && [ "${PRISM_REMOTE_OID#0000000000}" = "${PRISM_REMOTE_OID}" ]; then
+        PRISM_BASE="${PRISM_REMOTE_OID}"
+        prism_info "找不到默认分支的本地引用，改为与远端已有的推送目标比对（${PRISM_REMOTE_OID}）。"
+    else
+        prism_info "没有可比对的基线（首次推送？），本次对全仓 C/C++ 文件查一遍。"
+    fi
+fi
+
+if ! "${PRISM_HOOK_DIR}/check-clang-tidy.sh" "${PRISM_BUILD_DIR}" "${PRISM_BASE}"; then
+    prism_blank
+    prism_error "推送被拒绝：静态检查未通过（详见上）。"
+    prism_error "规则集：.clang-tidy（三条规则，均为致命错误）；规范映射：docs/markdown/代码规范.md §0。"
+    prism_error "确实无法改的地方，只允许就地加 NOLINTNEXTLINE 并注明原因（#64 实现决策 13）。"
+    exit 1
+fi
+
+PRISM_END=$(date +%s)
+PRISM_TOTAL=$((PRISM_END - PRISM_START))
+prism_info "pre-push 门禁通过，总耗时 ${PRISM_TOTAL} 秒。"
+if [ "${PRISM_TOTAL}" -gt "${PRISM_TIME_BUDGET_SECONDS}" ]; then
+    prism_error "注意：本次耗时超过 AGENTS.md 记录的预算 ${PRISM_TIME_BUDGET_SECONDS} 秒（通常是一次冷配置）。"
+fi
+exit 0

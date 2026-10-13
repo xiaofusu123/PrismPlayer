@@ -1,7 +1,30 @@
-* text=auto
+# 行尾策略 —— 见 docs/adr/0002-代码门禁.md、docs/markdown/代码规范.md §0
+# 默认：仓库与工作区都存 LF（钩子文件没有扩展名，也靠这条保住 shebang）。
+# 只有 Windows 原生脚本在工作区用 CRLF —— cmd.exe 解析 LF-only 的 .bat 时 goto/label 会出错。
 
+* text=auto eol=lf
+
+# 显式写出来（ADR 0002 决策 4 把它当地基，install-hooks 的告警文案也指向它）：
+# 钩子文件没有扩展名，一旦被检出成 CRLF，`#!/bin/sh` 在 Linux/WSL 上直接 bad interpreter。
+.githooks/* text eol=lf
 *.sh text eol=lf
 
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+# 归档 Word 按二进制（#68）：不做行尾转换，也不参与 diff；
+# 顺带压掉 Git for Windows 给 *.docx 挂的 astextplain 文本 diff。
+*.docx binary
+*.doc  binary
+*.dotx binary
+
+# 图片等二进制资产
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.bmp  binary
+*.ico  binary
+*.ttf  binary
+*.otf  binary
