@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Types.h"
 #include "API.h"
+#include "Types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,8 +16,7 @@ extern "C" {
  * @param user_data 回调透传的用户数据
  * @return 播放器句柄，失败返回 NULL
  */
-_API PrismPlayerHandle prism_player_create(const PrismConfig* config,
-                                           PrismEventCallback callback,
+_API PrismPlayerHandle prism_player_create(const PrismConfig* config, PrismEventCallback callback,
                                            void* user_data);
 
 /**
@@ -138,8 +137,7 @@ _API int prism_player_stop(PrismPlayerHandle player);
  * @return PRISM_OK，未加载媒体返回 PRISM_ERROR_NO_MEDIA，
  *         不可 seek 返回 PRISM_ERROR_SEEK_FAILED
  */
-_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms,
-                           PrismSeekMode mode);
+_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms, PrismSeekMode mode);
 
 /* ========== 状态查询 ========== */
 
