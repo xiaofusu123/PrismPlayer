@@ -1,0 +1,116 @@
+#!/bin/sh
+# pre-commit：只查本次提交 staged 的内容（index，不是工作区）。
+#   ① 文件名不得是 CmakeLists.txt（vendor/** 例外，#39 决策 29）；
+#   ② staged 的 C/C++ 文件必须已经 clang-format 过。
+# 不跑 clang-tidy（要编译数据库且慢，ADR 决策 3）。绕过只允许一次性格式批量整理，且须在 PR 里说明。
+
+set -u
+
+PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck source=.githooks/common.sh
+. "${PRISM_HOOK_DIR}/common.sh"
+
+# 第一件事：校验工具版本前缀（#67 AC）。
+if ! PRISM_CLANG_FORMAT=$(prism_require_tool clang-format); then
+    exit 1
+fi
+
+PRISM_ROOT=$(prism_repo_root) || {
+    prism_error "不在 Git 仓库里，跳过 pre-commit 检查。"
+    exit 0
+}
+cd "${PRISM_ROOT}" || exit 1
+
+PRISM_TMP=$(prism_tmpdir) || {
+    prism_error "创建临时目录失败，无法执行检查。"
+    exit 1
+}
+trap 'rm -rf "${PRISM_TMP}"' EXIT HUP INT TERM
+
+# -z + tr：文件名含非 ASCII 时避免 core.quotePath 转义，否则 basename/git show 全会错。
+git diff --cached --name-only --diff-filter=ACM -z | tr '\0' '\n' > "${PRISM_TMP}/staged"
+
+if [ ! -s "${PRISM_TMP}/staged" ]; then
+    exit 0
+fi
+
+: > "${PRISM_TMP}/bad_names"
+: > "${PRISM_TMP}/bad_format"
+: > "${PRISM_TMP}/format_log"
+
+PRISM_CHECKED=0
+
+# 用重定向而不是管道喂循环，避免整个循环掉进子 shell 导致计数器丢失。
+while IFS= read -r PRISM_FILE; do
+    [ -n "${PRISM_FILE}" ] || continue
+
+    # vendor/ 不参与构建，保留上游目录结构与那 3 个 CmakeLists.txt。
+    case "${PRISM_FILE}" in
+        vendor/*) continue ;;
+    esac
+
+    if [ "$(basename -- "${PRISM_FILE}")" = "CmakeLists.txt" ]; then
+        printf '%s\n' "${PRISM_FILE}" >> "${PRISM_TMP}/bad_names"
+    fi
+
+    prism_is_c_source "${PRISM_FILE}" || continue
+
+    PRISM_CHECKED=$((PRISM_CHECKED + 1))
+
+    # cwd 已是仓库根，--assume-filename 用仓库内相对路径，clang-format 靠它找 .clang-format 并判语言。
+    PRISM_FMT_OUT=$(git show ":${PRISM_FILE}" 2>/dev/null \
+        | "${PRISM_CLANG_FORMAT}" --dry-run --Werror --assume-filename="${PRISM_FILE}" - 2>&1)
+    PRISM_FMT_STATUS=$?
+
+    if [ "${PRISM_FMT_STATUS}" -ne 0 ]; then
+        printf '%s\n' "${PRISM_FILE}" >> "${PRISM_TMP}/bad_format"
+        {
+            printf '%s\n' "----- ${PRISM_FILE}"
+            printf '%s\n' "${PRISM_FMT_OUT}"
+        } >> "${PRISM_TMP}/format_log"
+    fi
+done < "${PRISM_TMP}/staged"
+
+PRISM_NAME_COUNT=$(wc -l < "${PRISM_TMP}/bad_names" | tr -d ' ')
+PRISM_FORMAT_COUNT=$(wc -l < "${PRISM_TMP}/bad_format" | tr -d ' ')
+
+if [ "${PRISM_NAME_COUNT}" -eq 0 ] && [ "${PRISM_FORMAT_COUNT}" -eq 0 ]; then
+    prism_info "通过：${PRISM_CHECKED} 个 staged C/C++ 文件格式合规，没有 CmakeLists.txt。"
+    exit 0
+fi
+
+prism_blank
+prism_error "提交被拒绝：下面这些 staged 文件没有通过门禁。"
+
+if [ "${PRISM_NAME_COUNT}" -ne 0 ]; then
+    prism_blank
+    prism_error "① 文件名错误（正确写法是 CMakeLists.txt：大写 CMake、小写 lists）："
+    while IFS= read -r PRISM_BAD; do
+        [ -n "${PRISM_BAD}" ] || continue
+        prism_error "     ${PRISM_BAD}"
+        prism_error "     修复：git mv -f -- \"${PRISM_BAD}\" \"$(dirname -- "${PRISM_BAD}")/CMakeLists.txt\""
+        prism_error "     Windows 不区分大小写，本地能过；Linux 上 CMake 找不到这个文件。"
+    done < "${PRISM_TMP}/bad_names"
+fi
+
+if [ "${PRISM_FORMAT_COUNT}" -ne 0 ]; then
+    prism_blank
+    prism_error "② 格式不合规（clang-format --dry-run --Werror 未通过）："
+    while IFS= read -r PRISM_BAD; do
+        [ -n "${PRISM_BAD}" ] || continue
+        prism_error "     ${PRISM_BAD}"
+        prism_error "     修复：\"${PRISM_CLANG_FORMAT}\" -i -- \"${PRISM_BAD}\""
+    done < "${PRISM_TMP}/bad_format"
+    prism_blank
+    # shellcheck disable=SC2013
+    PRISM_FIX_LIST=$(tr '\n' ' ' < "${PRISM_TMP}/bad_format")
+    prism_error "     一次修完：\"${PRISM_CLANG_FORMAT}\" -i -- ${PRISM_FIX_LIST}"
+    prism_blank
+    prism_error "     clang-format 判定详情："
+    sed 's/^/       /' "${PRISM_TMP}/format_log" >&2
+fi
+
+prism_blank
+prism_error "改完只 stage 这些文件再提交即可。"
+prism_error "要绕过（仅限一次性格式批量整理，且须在 PR 描述里说明）：git commit --no-verify"
+exit 1

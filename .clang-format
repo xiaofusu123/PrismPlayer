@@ -1,0 +1,14 @@
+# 代码格式规则集 —— 见 docs/adr/0002-代码门禁.md 决策 2 / docs/markdown/代码规范.md §0
+#
+# 只在这里写「与 BasedOnStyle 的差异项」；其余继承 LLVM。
+# 本文件由 pre-commit 钩子通过 `clang-format --dry-run --Werror` 消费，
+# 修改它等于改门禁，必须同步 docs/markdown/代码规范.md §0 的那张表。
+---
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+PointerAlignment: Left
+BreakBeforeBraces: Attach
+NamespaceIndentation: None
+AllowShortFunctionsOnASingleLine: Inline
+...
