@@ -1,0 +1,38 @@
+if(DEFINED PRISM_VCPKG_TOOLCHAIN_INCLUDED)
+  return()
+endif()
+set(PRISM_VCPKG_TOOLCHAIN_INCLUDED TRUE)
+
+set(_prism_doc "docs/markdown/项目框架.md 7.1（环境与依赖基线）")
+
+if(CMAKE_HOST_WIN32)
+  set(_prism_missing "")
+  foreach(_prism_tool clang.exe clang++.exe ninja.exe)
+    if(NOT EXISTS "$ENV{CLANG_ROOT}/${_prism_tool}")
+      list(APPEND _prism_missing "${_prism_tool}")
+    endif()
+  endforeach()
+  if(_prism_missing)
+    message(FATAL_ERROR "PRISM: 环境变量 CLANG_ROOT 未设置或无效（当前值：'$ENV{CLANG_ROOT}'），缺少：${_prism_missing}。前置条件与设置方式见 ${_prism_doc}。")
+  endif()
+endif()
+
+set(_prism_candidates "$ENV{VCPKG_ROOT}" "$ENV{PRISM_VCPKG_ROOT}")
+if(NOT CMAKE_HOST_WIN32)
+  list(APPEND _prism_candidates "$ENV{HOME}/vcpkg")
+endif()
+
+set(_prism_root "")
+foreach(_prism_candidate IN LISTS _prism_candidates)
+  if(_prism_candidate AND EXISTS "${_prism_candidate}/scripts/buildsystems/vcpkg.cmake")
+    set(_prism_root "${_prism_candidate}")
+    break()
+  endif()
+endforeach()
+
+if(NOT _prism_root)
+  message(FATAL_ERROR "PRISM: 环境变量 VCPKG_ROOT 未设置或无效（当前值：'$ENV{VCPKG_ROOT}'）。前置条件与设置方式见 ${_prism_doc}。")
+endif()
+
+message(STATUS "PRISM: vcpkg = ${_prism_root}")
+include("${_prism_root}/scripts/buildsystems/vcpkg.cmake")
