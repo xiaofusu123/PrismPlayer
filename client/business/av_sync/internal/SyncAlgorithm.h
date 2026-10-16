@@ -12,16 +12,16 @@ namespace Prism::Business {
  * 正 drift = 视频超前 → WAIT；负 drift 超过阈值 = 视频滞后 → DROP。
  */
 class SyncAlgorithm : public ISyncAlgorithm {
-public:
+  public:
     SyncAlgorithm();
     ~SyncAlgorithm() override = default;
 
     SyncAction calibrate(uint64_t audio_pts, uint64_t video_pts) override;
     void configure(const SyncConfig& config) override;
-    DriftInfo get_drift_info() const override;
+    [[nodiscard]] DriftInfo get_drift_info() const override;
     void reset() override;
 
-private:
+  private:
     SyncConfig config_;
     DriftInfo drift_info_;
 };
