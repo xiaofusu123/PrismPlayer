@@ -260,8 +260,10 @@ prism_event_json_flat() {
 
 # prism_event_json_child_sha <JSON 文件> <父键> -> 回显 "<父键>": { … } 里的第一个 sha；取不到返回 1。
 # GitHub 的事件 payload 是缩进好的 JSON，门禁真正要的那两个对象（pull_request 的 base / head）里
-# sha 排在 user / repo 这些嵌套对象之前，所以压成一行后「父键之后、遇到 } 之前的第一个 sha」就是它。
-# 只依赖 grep / sed，不要求 runner 上有 jq —— 本地 Git-for-Windows 的 sh 也跑同一条路径。
+# sha 排在 user / repo 这些嵌套对象之前，所以「父键之后、遇到 } 之前的第一个 sha」就是它。
+# 故意用参数展开而不是正则：`${var#模式}` 去的是最短前缀，天生非贪婪；sed/grep 的 `.*` 是贪婪的，
+# 会把 user / repo 里的同名 sha 当成结果挑出来（见 test/checks/run.sh 里带诱饵的 CI 夹具）。
+# 只依赖 tr 与参数展开，不要求 runner 上有 jq —— 本地 Git-for-Windows 的 sh 也跑同一条路径。
 # 取不到时由调用方决定退路（GITHUB_SHA / GITHUB_BASE_SHA），绝不猜一个 sha 出来。
 prism_event_json_child_sha() {
     _prism_evs_file=${1:-}
@@ -269,9 +271,27 @@ prism_event_json_child_sha() {
     if [ -z "${_prism_evs_file}" ] || [ ! -f "${_prism_evs_file}" ]; then
         return 1
     fi
-    _prism_evs_sha=$(tr -d '\r\n' < "${_prism_evs_file}" \
-        | sed -n 's/.*"'"${_prism_evs_key}"'"[^{]*{[^}]*"sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
-        | head -n 1)
+    # 压成一行，再去掉父键之前的所有内容（最短前缀 = 第一个出现的父键）。
+    _prism_evs_rest=$(tr -d '\r\n' < "${_prism_evs_file}")
+    # 父键的字面量（连引号一起拼出来）再进模式：展开若直接写在模式里会被当成通配符。
+    _prism_evs_needle='"'"${_prism_evs_key}"'"'
+    case "${_prism_evs_rest}" in
+        *"${_prism_evs_needle}"*) ;;
+        *) return 1 ;;
+    esac
+    _prism_evs_rest=${_prism_evs_rest#*"${_prism_evs_needle}"}
+    _prism_evs_rest=${_prism_evs_rest#*\{}   # 到父键对象的 { 之后
+    case "${_prism_evs_rest}" in
+        *\"sha\"*) ;;
+        *) return 1 ;;
+    esac
+    # 第一个 "sha" 之前先出现了 }：说明父键对象里第一个 sha 属于嵌套对象，不是这一层的，宁可不取。
+    case "${_prism_evs_rest%%\"sha\"*}" in
+        *\}*) return 1 ;;
+    esac
+    _prism_evs_rest=${_prism_evs_rest#*\"sha\"}
+    _prism_evs_rest=${_prism_evs_rest#*\"}
+    _prism_evs_sha=${_prism_evs_rest%%\"*}
     if [ -z "${_prism_evs_sha}" ]; then
         return 1
     fi
