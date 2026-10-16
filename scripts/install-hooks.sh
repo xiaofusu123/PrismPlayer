@@ -13,8 +13,10 @@ prism_say()  { printf '%s\n' "$*"; }
 prism_bad()  { printf '%s\n' "$*" >&2; PRISM_FAIL=1; }
 prism_warn() { printf '%s\n' "$*" >&2; }
 
-# 四个文件只列一次：存在性检查、执行位、CRLF 自检都从它派生。
-PRISM_HOOKS="common.sh pre-commit pre-push check-clang-tidy.sh"
+# 钩子只列一次：存在性检查、执行位、CRLF 自检都从它派生。
+PRISM_HOOKS="pre-commit pre-push check-clang-tidy.sh"
+# 检查入口（#97）：本地钩子与 CI 的判定都来自这里，也要有 exec 位。
+PRISM_CHECK_SCRIPTS="scripts/checks/lib.sh scripts/checks/format.sh"
 
 PRISM_CHMOD_TARGETS=""
 for PRISM_HOOK in ${PRISM_HOOKS}; do
@@ -22,6 +24,12 @@ for PRISM_HOOK in ${PRISM_HOOKS}; do
         prism_bad "错误：找不到 .githooks/${PRISM_HOOK}（当前目录 ${PRISM_INSTALL_ROOT} 可能不是仓库根）。"
     fi
     PRISM_CHMOD_TARGETS="${PRISM_CHMOD_TARGETS} .githooks/${PRISM_HOOK}"
+done
+for PRISM_CHECK_SCRIPT in ${PRISM_CHECK_SCRIPTS}; do
+    if [ ! -f "${PRISM_CHECK_SCRIPT}" ]; then
+        prism_bad "错误：找不到 ${PRISM_CHECK_SCRIPT}（当前目录 ${PRISM_INSTALL_ROOT} 可能不是仓库根）。"
+    fi
+    PRISM_CHMOD_TARGETS="${PRISM_CHMOD_TARGETS} ${PRISM_CHECK_SCRIPT}"
 done
 [ "${PRISM_FAIL}" -eq 0 ] || exit 1
 
@@ -54,14 +62,15 @@ if [ -n "${PRISM_CRLF}" ]; then
     prism_warn "      .gitattributes 已声明 .githooks/* text eol=lf，重新 checkout 即可修正。"
 fi
 
-# 版本要求从钩子自己的常量读，不在安装脚本里再写一遍（避免两处各说一套）。
-# shellcheck source=.githooks/common.sh
-. .githooks/common.sh
+# 版本要求从检查入口的公共库读，不在安装脚本里再写一遍（避免两处各说一套）。
+# shellcheck source=scripts/checks/lib.sh
+. scripts/checks/lib.sh
 
 prism_say "门禁已装上：core.hooksPath = ${PRISM_SET}（写在本仓库 .git/config，不进版本控制）"
 prism_say ""
 prism_say "pre-commit  staged 的 C/C++ 文件必须 clang-format 过；文件名不得是 CmakeLists.txt（vendor/** 只豁免这一条）。"
 prism_say "pre-push    先跑 <平台>-clang-x64-Debug 构建，再对本次推送改动的 C/C++ 文件跑 clang-tidy。"
+prism_say "检查入口     scripts/checks/format.sh <staged|ci|<rev>|<a>...<b>> 一条命令打印与钩子同源的判定结果。"
 prism_say "版本要求     clang-format / clang-tidy 必须 ${PRISM_CLANG_VERSION_PREFIX}.x，不符时钩子在动手前就报错退出（ADR 决策 6）。"
 prism_say "唯一绕过场景 一次性格式批量整理，且必须在 PR 描述里说明：git commit/push --no-verify"
 

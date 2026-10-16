@@ -10,8 +10,8 @@
 set -u
 
 PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-# shellcheck source=.githooks/common.sh
-. "${PRISM_HOOK_DIR}/common.sh"
+# shellcheck source=scripts/checks/lib.sh
+. "${PRISM_HOOK_DIR}/../scripts/checks/lib.sh"
 
 PRISM_DB_DIR=${1:-}
 PRISM_BASE=${2:-}

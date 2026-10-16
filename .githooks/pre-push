@@ -6,8 +6,8 @@
 set -u
 
 PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-# shellcheck source=.githooks/common.sh
-. "${PRISM_HOOK_DIR}/common.sh"
+# shellcheck source=scripts/checks/lib.sh
+. "${PRISM_HOOK_DIR}/../scripts/checks/lib.sh"
 
 # 耗时预算，可用环境变量覆盖（默认与 AGENTS.md 记录的值一致，超了只提示不拒绝）。
 PRISM_TIME_BUDGET_SECONDS=${PRISM_TIME_BUDGET_SECONDS:-900}
