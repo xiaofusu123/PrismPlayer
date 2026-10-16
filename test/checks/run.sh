@@ -1,0 +1,477 @@
+#!/bin/sh
+# 检查入口自测（#97）：在临时 git 仓库里造变更集，断言 scripts/checks/format.sh 的退出码与 stderr。
+# 覆盖三种输入（全合规 → 0 / 含未格式化 → 非 0 / 空范围 → 0）、vendor 例外、<rev> 与 <a>...<b> 两种范围
+# 写法、非 C/C++ 忽略、git 失败绝不 fail-open，以及 ci（GitHub Actions 环境解析范围）。
+# 不联网、不依赖 CI。用法：sh test/checks/run.sh
+
+set -u
+
+PRISM_TEST_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+cd "${PRISM_TEST_ROOT}" || exit 1
+
+# shellcheck source=scripts/checks/lib.sh
+. "${PRISM_TEST_ROOT}/scripts/checks/lib.sh"
+
+PRISM_RUN_SH=$(command -v sh) || PRISM_RUN_SH=/bin/sh
+PRISM_CLANG_FORMAT_REAL=$(prism_find_tool clang-format || :)
+
+PRISM_PASS=0
+PRISM_FAIL=0
+
+# ---------- 断言 ----------
+ok()  { PRISM_PASS=$((PRISM_PASS + 1)); printf '    [PASS] %s\n' "$1"; }
+bad() {
+    PRISM_FAIL=$((PRISM_FAIL + 1))
+    printf '    [FAIL] %s\n' "$1"
+    printf '          退出码=%s\n' "${PRISM_STATUS}"
+    printf '          输出：\n'
+    printf '%s\n' "${PRISM_OUT}" | sed 's/^/            | /'
+}
+
+expect_status() {
+    if [ "${PRISM_STATUS}" -eq "$1" ]; then ok "$2"; else bad "$2（期望退出码 $1）"; fi
+}
+
+expect_status_nonzero() {
+    if [ "${PRISM_STATUS}" -ne 0 ]; then ok "$1"; else bad "$1（期望非零退出码）"; fi
+}
+
+expect_out_has() {
+    case "${PRISM_OUT}" in
+        *"$1"*) ok "$2" ;;
+        *) bad "$2（输出里没有 '$1'）" ;;
+    esac
+}
+
+expect_out_lacks() {
+    case "${PRISM_OUT}" in
+        *"$1"*) bad "$2（输出里不该出现 '$1'）" ;;
+        *) ok "$2" ;;
+    esac
+}
+
+# 逐字比对：用来断言「pre-commit 与入口是同一份判定」。
+expect_out_equals() {
+    if [ "${PRISM_OUT}" = "$1" ]; then
+        ok "$2"
+    else
+        bad "$2（输出与预期不一致）"
+        printf '          预期：\n'
+        printf '%s\n' "$1" | sed 's/^/            | /'
+    fi
+}
+
+# run_in <目录> <命令...>：cwd 切到目录执行，合并捕获 stdout+stderr，stdin 接 /dev/null 防卡住。
+run_in() {
+    _prism_dir=$1
+    shift
+    PRISM_OUT=$(cd "${_prism_dir}" && "$@" 2>&1 < /dev/null)
+    PRISM_STATUS=$?
+}
+
+# 跑检查入口；cwd 在仓库内即可，入口自己会 cd 到仓库根。
+run_entry() {
+    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/format.sh "$@"
+}
+
+# 跑入口的 ci token，显式传全部 CI 环境变量（含空值）：本机/CI 已有的同名变量不能漏进来影响判定。
+run_entry_ci() {
+    _prism_ci_event_name=$1
+    _prism_ci_event_path=$2
+    _prism_ci_sha=$3
+    _prism_ci_base=$4
+    PRISM_OUT=$(cd "${PRISM_REPO}" && env GITHUB_EVENT_NAME="${_prism_ci_event_name}" \
+        GITHUB_EVENT_PATH="${_prism_ci_event_path}" GITHUB_SHA="${_prism_ci_sha}" \
+        GITHUB_BASE_SHA="${_prism_ci_base}" \
+        "${PRISM_RUN_SH}" scripts/checks/format.sh ci 2>&1 < /dev/null)
+    PRISM_STATUS=$?
+}
+
+# ---------- 夹具 ----------
+# 夹具放在仓库的 build/ 下（已 gitignore）。不要用 /tmp：Git Bash 的 /tmp 与 git.exe 认的
+# /tmp 不是同一个目录，-C 会直接找不到目录。
+PRISM_CASE_ROOT="${PRISM_TEST_ROOT}/build/check-tests"
+PRISM_CASE_SEQ=0
+
+# 每个用例一个全新 git 仓库，拷入入口真正会用到的门禁文件。
+new_fixture() {
+    PRISM_CASE_SEQ=$((PRISM_CASE_SEQ + 1))
+    PRISM_CASE_DIR="${PRISM_CASE_ROOT}/case-${PRISM_CASE_SEQ}"
+    PRISM_REPO="${PRISM_CASE_DIR}/repo"
+    rm -rf "${PRISM_CASE_DIR}"
+    mkdir -p "${PRISM_REPO}/scripts" || exit 1
+
+    if ! git -C "${PRISM_REPO}" init -q -b main 2>/dev/null; then
+        git -C "${PRISM_REPO}" init -q
+        git -C "${PRISM_REPO}" symbolic-ref HEAD refs/heads/main
+    fi
+    git -C "${PRISM_REPO}" config user.name "gate-test"
+    git -C "${PRISM_REPO}" config user.email "gate-test@example.invalid"
+    git -C "${PRISM_REPO}" config core.autocrlf false
+
+    cp -r "${PRISM_TEST_ROOT}/scripts/checks" "${PRISM_REPO}/scripts/"
+    cp -r "${PRISM_TEST_ROOT}/.githooks" "${PRISM_REPO}/.githooks"
+    cp "${PRISM_TEST_ROOT}/.clang-format" "${PRISM_TEST_ROOT}/.clang-tidy" "${PRISM_REPO}/"
+    cp "${PRISM_TEST_ROOT}/.gitattributes" "${PRISM_REPO}/"
+}
+
+drop_fixture() {
+    [ -n "${PRISM_CASE_DIR:-}" ] && rm -rf "${PRISM_CASE_DIR}"
+    PRISM_CASE_DIR=""
+}
+
+start_case() {
+    printf '\n-- %s\n' "$1"
+    drop_fixture
+    new_fixture
+}
+
+# 用真 clang-format 生成「一定合规」的内容，保证夹具本身不会因为手写格式被判违规。
+good_cpp() {
+    printf 'int PrismSample(int a, int b) {\n    return a + b;\n}\n' \
+        | "${PRISM_CLANG_FORMAT_REAL}" --assume-filename=sample.cpp -
+}
+
+# 含两处违规：空格不规整 + 超过 ColumnLimit 100 的长行。
+bad_cpp() {
+    cat <<'EOF'
+int  PrismSample(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l) {
+      return   a + b;
+}
+EOF
+}
+
+stage() { git -C "${PRISM_REPO}" add "$@"; }
+commit_all() {
+    git -C "${PRISM_REPO}" add -A
+    git -C "${PRISM_REPO}" commit -q -m "$1"
+}
+commit_base() {
+    commit_all "$1"
+    git -C "${PRISM_REPO}" rev-parse HEAD
+}
+
+printf '检查入口自测：仓库根 %s\n' "${PRISM_TEST_ROOT}"
+printf '入口: %s\n' "${PRISM_TEST_ROOT}/scripts/checks/format.sh"
+printf 'clang-format: %s\n' "${PRISM_CLANG_FORMAT_REAL:-未找到}"
+if [ -z "${PRISM_CLANG_FORMAT_REAL}" ]; then
+    printf '错误：找不到 clang-format，无法自测（见 docs/markdown/项目框架.md 7.1）。\n' >&2
+    exit 1
+fi
+
+# ============================================================
+# AC1/AC3：三种输入 —— 全合规 / 未格式化 / 空范围
+# ============================================================
+
+start_case "入口：全合规的变更集 → 0，通过文案与 pre-commit 逐字一致"
+good_cpp > "${PRISM_REPO}/sample.cpp"
+stage sample.cpp
+run_entry staged
+expect_status 0 "全合规放行"
+expect_out_has "通过：1 个 staged C/C++ 文件" "通过文案与 pre-commit 完全一致"
+
+start_case "入口：含未格式化文件 → 非 0，点名文件并给出可复制的修复命令"
+bad_cpp > "${PRISM_REPO}/sample.cpp"
+stage sample.cpp
+run_entry staged
+expect_status_nonzero "格式违规被拦"
+expect_out_has "sample.cpp" "报错点名了具体文件"
+expect_out_has "-i -- sample.cpp" "报错含可复制的修复命令"
+expect_out_has "一次修完" "给出批量修复命令"
+expect_out_has "clang-format" "报错说明是 clang-format 检查"
+
+start_case "入口：空变更范围 → 0（git 成功但列表为空，不是错误）"
+printf '# base\n' > "${PRISM_REPO}/README.md"
+commit_all base
+run_entry HEAD
+expect_status 0 "完全空的范围放行"
+expect_out_has "为空" "明确说明范围为空"
+
+start_case "入口：只有文档改动 → 0，且不误报 C/C++"
+printf '# base\n' > "${PRISM_REPO}/README.md"
+commit_all base
+printf '# base\n\n文档更新。\n' > "${PRISM_REPO}/README.md"
+commit_all doc-only
+run_entry HEAD~1
+expect_status 0 "只有文档改动放行"
+expect_out_has "通过" "给出通过信息"
+
+# ============================================================
+# AC2：pre-commit 调用同一份入口
+# ============================================================
+
+start_case "入口：pre-commit 与 format.sh staged 是同一份判定（输出逐字相同）"
+bad_cpp > "${PRISM_REPO}/sample.cpp"
+stage sample.cpp
+run_entry staged
+PRISM_ENTRY_OUT=${PRISM_OUT}
+PRISM_ENTRY_STATUS=${PRISM_STATUS}
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/pre-commit
+expect_out_equals "${PRISM_ENTRY_OUT}" "pre-commit 的输出与入口 staged 逐字相同"
+if [ "${PRISM_STATUS}" -eq "${PRISM_ENTRY_STATUS}" ]; then
+    ok "退出码也一致"
+else
+    bad "退出码一致（pre-commit ${PRISM_STATUS} vs 入口 ${PRISM_ENTRY_STATUS}）"
+fi
+
+start_case "入口：合规路径下 pre-commit 与入口输出同样逐字相同"
+good_cpp > "${PRISM_REPO}/sample.cpp"
+stage sample.cpp
+run_entry staged
+PRISM_ENTRY_OUT=${PRISM_OUT}
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/pre-commit
+expect_out_equals "${PRISM_ENTRY_OUT}" "合规路径下两边输出逐字相同"
+expect_status 0 "两边都放行"
+
+# ============================================================
+# AC1：vendor/** 只豁免文件名检查
+# ============================================================
+
+start_case "入口：vendor/** 下的 CmakeLists.txt 跳过文件名检查，格式检查照做"
+mkdir -p "${PRISM_REPO}/vendor/memorypool"
+printf 'cmake_minimum_required(VERSION 3.12)\n' > "${PRISM_REPO}/vendor/memorypool/CmakeLists.txt"
+stage vendor/memorypool/CmakeLists.txt
+run_entry staged
+expect_status 0 "vendor 下的 CmakeLists.txt 跳过文件名检查"
+expect_out_lacks "git mv" "不给出改名命令"
+
+mkdir -p "${PRISM_REPO}/vendor/third_party"
+good_cpp > "${PRISM_REPO}/vendor/third_party/ok.cc"
+stage vendor/third_party/ok.cc
+run_entry staged
+expect_status 0 "vendor 下合规的 C/C++ 放行（格式检查照做）"
+
+bad_cpp > "${PRISM_REPO}/vendor/third_party/thing.cc"
+stage vendor/third_party/thing.cc
+run_entry staged
+expect_status_nonzero "vendor 下的 C/C++ 格式违规仍被拦"
+expect_out_has "vendor/third_party/thing.cc" "报错点名 vendor 下的文件"
+
+# ============================================================
+# AC1/AC3：范围写法 —— <rev> 与 <a>...<b>
+# ============================================================
+
+start_case "入口：<rev> 范围里 vendor 之外的 CmakeLists.txt → 非 0 并给出 git mv"
+printf '# base\n' > "${PRISM_REPO}/README.md"
+PRISM_REV_BASE=$(commit_base base)
+printf 'cmake_minimum_required(VERSION 3.20)\n' > "${PRISM_REPO}/CmakeLists.txt"
+commit_all "bad name"
+run_entry "${PRISM_REV_BASE}"
+expect_status_nonzero "revision 范围里 CmakeLists.txt 被拦"
+expect_out_has "文件名错误" "报出文件名问题"
+expect_out_has "git mv" "给出改名命令"
+expect_out_has "改动的文件" "revision 模式用「改动」措辞，不用 staged"
+expect_out_lacks "staged" "revision 模式不出现 staged 字样"
+
+start_case "入口：<rev> 取 HEAD 内容，<a>...<b> 取 <b> 内容（真跑提交，验证 ... 语义）"
+printf '# base\n' > "${PRISM_REPO}/README.md"
+PRISM_REV_BASE=$(commit_base base)
+
+git -C "${PRISM_REPO}" checkout -q -b side
+bad_cpp > "${PRISM_REPO}/sample.cpp"
+commit_all "side: bad"
+PRISM_REV_SIDE=$(git -C "${PRISM_REPO}" rev-parse HEAD)
+
+git -C "${PRISM_REPO}" checkout -q main
+good_cpp > "${PRISM_REPO}/sample.cpp"
+commit_all "main: good"
+PRISM_REV_MAIN=$(git -C "${PRISM_REPO}" rev-parse HEAD)
+
+# <rev>：文件取 <rev>...HEAD，内容取 HEAD。
+run_entry "${PRISM_REV_BASE}"
+expect_status 0 "<rev> 模式内容取 HEAD（HEAD 上是合规内容）"
+expect_out_has "通过：1 个改动的 C/C++ 文件" "revision 模式统计到了改动的那个文件"
+
+git -C "${PRISM_REPO}" checkout -q side
+run_entry "${PRISM_REV_BASE}"
+expect_status_nonzero "<rev> 模式内容取 HEAD（HEAD 是坏内容，必须拦）"
+expect_out_has "sample.cpp" "点名坏文件"
+git -C "${PRISM_REPO}" checkout -q main
+
+# <a>...<b>：两条分叉的支线，内容取 <b> —— 同一对提交，方向反过来结论就相反。
+run_entry "${PRISM_REV_SIDE}...${PRISM_REV_MAIN}"
+expect_status 0 "a...b 取 b（main 上的合规内容）"
+run_entry "${PRISM_REV_MAIN}...${PRISM_REV_SIDE}"
+expect_status_nonzero "a...b 取 b（side 上的坏内容）"
+expect_out_has "sample.cpp" "点名 side 上的坏文件"
+
+# ============================================================
+# AC3：非 C/C++ 忽略、改名不漏、非 ASCII 文件名
+# ============================================================
+
+start_case "入口：非 C/C++ 文件被忽略"
+printf '  这不是 C++，随便写   \n' > "${PRISM_REPO}/notes.md"
+printf 'int  x( ) {\n      return 1;\n}\n' > "${PRISM_REPO}/other.txt"
+stage notes.md other.txt
+run_entry staged
+expect_status 0 "非 C/C++ 文件被忽略"
+expect_out_lacks "notes.md" "报错/统计里不出现它们"
+
+start_case "入口：git mv 改名后的文件不会被漏掉（--diff-filter 必须带 R）"
+bad_cpp > "${PRISM_REPO}/before.cpp"
+commit_base base
+git -C "${PRISM_REPO}" mv before.cpp after.cpp
+run_entry staged
+expect_status_nonzero "改名后的坏文件仍然被拦"
+expect_out_has "after.cpp" "报错点名改名后的新路径"
+
+start_case "入口：非 ASCII 文件名也能正确定位（-z + tr 抗 core.quotePath）"
+bad_cpp > "${PRISM_REPO}/样例.cpp"
+stage 样例.cpp
+run_entry staged
+expect_status_nonzero "非 ASCII 文件名的违规被拦"
+expect_out_has "样例.cpp" "报错里的文件名没有被转义"
+expect_out_has "-i -- 样例.cpp" "修复命令可直接复制"
+
+# ============================================================
+# AC3/AC8：git 失败绝不 fail-open
+# ============================================================
+
+start_case "入口：取不到变更范围 / 参数不合法 → 非 0，绝不静默放行"
+run_entry no-such-rev-abc123
+expect_status_nonzero "不存在的 revision 被拦"
+expect_out_has "门禁" "报错带门禁前缀"
+expect_out_has "读取变更范围失败" "明确说是范围取不到"
+
+run_entry "no-such-rev-abc123...HEAD"
+expect_status_nonzero "a...b 里 a 不存在也被拦"
+
+run_entry "HEAD...no-such-rev-abc123"
+expect_status_nonzero "a...b 里 b 不存在也被拦"
+
+run_entry "no-such-rev-abc123...no-such-rev-def456"
+expect_status_nonzero "两端都不存在也被拦"
+
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/format.sh
+expect_status_nonzero "缺范围参数被拦"
+expect_out_has "用法" "给出用法说明"
+
+run_entry --help
+expect_status 0 "--help 放行"
+expect_out_has "staged" "usage 里写明三种范围写法"
+
+run_entry --nope
+expect_status_nonzero "不认识的参数被拦"
+
+# ============================================================
+# AC6（CI 同源）：ci token 从 GitHub Actions 环境解析范围
+# ============================================================
+
+start_case "入口：ci 从 GitHub Actions 环境解析变更范围（pull_request / push）"
+printf '# base\n' > "${PRISM_REPO}/README.md"
+PRISM_REV_BASE=$(commit_base base)
+printf '# base\n\nv2\n' > "${PRISM_REPO}/README.md"
+bad_cpp > "${PRISM_REPO}/sample.cpp"
+commit_all "bad cpp"
+PRISM_REV_BAD=$(git -C "${PRISM_REPO}" rev-parse HEAD)
+good_cpp > "${PRISM_REPO}/sample.cpp"
+commit_all "good cpp"
+PRISM_REV_GOOD=$(git -C "${PRISM_REPO}" rev-parse HEAD)
+
+# 事件 JSON 照抄 GitHub 的形状（base/head 里 sha 先于任何嵌套对象出现）。
+cat > "${PRISM_REPO}/event-pr.json" <<EOF
+{
+  "action": "opened",
+  "pull_request": {
+    "url": "https://api.github.com/repos/example/repo/pulls/97",
+    "number": 97,
+    "base": {
+      "label": "example:main",
+      "ref": "main",
+      "sha": "${PRISM_REV_BASE}",
+      "user": {
+        "login": "example"
+      },
+      "repo": {
+        "id": 1
+      }
+    },
+    "head": {
+      "label": "example:topic",
+      "ref": "topic",
+      "sha": "${PRISM_REV_GOOD}",
+      "user": {
+        "login": "example"
+      },
+      "repo": {
+        "id": 1
+      }
+    }
+  }
+}
+EOF
+
+# head 取自事件 JSON（REV_GOOD，合规），不是 GITHUB_SHA（REV_BAD，坏）：所以放行。
+run_entry_ci pull_request "${PRISM_REPO}/event-pr.json" "${PRISM_REV_BAD}" ""
+expect_status 0 "pull_request：head 取自事件 JSON 而不是 GITHUB_SHA"
+expect_out_has "通过：1 个改动的 C/C++ 文件" "范围落在 base...head 上"
+
+# base 以 GITHUB_BASE_SHA 优先（= head，范围为空）；若退回 JSON 的 base 就不是空范围了。
+run_entry_ci pull_request "${PRISM_REPO}/event-pr.json" "${PRISM_REV_BAD}" "${PRISM_REV_GOOD}"
+expect_status 0 "pull_request：base 以 GITHUB_BASE_SHA 优先"
+expect_out_has "为空" "范围确实按 GITHUB_BASE_SHA 收敛成空"
+
+# push：base 取事件里的 .before，head 取 GITHUB_SHA。
+cat > "${PRISM_REPO}/event-push.json" <<EOF
+{
+  "ref": "refs/heads/main",
+  "before": "${PRISM_REV_BASE}",
+  "after": "${PRISM_REV_BAD}",
+  "created": false,
+  "deleted": false,
+  "forced": false,
+  "base_ref": null,
+  "commits": [
+    {
+      "id": "${PRISM_REV_BAD}",
+      "message": "bad cpp",
+      "added": [
+        "sample.cpp"
+      ]
+    }
+  ]
+}
+EOF
+run_entry_ci push "${PRISM_REPO}/event-push.json" "${PRISM_REV_BAD}" ""
+expect_status_nonzero "push：.before..GITHUB_SHA 的坏内容被拦"
+expect_out_has "sample.cpp" "点名坏文件"
+
+# .before 是全零（新建分支）时不能悄悄把整个历史当成变更范围。
+cat > "${PRISM_REPO}/event-push-zero.json" <<EOF
+{
+  "ref": "refs/heads/main",
+  "before": "0000000000000000000000000000000000000000",
+  "after": "${PRISM_REV_BAD}"
+}
+EOF
+run_entry_ci push "${PRISM_REPO}/event-push-zero.json" "${PRISM_REV_BAD}" ""
+expect_status_nonzero "push：.before 全零被拦"
+expect_out_has "before" "报错点出 .before"
+
+start_case "入口：ci 在没有可用的 CI 环境时硬失败（空范围是 fail-open）"
+printf '# base\n' > "${PRISM_REPO}/README.md"
+PRISM_REV_BASE=$(commit_base base)
+
+run_entry_ci "" "${PRISM_REPO}/event-pr.json" "${PRISM_REV_BASE}" ""
+expect_status_nonzero "缺 GITHUB_EVENT_NAME 被拦"
+expect_out_has "GITHUB_EVENT_NAME" "报错点出缺哪个变量"
+
+run_entry_ci workflow_dispatch "${PRISM_REPO}/event-pr.json" "${PRISM_REV_BASE}" ""
+expect_status_nonzero "不认识的事件类型被拦"
+expect_out_has "GITHUB_EVENT_NAME" "报错说明支持哪些事件"
+
+run_entry_ci pull_request "${PRISM_REPO}/no-such-event.json" "${PRISM_REV_BASE}" ""
+expect_status_nonzero "事件文件不存在且没有 GITHUB_BASE_SHA 时被拦"
+
+# ============================================================
+
+drop_fixture
+rm -rf "${PRISM_CASE_ROOT}"
+printf '\n========================================\n'
+printf '通过 %s 项，失败 %s 项\n' "${PRISM_PASS}" "${PRISM_FAIL}"
+if [ "${PRISM_FAIL}" -ne 0 ]; then
+    printf '检查入口自测失败。\n' >&2
+    exit 1
+fi
+printf '检查入口自测全部通过。\n'
+exit 0
