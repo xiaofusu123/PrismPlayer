@@ -6,8 +6,8 @@
 set -u
 
 PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-# shellcheck source=.githooks/common.sh
-. "${PRISM_HOOK_DIR}/common.sh"
+# shellcheck source=scripts/checks/lib.sh
+. "${PRISM_HOOK_DIR}/../scripts/checks/lib.sh"
 
 # 耗时预算，可用环境变量覆盖（默认与 AGENTS.md 记录的值一致，超了只提示不拒绝）。
 PRISM_TIME_BUDGET_SECONDS=${PRISM_TIME_BUDGET_SECONDS:-900}
@@ -149,10 +149,13 @@ if [ -z "${PRISM_BASE}" ]; then
     fi
 fi
 
-if ! "${PRISM_HOOK_DIR}/check-clang-tidy.sh" "${PRISM_BUILD_DIR}" "${PRISM_BASE}"; then
+# 判定由共享入口承担（#100）：与 CI 的 tidy job 调的是同一个 scripts/checks/tidy.sh，
+# 区别只在范围（这里传本次推送的基线，CI 传这个 PR 的 base...head）。
+PRISM_TIDY_RANGE=${PRISM_BASE:-all}
+if ! sh "${PRISM_HOOK_DIR}/../scripts/checks/tidy.sh" "${PRISM_BUILD_DIR}" "${PRISM_TIDY_RANGE}"; then
     prism_blank
     prism_error "推送被拒绝：静态检查未通过（详见上）。"
-    prism_error "规则集：.clang-tidy（三条规则，均为致命错误）；规范映射：docs/markdown/代码规范.md §0。"
+    prism_error "规则集：.clang-tidy 里当前启用的规则（每一条都设为致命错误）；规范映射：docs/markdown/代码规范.md §0。"
     prism_error "确实无法改的地方，只允许就地加 NOLINTNEXTLINE 并注明原因（#64 实现决策 13）。"
     exit 1
 fi

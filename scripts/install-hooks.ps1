@@ -18,15 +18,20 @@ if (-not (Get-Command $gitExe -ErrorAction SilentlyContinue)) {
     }
 }
 
-# 四个文件只列一次：存在性检查与 CRLF 自检都从它派生。
-$hooks = @("common.sh", "pre-commit", "pre-push", "check-clang-tidy.sh")
+# 钩子只列一次：存在性检查与 CRLF 自检都从它派生。
+$hooks = @("pre-commit", "pre-push")
+# 检查入口（#97 / #100）：本地钩子与 CI 的判定都来自这里。
+$checkScripts = @("scripts/checks/lib.sh", "scripts/checks/format.sh", "scripts/checks/tidy.sh", "scripts/checks/ctest.sh")
 
 $missing = @()
 foreach ($hook in $hooks) {
-    if (-not (Test-Path (Join-Path ".githooks" $hook))) { $missing += $hook }
+    if (-not (Test-Path (Join-Path ".githooks" $hook))) { $missing += ".githooks/$hook" }
+}
+foreach ($script in $checkScripts) {
+    if (-not (Test-Path $script)) { $missing += $script }
 }
 if ($missing.Count -gt 0) {
-    Write-Host "错误：找不到 .githooks/$($missing -join '、')，当前目录 $PROJECT_ROOT 可能不是仓库根。" -ForegroundColor Red
+    Write-Host "错误：找不到 $($missing -join '、')，当前目录 $PROJECT_ROOT 可能不是仓库根。" -ForegroundColor Red
     exit 1
 }
 
@@ -52,17 +57,18 @@ if ($crlf.Count -gt 0) {
 }
 
 # 版本要求从钩子自己的常量读，不在安装脚本里再写一遍（避免两处各说一套）。
-$commonSh = Get-Content -Raw (Join-Path ".githooks" "common.sh")
-if ($commonSh -match 'PRISM_CLANG_VERSION_PREFIX="([^"]+)"') {
+$libSh = Get-Content -Raw (Join-Path "scripts" (Join-Path "checks" "lib.sh"))
+if ($libSh -match 'PRISM_CLANG_VERSION_PREFIX="([^"]+)"') {
     $versionRequirement = "$($Matches[1]).x"
 } else {
-    $versionRequirement = "见 .githooks/common.sh 的 PRISM_CLANG_VERSION_PREFIX"
+    $versionRequirement = "见 scripts/checks/lib.sh 的 PRISM_CLANG_VERSION_PREFIX"
 }
 
 Write-Host "门禁已装上：core.hooksPath = $hooksPath（写在本仓库 .git/config，不进版本控制）"
 Write-Host ""
 Write-Host "pre-commit  staged 的 C/C++ 文件必须 clang-format 过；文件名不得是 CmakeLists.txt（vendor/** 只豁免这一条）。"
 Write-Host "pre-push    先跑 windows-clang-x64-Debug 构建，再对本次推送改动的 C/C++ 文件跑 clang-tidy。"
+Write-Host "检查入口     scripts/checks/format.sh <staged|ci|<rev>|<a>...<b>> 一条命令打印与钩子同源的判定结果。"
 Write-Host "版本要求     clang-format / clang-tidy 必须 $versionRequirement，不符时钩子在动手前就报错退出（ADR 决策 6）。"
 Write-Host "唯一绕过场景 一次性格式批量整理，且必须在 PR 描述里说明：git commit/push --no-verify"
 

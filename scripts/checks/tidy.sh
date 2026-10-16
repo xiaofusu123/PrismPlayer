@@ -1,29 +1,82 @@
 #!/bin/sh
-# clang-tidy 检查（#69）：只查本次推送相对默认分支改动的 C/C++ 文件。
-# 用法：check-clang-tidy.sh <编译数据库所在目录> [基线 ref]；基线为空串时按全仓查。
-# 退出码：0 = 通过（含「没有 C/C++ 改动」）；1 = 有违规，或检查无法完成。
+# 静态检查入口（#100）：把 clang-tidy 的判定从 Git 钩子里抽出来，本地 pre-push 与 CI 跑同一份。
 #
-# 只查改动文件：全量 clang-tidy 几十秒起步，慢到会被 --no-verify 绕过；三条规则基线已清零，
-# 本次改动引入的违规就是目标。
-# 判定不看退出码：数据库加载失败时 clang-tidy 会打印错误却以 0 退出，只看退出码等于放行。
+# 为什么抽：钩子只查「本次推送改了什么」，CI 要查「这个 PR 改了什么」—— 范围不同、判定必须相同。
+# 范围用与 scripts/checks/format.sh 同一套 helper（scripts/checks/lib.sh 的 prism_range_*），
+# 于是同一段代码范围内，钩子与 CI 得出同一个结论。
+#
+# 用法：sh scripts/checks/tidy.sh <编译数据库目录> <变更范围>
+#   <变更范围>：staged | ci | all | <rev> | <a>...<b>（见 scripts/checks/format.sh 的 usage）
+#   all        仓库里全部 tracked 的 C/C++ 文件（全仓扫描；钩子在找不到基线时走这条路）
+#   注意：clang-tidy 分析的是**工作区里的文件**，范围只用来挑「哪些文件/编译单元要查」。
+#
+# 退出码：0 = 通过（含「范围内没有 C/C++ 改动」）；1 = 有违规，或检查无法完成。
 
 set -u
 
-PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-# shellcheck source=.githooks/common.sh
-. "${PRISM_HOOK_DIR}/common.sh"
+PRISM_ENTRY_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck source=scripts/checks/lib.sh
+. "${PRISM_ENTRY_DIR}/lib.sh"
 
-PRISM_DB_DIR=${1:-}
-PRISM_BASE=${2:-}
+prism_usage() {
+    cat <<'EOF'
+用法：sh scripts/checks/tidy.sh <编译数据库目录> <变更范围>
 
-if [ -z "${PRISM_DB_DIR}" ]; then
-    prism_error "用法：check-clang-tidy.sh <编译数据库所在目录> [基线 ref]"
-    exit 1
-fi
+用 clang-tidy 检查变更范围内的 C/C++ 文件（规则集见仓库根的 .clang-tidy）。
 
+变更范围：
+  staged       暂存内容：文件取自 git diff --cached（内容取自 index，但分析用的是工作区文件）
+  ci           GitHub Actions：由 GITHUB_EVENT_NAME / GITHUB_SHA / GITHUB_EVENT_PATH 解析出 <base>...<head>
+  all          仓库里全部 tracked 的 C/C++ 文件（全仓扫描）
+  <rev>        与默认分支的分叉点，如 main：文件取自 git diff <rev>...HEAD
+  <a>...<b>    任意范围：文件取自 git diff <a>...<b>
+
+判定：范围内的 C/C++ 文件 → 向上找 include 它们的编译单元（最多 3 层）→ 逐个跑 clang-tidy。
+      改动文件如果没有任何编译单元引用（3 层内），会被明确列为「覆盖不到」，不假装查过。
+      范围内的改动文件里没有 C/C++ 时直接跳过，且**不要求编译数据库存在**。
+
+退出码：0 = 通过（含无 C/C++ 改动）；1 = 有违规，或检查无法完成。
+
+例：sh scripts/checks/tidy.sh build/Linux/debug ci
+    sh scripts/checks/tidy.sh build/Windows/debug main
+    sh scripts/checks/tidy.sh build/Windows/debug all
+EOF
+}
+
+# 第一件事：校验工具版本前缀（#67 AC）。版本漂移会让同一段代码在不同机器上得出不同结论。
 if ! PRISM_TIDY=$(prism_require_tool clang-tidy); then
     exit 1
 fi
+
+if [ "$#" -gt 2 ]; then
+    prism_error "参数太多：只需要 <编译数据库目录> <变更范围>。"
+    prism_usage >&2
+    exit 1
+fi
+
+PRISM_DB_DIR=${1:-}
+PRISM_SPEC=${2:-}
+
+case "${PRISM_SPEC}" in
+    -h|--help)
+        prism_usage
+        exit 0
+        ;;
+esac
+
+if [ -z "${PRISM_DB_DIR}" ] || [ -z "${PRISM_SPEC}" ]; then
+    prism_error "用法：sh scripts/checks/tidy.sh <编译数据库目录> <变更范围>"
+    prism_usage >&2
+    exit 1
+fi
+
+case "${PRISM_SPEC}" in
+    -*)
+        prism_error "不认识的参数：${PRISM_SPEC}"
+        prism_usage >&2
+        exit 1
+        ;;
+esac
 
 PRISM_ROOT=$(prism_repo_root) || {
     prism_error "不在 Git 仓库里，无法执行 clang-tidy 检查。"
@@ -39,22 +92,22 @@ PRISM_TMP=$(prism_tmpdir) || {
 }
 trap 'rm -rf "${PRISM_TMP}"' EXIT HUP INT TERM
 
-# -z + tr：避开 core.quotePath 对非 ASCII 文件名的转义。退出码要判：git 失败留下空文件，
-# 会被下面的「没有 C/C++ 改动」当成放行（fail-open）。
-if [ -n "${PRISM_BASE}" ]; then
-    if ! git diff --name-only --diff-filter=ACMR -z "${PRISM_BASE}...HEAD" > "${PRISM_TMP}/raw.z"; then
-        prism_error "取改动文件失败（git diff ${PRISM_BASE}...HEAD 返回非零），检查无法完成。"
-        exit 1
-    fi
-else
+# ---- 范围内的改动文件（all = 全仓）----
+if [ "${PRISM_SPEC}" = "all" ]; then
+    # 退出码要判：git 失败留下空文件，会被下面的「没有 C/C++ 改动」当成放行（fail-open）。
     if ! git ls-files -z > "${PRISM_TMP}/raw.z"; then
         prism_error "取 tracked 文件失败（git ls-files 返回非零），检查无法完成。"
         exit 1
     fi
+    tr '\0' '\n' < "${PRISM_TMP}/raw.z" > "${PRISM_TMP}/raw"
+else
+    if ! prism_range_files "${PRISM_SPEC}" "${PRISM_TMP}/raw"; then
+        prism_error "读取变更范围失败（${PRISM_SPEC}），无法判定，拒绝放行。"
+        prism_error "范围写法：staged | ci | all | <rev> | <a>...<b>，见 --help。"
+        exit 1
+    fi
 fi
-tr '\0' '\n' < "${PRISM_TMP}/raw.z" > "${PRISM_TMP}/raw"
 
-# ---- 本次改动的 C/C++ 文件 ----
 : > "${PRISM_TMP}/changed_c"
 while IFS= read -r PRISM_F; do
     [ -n "${PRISM_F}" ] || continue
@@ -65,13 +118,13 @@ while IFS= read -r PRISM_F; do
 done < "${PRISM_TMP}/raw"
 
 if [ ! -s "${PRISM_TMP}/changed_c" ]; then
-    prism_info "本次推送没有 C/C++ 改动，跳过 clang-tidy（不产生额外耗时）。"
+    prism_info "本次变更没有 C/C++ 改动，跳过 clang-tidy（不产生额外耗时）。"
     exit 0
 fi
 PRISM_CHANGED_COUNT=$(wc -l < "${PRISM_TMP}/changed_c" | tr -d ' ')
 prism_info "clang-tidy 检查范围：本次改动的 ${PRISM_CHANGED_COUNT} 个 C/C++ 文件"
 
-# 数据库只在确实要查时才要求：没有 C/C++ 改动就不该因为缺数据库而拦人（#69 AC）。
+# 数据库只在确实要查时才要求：没有 C/C++ 改动就不该因为缺数据库而拦人（#69 AC / #100 AC）。
 if [ ! -f "${PRISM_DB}" ]; then
     prism_error "找不到编译数据库：${PRISM_DB}"
     prism_error "原因：clang-tidy 要有编译参数（include 路径、宏、语言标准）才能正确分析，缺了它结论不可信。"
@@ -105,7 +158,7 @@ grep -o '"file"[[:space:]]*:[[:space:]]*"[^"]*"' "${PRISM_DB}" \
 
 if [ ! -s "${PRISM_TMP}/db_sources" ]; then
     prism_error "编译数据库里解析不出任何源文件条目：${PRISM_DB}"
-    prism_error "处理：删掉构建目录重新配置（scripts/build.ps1 1 --clean）后重试。"
+    prism_error "处理：删掉构建目录重新配置（scripts/build.ps1 1 --clean / scripts/build.sh 1 --clean）后重试。"
     exit 1
 fi
 
@@ -216,7 +269,7 @@ if grep -q -e "Error while trying to load a compilation database" \
     prism_blank
     prism_error "clang-tidy 没能加载编译数据库，结论不可信（这种失败以退出码 0 结束，必须显式拦）。"
     prism_error "数据库：${PRISM_DB}"
-    prism_error "处理：删掉构建目录重新配置（scripts/build.ps1 1 --clean）后再 push。"
+    prism_error "处理：删掉构建目录重新配置（scripts/build.ps1 1 --clean / scripts/build.sh 1 --clean）后再跑一次。"
     exit 1
 fi
 
@@ -226,7 +279,7 @@ PRISM_ERR_COUNT=$(grep -c -E '(error|warning):' "${PRISM_TMP}/tidy.log" || :)
 if [ "${PRISM_DIAG_COUNT}" -ne 0 ]; then
     grep -E ':[0-9][0-9]*:[0-9][0-9]*: (error|warning):' "${PRISM_TMP}/tidy.log" > "${PRISM_TMP}/diags"
     prism_blank
-    prism_error "clang-tidy 未通过：${PRISM_DIAG_COUNT} 处诊断（三条规则都是致命错误）。"
+    prism_error "clang-tidy 未通过：${PRISM_DIAG_COUNT} 处诊断（启用的规则都是致命错误）。"
     while IFS= read -r PRISM_LINE; do
         [ -n "${PRISM_LINE}" ] || continue
         prism_error "  ${PRISM_LINE}"
