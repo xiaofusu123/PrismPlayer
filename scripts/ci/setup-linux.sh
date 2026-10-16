@@ -85,10 +85,14 @@ install_cmake() {
 }
 
 # Linux 上 glfw3 / vulkan / ffmpeg 的 vcpkg port 要这些系统开发包（#96 决策 15，风险清单第①条）。
-# 清单以本机 WSL 上「构建确实跑通」的那一套为准：X11 一族 + GL/EGL + Wayland + DRM + 汇编器，
-# 外加 ninja-build（构建器也要显式钉住，不能指望镜像碰巧自带，见 #99 AC）。
-# 干净 runner 上不会碰巧有，所以显式装，不靠镜像自带；整份清单在 WSL Ubuntu 24.04.5 上用
-# `apt-get install -s` 逐个验过包名可解析。
+# 清单以本机 WSL 上「构建确实跑通」的那一套为准：X11 一族 + GL/EGL + Wayland + DRM + 汇编器 +
+# autoreconf 一族（`vcpkg_make` 的 port 走 autoreconf，缺 `autoconf-archive`/`bison`/`flex` 会
+# BUILD_FAILED），外加 ninja-build（构建器也要显式钉住，不能指望镜像碰巧自带，见 #99 AC）。
+# 干净 runner 上不会碰巧有，所以显式装，不靠镜像自带。
+#
+# 教训（#99 的 CI 首次真实运行）：`apt-get install -s` 逐个验过的只是「包名可解析」，**证明不了
+# 清单够用** —— 本机 WSL 上 autoconf-archive / bison / flex 早就装着，所以本地永远看不出缺它们。
+# 干净的 runner 上 pthread-stubs 当场 BUILD_FAILED，报的就是缺 autoconf-archive。
 install_system_deps() {
     say "system：安装 glfw3 / vulkan / ffmpeg 在 Linux 侧的系统开发包 ..."
     sudo apt-get update
@@ -97,7 +101,8 @@ install_system_deps() {
         ninja-build \
         binutils \
         nasm yasm \
-        autoconf automake libtool libltdl-dev \
+        autoconf autoconf-archive automake libtool libltdl-dev \
+        bison flex \
         libx11-dev libxext-dev libxrandr-dev libxinerama-dev libxcursor-dev \
         libxi-dev libxfixes-dev libxss-dev libxxf86vm-dev libxcb1-dev libx11-xcb-dev \
         libgl-dev libglu1-mesa-dev libegl-dev mesa-common-dev \
