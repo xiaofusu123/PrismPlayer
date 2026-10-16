@@ -1,0 +1,69 @@
+# 门禁第二阶段（spec #96）：服务端的「不可绕过层」。
+#
+# 本文件只做编排 —— 装工具链、还原缓存、按预设配置与构建、调用检查入口。
+# 判定逻辑一律住在 scripts/checks/ 与 test/ 里：本地钩子与 CI 调用同一份，
+# 「CI 说绿、本机说红」这类口径漂移在结构上不可能出现（#96 决策 6/8）。
+#
+# job 名即契约：main 的规则集按名字把它们设成必需检查，改名必须同步规则集，
+# 否则必需检查会静默失效（#96 决策 27 / #103）。
+#
+# 本地复现：
+#   sh test/hooks/run.sh              钩子自测
+#   sh test/checks/run.sh             检查入口自测
+#   sh scripts/checks/format.sh ci    格式检查（与 CI 同源的判定）
+
+name: 门禁
+
+on:
+  pull_request: # 含草稿 PR，便于自查（#96 决策 3/28）
+  push:
+    branches: [main] # 留痕：合进 main 的每一次推送也跑一遍
+
+# 只读权限、不使用任何 secret、不用 pull_request_target（#96 决策 4）：
+# 仓库是公开的，fork 的 PR 会执行我们的编排，任何凭据都不进 workflow。
+permissions:
+  contents: read
+
+# 同一 PR 的新推送取消上一次仍在跑的运行（#96 决策 5）。
+concurrency:
+  group: gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 门禁钉死的 23.1.x 必须来自 apt.llvm.org 的 noble-23 仓（#96 决策 12）。
+  # CLANG_ROOT 让 scripts/checks/lib.sh 的 prism_require_tool 直接命中这一份，
+  # 而不是 runner 自带的旧 clang。
+  CLANG_ROOT: /usr/lib/llvm-23/bin
+
+jobs:
+  # 「门禁机制本身」在干净的 Linux 机器上成立（#96 决策 20）：无依赖、秒级。
+  hooks-self-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 装 23.1.x 的 clang 工具链
+        run: bash scripts/ci/setup-linux.sh llvm
+      - name: 在临时仓库里跑真钩子，断言退出码与 stderr
+        run: sh test/hooks/run.sh
+
+  # 检查入口自己的自测（#96 决策 21）：同样无依赖、秒级。
+  checks-self-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 装 23.1.x 的 clang 工具链
+        run: bash scripts/ci/setup-linux.sh llvm
+      - name: 检查入口 CLI 契约自测
+        run: sh test/checks/run.sh
+
+  # 格式检查：只查本次变更范围（#96 决策 7/10 —— 全仓会让 CI 从第一天起常年飘红）。
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 变更范围是 base...head，需要 base 那一侧的提交
+      - name: 装 23.1.x 的 clang 工具链
+        run: bash scripts/ci/setup-linux.sh llvm
+      - name: 格式检查（只查本次变更范围，判定逻辑在 scripts/checks/format.sh）
+        run: sh scripts/checks/format.sh ci
