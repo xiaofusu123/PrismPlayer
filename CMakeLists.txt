@@ -16,6 +16,10 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     enable_testing()
     add_compile_definitions(PRISM_DEBUG)
 
+    # #102 AC2/AC3 探针：注册一过一挂两条测试，验证 ctest job 自动变成真检查、并点名挂掉的那条（随即撤掉）
+    add_test(NAME prism-probe-102-pass COMMAND ${CMAKE_COMMAND} -E true)
+    add_test(NAME prism-probe-102-fail COMMAND ${CMAKE_COMMAND} -E false)
+
 else()
     add_compile_definitions(PRISM_RELEASE)
 endif()

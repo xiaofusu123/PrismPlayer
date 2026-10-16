@@ -10,8 +10,9 @@
 #include <spdlog/spdlog.h>
 #include <string>
 
-// #99 AC4 探针：故意制造一个编译错误，验证 build-linux-debug 会红并给出本地复现命令（本行随即撤掉）
-static_assert(false, "prism probe 99: deliberate compile error");
+// #100 AC4 探针：故意违反 readability-identifier-naming（ClassCase: CamelCase），验证 tidy
+// 变红并点名规则与文件 （这些探针行随即撤掉）
+class prism_probe_naming_violation {};
 
 namespace Prism::Service {
 
