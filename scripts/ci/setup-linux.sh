@@ -66,6 +66,28 @@ install_llvm() {
         "libclang-rt-${LLVM_MAJOR}-dev"
 }
 
+# 预设（CMakePresets.json 的 linux-base）把 CMAKE_C_COMPILER / CMAKE_CXX_COMPILER 写成裸
+# `clang` / `clang++`（CC / CXX 环境变量也是），所以 **PATH 上第一个 clang 就是构建用的编译器**。
+# runner 自带的 /usr/bin/clang 是 18：只校验 ${LLVM_BIN} 会漏掉它，构建会拿着 18 一路跑完而没人知道
+# （#99 的第一次真实运行就是这么红的：C compiler identification = Clang 18.1.3）。
+prepend_llvm_path() {
+    local tool versioned
+    for tool in clang clang++ clang-format clang-tidy; do
+        if [ ! -x "${LLVM_BIN}/${tool}" ]; then
+            versioned="${LLVM_BIN}/${tool}-${LLVM_MAJOR}"
+            [ -x "${versioned}" ] || die "${LLVM_BIN} 里既没有 ${tool} 也没有 ${tool}-${LLVM_MAJOR}。"
+            sudo ln -sf "${versioned}" "${LLVM_BIN}/${tool}"
+        fi
+    done
+
+    if [ -n "${GITHUB_PATH:-}" ]; then
+        printf '%s\n' "${LLVM_BIN}" >> "${GITHUB_PATH}"
+        say "llvm：${LLVM_BIN} 会加到后续步骤 PATH 的最前面（预设用裸 clang / clang++）。"
+    else
+        say "llvm：本机运行，不写 GITHUB_PATH（只有 CI 需要）。"
+    fi
+}
+
 install_cmake() {
     local version
     version=$(cmake --version 2>/dev/null | sed -n 's/^cmake version \([0-9]*\).*$/\1/p' || true)
@@ -165,6 +187,17 @@ verify_toolchain() {
     for tool in clang clang++ clang-format clang-tidy; do
         prism_require_tool "${tool}" > /dev/null || die "${tool} 不是 ${prefix}.x，拒绝在版本不符的 runner 上跑门禁。"
     done
+
+    # 再确认「下一个步骤真正会用的那个 clang」：用 ${LLVM_BIN} 前置后的 PATH 解析一次。
+    # 这一条是必需的 —— 预设调用裸 `clang`，而 runner 自带的 18 就在 PATH 上。
+    local resolved
+    resolved=$(PATH="${LLVM_BIN}:${PATH}" command -v clang 2>/dev/null || true)
+    [ -n "${resolved}" ] || die "PATH 上找不到 clang。"
+    case "$(PATH="${LLVM_BIN}:${PATH}" clang --version 2>/dev/null | head -n 1)" in
+        *"clang version ${prefix}"*) : ;;
+        *) die "PATH 上的 clang（${resolved}）不是 ${prefix}.x —— CMakePresets.json 的 linux-base 用的是裸 clang。" ;;
+    esac
+    say "PATH 工具链校验通过：${resolved} → $(PATH="${LLVM_BIN}:${PATH}" clang --version | head -n 1)"
     say "工具链版本校验通过：clang / clang++ / clang-format / clang-tidy 全部 ${prefix}.x（${LLVM_BIN}）"
 }
 
@@ -191,6 +224,11 @@ main() {
             *) die "未知组件 '${component}'（可选：llvm cmake system vcpkg）" ;;
         esac
     done
+
+    # PATH 必须在校验之前就摆好：预设调用裸 clang，校验要检查的正是「下一个步骤会用的那个」。
+    case " ${components[*]} " in
+        *" llvm "*) prepend_llvm_path ;;
+    esac
 
     verify_toolchain
 }

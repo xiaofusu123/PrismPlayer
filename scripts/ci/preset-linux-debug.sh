@@ -40,6 +40,35 @@ on_error() {
 }
 trap 'on_error' ERR
 
+# 构建用的编译器由预设写死成裸 `clang` / `clang++`（CMakePresets.json 的 linux-base，CC / CXX 也是），
+# 所以先问一句：PATH 上第一个 clang 是不是门禁钉死的那一版。runner 自带的 /usr/bin/clang 是 18，
+# 装前置时会把 llvm-23 放到 PATH 最前面；这一步是「真的生效了吗」的现场证据，而不是一句声明
+# —— #99 的第一次真实运行就是拿着 18 一路配置下去的（C compiler identification = Clang 18.1.3）。
+check_compiler() {
+    local prefix version
+    prefix=$(sed -n 's/^[[:space:]]*PRISM_CLANG_VERSION_PREFIX="\([^"]*\)".*$/\1/p' \
+        "${PROJECT_ROOT}/scripts/checks/lib.sh" | head -n 1)
+    [ -n "${prefix}" ] || { printf '错误：从 scripts/checks/lib.sh 里读不到 PRISM_CLANG_VERSION_PREFIX。\n' >&2; exit 1; }
+
+    version=$(clang --version 2>/dev/null | head -n 1) || true
+    [ -n "${version}" ] || { printf '错误：PATH 上没有 clang。\n' >&2; exit 1; }
+
+    case "${version}" in
+        *"clang version ${prefix}"*)
+            say "编译器：$(command -v clang) → ${version}"
+            ;;
+        *)
+            printf '错误：PATH 上的 clang 是「%s」，不是 %s.x。\n' "${version}" "${prefix}" >&2
+            printf '      linux-clang-x64-Debug 预设用的是裸 clang / clang++，这会直接影响构建结果。\n' >&2
+            printf '      先跑：bash scripts/ci/setup-linux.sh llvm（把 llvm-%s 放到 PATH 最前面）。\n' \
+                "${prefix%%.*}" >&2
+            exit 1
+            ;;
+    esac
+}
+
+check_compiler
+
 case "${STEP}" in
     configure)
         say "配置：cmake --preset ${PRESET}"
