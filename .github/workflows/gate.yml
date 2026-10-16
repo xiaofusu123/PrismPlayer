@@ -39,6 +39,29 @@ env:
   VCPKG_ROOT: /home/runner/vcpkg
 
 jobs:
+  # vcpkg 二进制缓存的键只算一次（#101）：baseline + manifest 内容 + triplet + runner 镜像 +
+  # clang 版本前缀。键的构成就是「CI 什么时候会变慢」的答案，所以只有这一处定义 ——
+  # 复制进每个 job 里迟早会漂移，而键一漂移就退化成每次都冷编译，且很难看出是为什么。
+  #
+  # 刻意**不用** restore-keys 做部分命中：键不匹配就是一次干净的冷编译。部分命中会让
+  # 「这次为什么慢」变得不可解释，而这一票要回答的正是这个问题。
+  cache-key:
+    runs-on: ubuntu-24.04
+    outputs:
+      key: ${{ steps.key.outputs.key }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 算缓存键（并写进日志，便于事后判断「为什么没命中」）
+        id: key
+        run: |
+          prefix=$(bash scripts/ci/setup-linux.sh --clang-prefix)
+          baseline=$(bash scripts/ci/setup-linux.sh --vcpkg-baseline)
+          manifest=$(sha256sum vcpkg.json | cut -c1-16)
+          # triplet 固定 x64-linux：Linux Debug 预设用的就是它（CMakePresets.json 的 linux-base）。
+          key="vcpkg-${baseline}-manifest${manifest}-x64-linux-${ImageOS:-unknown}-${ImageVersion:-unknown}-clang${prefix}"
+          printf '缓存键：%s\n' "${key}"
+          printf 'key=%s\n' "${key}" >> "$GITHUB_OUTPUT"
+
   # 「门禁机制本身」在干净的 Linux 机器上成立（#96 决策 20）：无依赖、秒级。
   hooks-self-test:
     runs-on: ubuntu-24.04
@@ -78,9 +101,19 @@ jobs:
   # 这是本工作流唯一「重」的 job：干净 runner 上没有依赖缓存时，vcpkg 要从源码编译
   # ffmpeg / glfw3 / vulkan 等（本机 Linux 侧实测一次性约 14 分钟）。缓存与耗时入档见 #101。
   build-linux-debug:
+    needs: cache-key
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - name: 还原 vcpkg 二进制缓存（命中就不必再从源码编依赖）
+        uses: actions/cache@v4
+        with:
+          # .vcpkg-cache 是仓库自己的二进制缓存位置（CMakePresets.json 的 VCPKG_BINARY_SOURCES
+          # 指向 ${sourceDir}/.vcpkg-cache），downloads 是 vcpkg 的源码包缓存。
+          path: |
+            .vcpkg-cache
+            /home/runner/vcpkg/downloads
+          key: ${{ needs.cache-key.outputs.key }}
       - name: 装前置（clang 23.1.x / cmake 4.x / Linux 系统开发包 / vcpkg）
         run: bash scripts/ci/setup-linux.sh llvm cmake system vcpkg
       - name: 配置（linux-clang-x64-Debug：产出编译数据库与 vcpkg 依赖安装树）

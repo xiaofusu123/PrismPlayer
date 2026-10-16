@@ -13,6 +13,7 @@
 #   vcpkg   按 vcpkg-configuration.json 的 baseline 取一份 vcpkg 并 bootstrap
 #   默认：llvm
 #   --clang-prefix  只打印门禁钉死的版本前缀（给 CI 的缓存键用），不装任何东西
+#   --vcpkg-baseline  只打印 vcpkg 的 baseline（同上，缓存键的一部分；#101）
 #
 # 幂等：已经装过就跳过；任何一步失败都以非零码退出，绝不静默降级。
 
@@ -165,6 +166,10 @@ verify_toolchain() {
 main() {
     if [ "${1:-}" = "--clang-prefix" ]; then
         clang_prefix
+        exit 0
+    fi
+    if [ "${1:-}" = "--vcpkg-baseline" ]; then
+        vcpkg_baseline
         exit 0
     fi
 
