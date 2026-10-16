@@ -2,13 +2,9 @@
 
 namespace Prism::Engine {
 
-AudioEngineWasapiShared::AudioEngineWasapiShared() {
+AudioEngineWasapiShared::AudioEngineWasapiShared() = default;
 
-}
-
-AudioEngineWasapiShared::~AudioEngineWasapiShared() {
-    
-}
+AudioEngineWasapiShared::~AudioEngineWasapiShared() = default;
 
 bool AudioEngineWasapiShared::init() {
     return true;

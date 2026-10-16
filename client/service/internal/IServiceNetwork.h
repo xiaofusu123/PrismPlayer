@@ -13,7 +13,7 @@ namespace Prism::Service {
  * 当前阶段提供默认桩实现，后续替换为真实网络模块。
  */
 class IServiceNetwork {
-public:
+  public:
     virtual ~IServiceNetwork() = default;
 
     /**
@@ -55,7 +55,7 @@ public:
      * @brief 获取房间连接状态
      * @return PrismRoomState
      */
-    virtual PrismRoomState get_room_state() const = 0;
+    [[nodiscard]] virtual PrismRoomState get_room_state() const = 0;
 };
 
 } // namespace Prism::Service
