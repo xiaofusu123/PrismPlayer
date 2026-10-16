@@ -105,6 +105,8 @@ bash scripts/install-hooks.sh
 | `tidy` | 本次变更范围内的 clang-tidy（与 `pre-push` 同一份判定） | `sh scripts/checks/tidy.sh build/Linux/debug ci` |
 | `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿 | `sh scripts/checks/ctest.sh build/Linux/debug` |
 
+上表六个 job（`hooks-self-test`、`checks-self-test`、`format`、`build-linux-debug`、`tidy`、`ctest`）**全部**是 `main` 规则集里的**必需状态检查**；`cache-key` 只是内部步骤，不是契约的一部分（改名、增删 job 都必须同步规则集，理由见下）。
+
 本地复现同一个结论（WSL / Linux，仓库根）：
 
 ```bash
