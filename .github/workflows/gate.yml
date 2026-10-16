@@ -122,3 +122,31 @@ jobs:
         run: bash scripts/ci/preset-linux-debug.sh build
       - name: 产物契约断言（体积 / 导出数量 / 不含 libc++）
         run: bash scripts/ci/preset-linux-debug.sh verify
+
+  # 静态检查（#100）：与本地 pre-push 调用**同一份入口**（scripts/checks/tidy.sh）。
+  # 范围不同（这里查「这个 PR 改了什么」，钩子查「这次推送改了什么」），判定相同：
+  # 同一段代码范围在两处得到同一个结论，「CI 说绿、本机说红」在结构上不可能出现。
+  #
+  # 顺序不能反 —— 编译数据库与 vcpkg 依赖头文件树都来自配置阶段。#100 只靠 needs 保证先后，
+  # 不把 compile_commands.json 用 artifact 传过来（依赖头文件树 537 MB vs 数据库 1 MB），
+  # 理由见 ADR 0006「后果」。缓存与构建 job 同一个键：这个 job 自己配置一次同样靠它才快。
+  tidy:
+    needs: [cache-key, build-linux-debug]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 变更范围是 base...head
+      - name: 还原 vcpkg 二进制缓存（这个 job 自己配置一次，同样靠缓存才快）
+        uses: actions/cache@v4
+        with:
+          path: |
+            .vcpkg-cache
+            /home/runner/vcpkg/downloads
+          key: ${{ needs.cache-key.outputs.key }}
+      - name: 装前置（clang 23.1.x / cmake 4.x / Linux 系统开发包 / vcpkg）
+        run: bash scripts/ci/setup-linux.sh llvm cmake system vcpkg
+      - name: 配置（静态检查需要编译数据库与依赖头文件树）
+        run: bash scripts/ci/preset-linux-debug.sh configure
+      - name: 静态检查（scripts/checks/tidy.sh —— 与本地 pre-push 同一份判定）
+        run: sh scripts/checks/tidy.sh build/Linux/debug ci

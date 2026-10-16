@@ -1,7 +1,8 @@
 #!/bin/sh
-# 检查入口自测（#97）：在临时 git 仓库里造变更集，断言 scripts/checks/format.sh 的退出码与 stderr。
-# 覆盖三种输入（全合规 → 0 / 含未格式化 → 非 0 / 空范围 → 0）、vendor 例外、<rev> 与 <a>...<b> 两种范围
-# 写法、非 C/C++ 忽略、git 失败绝不 fail-open，以及 ci（GitHub Actions 环境解析范围）。
+# 检查入口自测（#97 / #100）：在临时 git 仓库里造变更集，断言 scripts/checks/ 下入口的退出码与 stderr。
+# format.sh（#97）覆盖三种输入（全合规 → 0 / 含未格式化 → 非 0 / 空范围 → 0）、vendor 例外、<rev> 与
+# <a>...<b> 两种范围写法、非 C/C++ 忽略、git 失败绝不 fail-open，以及 ci（GitHub Actions 环境解析范围）。
+# tidy.sh（#100）覆盖三种输入（有违规 → 非 0 / 无 C/C++ 改动 → 0 且不要求编译数据库 / 空范围 → 0）。
 # 不联网、不依赖 CI。用法：sh test/checks/run.sh
 
 set -u
@@ -14,6 +15,9 @@ cd "${PRISM_TEST_ROOT}" || exit 1
 
 PRISM_RUN_SH=$(command -v sh) || PRISM_RUN_SH=/bin/sh
 PRISM_CLANG_FORMAT_REAL=$(prism_find_tool clang-format || :)
+# tidy.sh 的用例要真 clang-tidy（入口第一步就校验它）与真 clang++（手写编译数据库要用它当编译器）。
+PRISM_CLANG_TIDY_REAL=$(prism_find_tool clang-tidy || :)
+PRISM_CLANGXX_REAL=$(prism_find_tool clang++ || :)
 
 PRISM_PASS=0
 PRISM_FAIL=0
@@ -87,6 +91,11 @@ run_entry_ci() {
     PRISM_STATUS=$?
 }
 
+# 跑静态检查入口（#100）；参数是 <编译数据库目录> <变更范围>。
+run_entry_tidy() {
+    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh "$@"
+}
+
 # ---------- 夹具 ----------
 # 夹具放在仓库的 build/ 下（已 gitignore）。不要用 /tmp：Git Bash 的 /tmp 与 git.exe 认的
 # /tmp 不是同一个目录，-C 会直接找不到目录。
@@ -151,9 +160,61 @@ commit_base() {
     git -C "${PRISM_REPO}" rev-parse HEAD
 }
 
+# ---------- #100：tidy.sh 用的夹具 ----------
+
+# clang-tidy 是原生 exe，编译数据库里的 directory / file 必须是它认得的原生路径：Windows 上得是
+# D:/...，MSYS 的 /d/... 一条也匹配不上 —— clang-tidy 自己把编译单元绝对化成 D:/...，于是查不到
+# 编译命令，只打印「Compile command not found」并以 0 退出（假绿）。MSYS2 / Git Bash 的 `pwd -W`
+# 直接给出原生形式；Linux 没有 -W，退回 pwd -P（那里本来就是原生形式）。
+# 刻意不用 cygpath：它只在 MSYS 系存在，会多出一条「本机能过、CI 不能过」的路径。
+fixture_native_dir() {
+    if _prism_native=$(cd "${PRISM_REPO}" && pwd -W 2>/dev/null) && [ -n "${_prism_native}" ]; then
+        _prism_native_out=${_prism_native}
+    else
+        _prism_native_out=$(cd "${PRISM_REPO}" && pwd -P)
+    fi
+    # 编译数据库是 JSON：路径里出现反斜杠（`\P` 之类）会直接把文件读坏，一律换成正斜杠。
+    printf '%s\n' "${_prism_native_out}" | tr '\\' '/'
+}
+
+# 夹具自己的最小规则集，不复用仓库根的 .clang-tidy：那份规则集由别的工单在改，自测跟着它漂就不是
+# 在测入口本身。InheritParentConfig: false 是关键 —— 夹具就在仓库的 build/ 下，不拦住向上查找，
+# 仓库根那份配置会被并进来。
+write_tidy_config() {
+    cat > "${PRISM_REPO}/.clang-tidy" <<'EOF'
+InheritParentConfig: false
+Checks: 'readability-identifier-naming'
+WarningsAsErrors: 'readability-identifier-naming'
+CheckOptions:
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+EOF
+}
+
+# 夹具里没有 CMake，编译数据库手写。command 里用真 clang++（prism_find_tool 解析出的路径，反斜杠
+# 换成 JSON 安全的正斜杠）。clang-tidy 只解析这条命令的参数、不执行它，所以 argv[0] 用 POSIX 形式
+# 也无妨；所有路径都从夹具自己的 pwd 推出来。
+write_tidy_db() {
+    mkdir -p "${PRISM_REPO}/build"
+    _prism_tidy_native=$(fixture_native_dir)
+    _prism_tidy_cxx=$(printf '%s\n' "${PRISM_CLANGXX_REAL}" | tr '\\' '/')
+    cat > "${PRISM_REPO}/build/compile_commands.json" <<EOF
+[
+  {
+    "directory": "${_prism_tidy_native}/build",
+    "file": "${_prism_tidy_native}/src/sample.cpp",
+    "command": "${_prism_tidy_cxx} -std=c++17 -c ${_prism_tidy_native}/src/sample.cpp -o ${_prism_tidy_native}/build/sample.o"
+  }
+]
+EOF
+}
+
 printf '检查入口自测：仓库根 %s\n' "${PRISM_TEST_ROOT}"
 printf '入口: %s\n' "${PRISM_TEST_ROOT}/scripts/checks/format.sh"
+printf '入口: %s\n' "${PRISM_TEST_ROOT}/scripts/checks/tidy.sh"
 printf 'clang-format: %s\n' "${PRISM_CLANG_FORMAT_REAL:-未找到}"
+printf 'clang-tidy:   %s\n' "${PRISM_CLANG_TIDY_REAL:-未找到}"
+printf 'clang++:      %s\n' "${PRISM_CLANGXX_REAL:-未找到}"
 if [ -z "${PRISM_CLANG_FORMAT_REAL}" ]; then
     printf '错误：找不到 clang-format，无法自测（见 docs/markdown/项目框架.md 7.1）。\n' >&2
     exit 1
@@ -475,6 +536,81 @@ expect_out_has "GITHUB_EVENT_NAME" "报错说明支持哪些事件"
 
 run_entry_ci pull_request "${PRISM_REPO}/no-such-event.json" "${PRISM_REV_BASE}" ""
 expect_status_nonzero "事件文件不存在且没有 GITHUB_BASE_SHA 时被拦"
+
+# ============================================================
+# #100：共享静态检查入口 tidy.sh —— 三种输入
+# 有违规 → 非 0（点名规则与文件）/ 无 C/C++ 改动 → 0（且不要求编译数据库）/ 变更范围为空 → 0
+# ============================================================
+
+start_case "入口（tidy.sh）：有违规 → 非 0，报出规则名与违规文件"
+if [ -z "${PRISM_CLANG_TIDY_REAL}" ] || [ -z "${PRISM_CLANGXX_REAL}" ]; then
+    printf '    [SKIP] 本机缺少 clang-tidy 或 clang++，违规用例跳过（需要真工具跑真诊断；不计为通过）\n'
+else
+printf '# base\n' > "${PRISM_REPO}/README.md"
+write_tidy_config
+PRISM_REV_BASE=$(commit_base base)
+
+mkdir -p "${PRISM_REPO}/src"
+# 只违反 ClassCase: CamelCase 一条（变量命名不在夹具的规则集里）。
+cat > "${PRISM_REPO}/src/sample.cpp" <<'EOF'
+class bad_name {
+public:
+    int value = 0;
+};
+
+int main() { return 0; }
+EOF
+commit_all "naming violation"
+write_tidy_db
+
+run_entry_tidy build "${PRISM_REV_BASE}"
+expect_status_nonzero "命名违规被拦"
+expect_out_has "readability-identifier-naming" "报出违规的规则名"
+expect_out_has "sample.cpp" "点名违规文件"
+expect_out_has "invalid case style for class 'bad_name'" "报出具体诊断"
+expect_out_has "落在本次改动的文件上" "把诊断对应回本次改动的文件"
+fi
+
+start_case "入口（tidy.sh）：无 C/C++ 改动 → 0，明确跳过且不要求编译数据库"
+if [ -z "${PRISM_CLANG_TIDY_REAL}" ]; then
+    printf '    [SKIP] 本机没有 clang-tidy，用例跳过（不计为通过）\n'
+else
+printf '# base\n' > "${PRISM_REPO}/README.md"
+write_tidy_config
+PRISM_REV_BASE=$(commit_base base)
+printf '# base\n\n文档更新。\n' > "${PRISM_REPO}/README.md"
+commit_all doc-only
+
+# 夹具故意不建 build/：这一步就是要证明「没有 C/C++ 改动」根本不碰编译数据库。
+run_entry_tidy build "${PRISM_REV_BASE}"
+expect_status 0 "只有文档改动时放行"
+expect_out_has "没有 C/C++ 改动" "明确说明范围内没有 C/C++ 改动"
+expect_out_has "跳过 clang-tidy" "明确说跳过 clang-tidy"
+expect_out_lacks "找不到编译数据库" "没有因为缺编译数据库而拦人"
+if [ -d "${PRISM_REPO}/build" ]; then
+    bad "入口造出了构建目录：这一步必须完全不碰编译数据库"
+else
+    ok "跑完后夹具里仍然没有构建目录（确实没碰编译数据库）"
+fi
+fi
+
+start_case "入口（tidy.sh）：变更范围为空 → 0（git 成功但列表为空，不是错误）"
+if [ -z "${PRISM_CLANG_TIDY_REAL}" ]; then
+    printf '    [SKIP] 本机没有 clang-tidy，用例跳过（不计为通过）\n'
+else
+printf '# base\n' > "${PRISM_REPO}/README.md"
+write_tidy_config
+PRISM_REV_BASE=$(commit_base base)
+
+# <rev> 写法：git diff HEAD...HEAD 拿不出任何改动。
+run_entry_tidy build HEAD
+expect_status 0 "空范围放行"
+expect_out_has "没有 C/C++ 改动" "空范围同样走「没有 C/C++ 改动」这条放行路"
+
+# <a>...<b> 写法：两端指向同一个提交，同样是空范围。
+run_entry_tidy build "${PRISM_REV_BASE}...${PRISM_REV_BASE}"
+expect_status 0 "两端相同的 a...b 空范围也放行"
+fi
 
 # ============================================================
 

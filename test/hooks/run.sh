@@ -332,7 +332,7 @@ PRISM_BASE_REF=$(commit_base base)
 printf '# 又改文档\n' > "${PRISM_REPO}/README.md"
 git -C "${PRISM_REPO}" add README.md
 git -C "${PRISM_REPO}" commit -q -m doc-only
-run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh build "${PRISM_BASE_REF}"
 expect_status 0 "没有 C/C++ 改动时通过"
 expect_out_has "跳过 clang-tidy" "明确说明跳过"
 fi
@@ -346,7 +346,7 @@ PRISM_BASE_REF=$(commit_base base)
 printf 'int  PrismOther( ) { return 2; }\n' > "${PRISM_REPO}/sample.cpp"
 git -C "${PRISM_REPO}" add sample.cpp
 git -C "${PRISM_REPO}" commit -q -m change
-run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh build "${PRISM_BASE_REF}"
 expect_status_nonzero "缺数据库时失败"
 expect_out_has "找不到编译数据库" "报错说明缺数据库"
 expect_out_has "CMAKE_EXPORT_COMPILE_COMMANDS" "报错指向修复方式"
@@ -403,7 +403,7 @@ EOF
     git -C "${PRISM_REPO}" add -A
     git -C "${PRISM_REPO}" commit -q -m change
 
-    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
+    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh build "${PRISM_BASE_REF}"
     expect_status_nonzero "命名违规的推送被拒绝"
     expect_out_has "invalid case style for typedef" "报出了命名违规"
     expect_out_has "Naming.h" "点名了违规所在的头文件"
@@ -417,7 +417,7 @@ typedef int NamingSample;
 EOF
     git -C "${PRISM_REPO}" add -A
     git -C "${PRISM_REPO}" commit -q -m fix
-    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
+    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh build "${PRISM_BASE_REF}"
     expect_status 0 "改回合规后通过"
     expect_out_has "0 处诊断" "报出 0 处诊断"
 fi
