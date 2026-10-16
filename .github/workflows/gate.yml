@@ -65,5 +65,16 @@ jobs:
           fetch-depth: 0 # 变更范围是 base...head，需要 base 那一侧的提交
       - name: 装 23.1.x 的 clang 工具链
         run: bash scripts/ci/setup-linux.sh llvm
+      - name: 临时探针（scratch，不入主线）
+        run: |
+          echo "payload 字节数: $(wc -c < "$GITHUB_EVENT_PATH")"
+          echo "--- base 出现位置（字节偏移）---"
+          grep -bo '"base"' "$GITHUB_EVENT_PATH" | head -n 5
+          echo "--- head 出现位置（字节偏移）---"
+          grep -bo '"head"' "$GITHUB_EVENT_PATH" | head -n 5
+          echo "--- 每处前 90 字节 ---"
+          grep -o -E '.{0,90}"(base|head)"' "$GITHUB_EVENT_PATH" | head -n 8
+          echo "--- 解析结果 ---"
+          sh -c '. scripts/checks/lib.sh; prism_ci_range_from_env' || echo "解析失败"
       - name: 格式检查（只查本次变更范围，判定逻辑在 scripts/checks/format.sh）
         run: sh scripts/checks/format.sh ci
