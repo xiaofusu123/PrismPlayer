@@ -1,7 +1,7 @@
 #!/bin/sh
-# 一条命令装上门禁（#67）：把 core.hooksPath 指向版本控制里的 .githooks/。
-# 用 hooksPath 而不是往 .git/hooks/ 拷贝：拷贝出来的钩子不进版本控制，别人 clone 完是裸奔的。
-# 用法：sh scripts/install-hooks.sh　（Windows 请用 scripts/install-hooks.ps1）
+# 门禁安装脚本（#67）：把 core.hooksPath 指向版本控制里的 .githooks/。
+# 用 hooksPath 而不是拷进 .git/hooks/：拷出来的钩子不进版本控制，别人 clone 完是裸奔的。
+# 用法：sh scripts/install-hooks.sh（Windows 请用 scripts/install-hooks.ps1）
 
 set -u
 
@@ -42,7 +42,6 @@ if ! git config core.hooksPath .githooks; then
     exit 1
 fi
 
-# 校验真的生效。
 PRISM_SET=$(git config --local --get core.hooksPath 2>/dev/null || :)
 if [ "${PRISM_SET}" != ".githooks" ]; then
     prism_bad "错误：core.hooksPath 没设成 .githooks（读回来是 '${PRISM_SET}'）。"

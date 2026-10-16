@@ -1,15 +1,7 @@
 #!/bin/sh
-# 格式与文件名检查入口（#97）：把「哪些文件要过检查、不合规时说什么」从 Git 钩子里抽出来。
-# 本地 pre-commit（staged）与 CI（ci）跑的是这一份，得出同一个结论，不各写一套。
-#
-# 用法：sh scripts/checks/format.sh <变更范围>
-#   staged      暂存内容（index）：文件取自 git diff --cached，内容取自 git show :<路径>
-#   ci          GitHub Actions：从 GITHUB_EVENT_NAME / GITHUB_SHA / GITHUB_EVENT_PATH 解析范围
-#   <rev>       与默认分支的分叉点：文件取自 git diff <rev>...HEAD，内容取自 HEAD:<路径>
-#   <a>...<b>   任意范围：文件取自 git diff <a>...<b>，内容取自 <b>:<路径>
-#
-# 判定：① 文件名不得是 CmakeLists.txt（vendor/** 只豁免这一条，#39 决策 29）；
-#       ② 范围内的 C/C++ 文件必须已经 clang-format 过（--dry-run --Werror）。
+# 格式与文件名检查入口（#97）：本地 pre-commit（staged）与 CI（ci）跑的是同一份，结论一致。
+# 契约：判定只此一处，钩子不再各写一套；成功/失败文案被自测断言，不得改动。
+# 用法：sh scripts/checks/format.sh <变更范围>（四选一，语法见 --help / prism_usage）。
 # 退出码：0 = 通过（含空变更范围）；1 = 有违规，或检查无法完成（git 失败绝不静默放行）。
 
 set -u
@@ -90,8 +82,8 @@ if ! prism_range_files "${PRISM_SPEC}" "${PRISM_TMP}/range"; then
     exit 1
 fi
 
-# 只有一处文案分叉：staged 模式必须与抽入口之前的 pre-commit 逐字一致，其余范围用「改动的」措辞。
-# 判定的代码路径始终是同一条，这里只换词。
+# 只有一处文案分叉：staged 必须与抽入口之前的 pre-commit 逐字一致，其余范围用「改动的」措辞；
+# 判定代码路径始终是同一条，这里只换词。
 if [ "${PRISM_SPEC}" = "staged" ]; then
     PRISM_PASS_MODE=" staged "
     PRISM_REJECT_SUBJECT=" staged 文件"
@@ -122,8 +114,8 @@ PRISM_CHECKED=0
 while IFS= read -r PRISM_FILE; do
     [ -n "${PRISM_FILE}" ] || continue
 
-    # vendor/ 不参与构建，那 3 个 CmakeLists.txt 永久保留（#39 决策 29）：只豁免文件名检查，
-    # 格式检查照做 —— vendor 里的 C/C++ 也是要提交的代码（AGENTS.md「只做格式检查」）。
+    # vendor/ 不参与构建，那 3 个 CmakeLists.txt 永久保留（#39 决策 29）：只豁免文件名检查，格式检查照做 ——
+    # vendor 里的 C/C++ 也是要提交的代码（AGENTS.md「只做格式检查」）。
     if [ "$(basename -- "${PRISM_FILE}")" = "CmakeLists.txt" ]; then
         case "${PRISM_FILE}" in
             vendor/*) ;;
