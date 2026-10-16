@@ -558,3 +558,6 @@ PRISM_API const char* prism_player_get_version(void) {
 }
 
 } // extern "C"
+
+// #103 探针：下面这个函数故意不按 .clang-format 排版，只为在红着的 PR 上验证必需检查会拦住普通合并。
+int prism_probe_103_bad_format( ){return 0;}
