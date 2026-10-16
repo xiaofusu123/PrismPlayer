@@ -99,7 +99,8 @@ jobs:
   # 「CI 说构建过了」由此有一条可核对的证据。
   #
   # 这是本工作流唯一「重」的 job：干净 runner 上没有依赖缓存时，vcpkg 要从源码编译
-  # ffmpeg / glfw3 / vulkan 等（本机 Linux 侧实测一次性约 14 分钟）。缓存与耗时入档见 #101。
+  # ffmpeg / glfw3 / vulkan 等。实测（#101）：未命中时配置一步 795 秒、整个 job 845 秒；
+  # 命中后同一个 job 77 秒。缓存与耗时的完整口径见 docs/adr/0006-门禁第二阶段CI.md 决策 5。
   build-linux-debug:
     needs: cache-key
     runs-on: ubuntu-24.04
