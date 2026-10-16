@@ -106,7 +106,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: 还原 vcpkg 二进制缓存（命中就不必再从源码编依赖）
-        uses: actions/cache@v4
+        id: vcpkg-cache
+        uses: actions/cache/restore@v4
         with:
           # .vcpkg-cache 是仓库自己的二进制缓存位置（CMakePresets.json 的 VCPKG_BINARY_SOURCES
           # 指向 ${sourceDir}/.vcpkg-cache），downloads 是 vcpkg 的源码包缓存。
@@ -118,6 +119,18 @@ jobs:
         run: bash scripts/ci/setup-linux.sh llvm cmake system vcpkg
       - name: 配置（linux-clang-x64-Debug：产出编译数据库与 vcpkg 依赖安装树）
         run: bash scripts/ci/preset-linux-debug.sh configure
+      # 存缓存这一步显式做、并且 `if: always()`：`actions/cache` 自带的「job 结束时保存」在 job
+      # 失败时不会发生（#101 实测：未命中 + configure 红 → Post 步骤 skipped），于是「依赖刚编完、
+      # 项目还没编」这种最需要复用的中间状态恰好留不下来，每次修 CI 都得重编 40 个依赖。
+      # 键已命中就跳过保存（cache-hit == true 时没有新东西可存）。
+      - name: 保存 vcpkg 二进制缓存（键已存在则跳过）
+        if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .vcpkg-cache
+            /home/runner/vcpkg/downloads
+          key: ${{ needs.cache-key.outputs.key }}
       - name: 构建
         run: bash scripts/ci/preset-linux-debug.sh build
       - name: 产物契约断言（体积 / 导出数量 / 不含 libc++）
@@ -138,7 +151,8 @@ jobs:
         with:
           fetch-depth: 0 # 变更范围是 base...head
       - name: 还原 vcpkg 二进制缓存（这个 job 自己配置一次，同样靠缓存才快）
-        uses: actions/cache@v4
+        id: vcpkg-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             .vcpkg-cache
@@ -148,5 +162,13 @@ jobs:
         run: bash scripts/ci/setup-linux.sh llvm cmake system vcpkg
       - name: 配置（静态检查需要编译数据库与依赖头文件树）
         run: bash scripts/ci/preset-linux-debug.sh configure
+      - name: 保存 vcpkg 二进制缓存（失败也留；键已存在则跳过）
+        if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .vcpkg-cache
+            /home/runner/vcpkg/downloads
+          key: ${{ needs.cache-key.outputs.key }}
       - name: 静态检查（scripts/checks/tidy.sh —— 与本地 pre-push 同一份判定）
         run: sh scripts/checks/tidy.sh build/Linux/debug ci
