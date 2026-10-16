@@ -558,7 +558,3 @@ PRISM_API const char* prism_player_get_version(void) {
 }
 
 } // extern "C"
-
-// #98 format 探针：下面这个函数故意不按 .clang-format 排版，用来验证 format job 会变红。
-// 验证完会立刻撤掉，恢复绿色。
-int prism_probe_98_bad_format( ){return 0;}
