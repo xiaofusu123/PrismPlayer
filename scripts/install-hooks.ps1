@@ -21,7 +21,7 @@ if (-not (Get-Command $gitExe -ErrorAction SilentlyContinue)) {
 # 钩子只列一次：存在性检查与 CRLF 自检都从它派生。
 $hooks = @("pre-commit", "pre-push")
 # 检查入口（#97 / #100）：本地钩子与 CI 的判定都来自这里。
-$checkScripts = @("scripts/checks/lib.sh", "scripts/checks/format.sh", "scripts/checks/tidy.sh")
+$checkScripts = @("scripts/checks/lib.sh", "scripts/checks/format.sh", "scripts/checks/tidy.sh", "scripts/checks/ctest.sh")
 
 $missing = @()
 foreach ($hook in $hooks) {

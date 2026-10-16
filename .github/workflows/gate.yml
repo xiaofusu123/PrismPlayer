@@ -172,3 +172,36 @@ jobs:
           key: ${{ needs.cache-key.outputs.key }}
       - name: 静态检查（scripts/checks/tidy.sh —— 与本地 pre-push 同一份判定）
         run: sh scripts/checks/tidy.sh build/Linux/debug ci
+
+  # 测试接入点（#102）：这一票只做骨架与语义 —— `test/` 还没接回根构建，所以这个 job
+  # 现在会**明确说「没有测试可跑」**并写进 PR 摘要，而不是静默绿灯。等 `add_test()` 出现，
+  # 同一个 job 自动变成真检查（判定从构建系统里问，不从 CMake 源码里猜），不需要改 CI。
+  ctest:
+    needs: [cache-key, build-linux-debug]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 还原 vcpkg 二进制缓存
+        id: vcpkg-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .vcpkg-cache
+            /home/runner/vcpkg/downloads
+          key: ${{ needs.cache-key.outputs.key }}
+      - name: 装前置（clang 23.1.x / cmake 4.x / Linux 系统开发包 / vcpkg）
+        run: bash scripts/ci/setup-linux.sh llvm cmake system vcpkg
+      - name: 配置（测试清单来自配置阶段产出的 CTestTestfile.cmake）
+        run: bash scripts/ci/preset-linux-debug.sh configure
+      - name: 保存 vcpkg 二进制缓存（失败也留；键已存在则跳过）
+        if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            .vcpkg-cache
+            /home/runner/vcpkg/downloads
+          key: ${{ needs.cache-key.outputs.key }}
+      - name: 构建（现在没有测试目标；#54 把 test/ 接回根构建后这一步才会产出测试二进制）
+        run: bash scripts/ci/preset-linux-debug.sh build
+      - name: 跑测试（没有注册用例时明确 SKIP，判定在 scripts/checks/ctest.sh）
+        run: sh scripts/checks/ctest.sh build/Linux/debug

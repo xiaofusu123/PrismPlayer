@@ -16,7 +16,7 @@ prism_warn() { printf '%s\n' "$*" >&2; }
 # 钩子只列一次：存在性检查、执行位、CRLF 自检都从它派生。
 PRISM_HOOKS="pre-commit pre-push"
 # 检查入口（#97 / #100）：本地钩子与 CI 的判定都来自这里，也要有 exec 位。
-PRISM_CHECK_SCRIPTS="scripts/checks/lib.sh scripts/checks/format.sh scripts/checks/tidy.sh"
+PRISM_CHECK_SCRIPTS="scripts/checks/lib.sh scripts/checks/format.sh scripts/checks/tidy.sh scripts/checks/ctest.sh"
 
 PRISM_CHMOD_TARGETS=""
 for PRISM_HOOK in ${PRISM_HOOKS}; do
