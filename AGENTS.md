@@ -120,7 +120,7 @@ sh scripts/checks/ctest.sh build/Linux/debug
 
 **CI 只跑 Linux Debug**：Windows 与 Release 由本机钩子覆盖（Server 的目标平台就是 Ubuntu，CI 对它最有说服力）。workflow 把 `CLANG_ROOT` 设成 `/usr/lib/llvm-23/bin`、`VCPKG_ROOT` 设成 `/home/runner/vcpkg`；工具版本前缀仍然必须是 `23.1`，不符即失败退出（判定复用 `scripts/checks/lib.sh`，与本机同一份）。
 
-**job 名是契约**：`main` 的规则集（id `15828446`）把这些 job 名设成**必需状态检查**，所以**改名必须同步规则集** —— 否则必需检查会静默失效（GitHub 不会因为「一个从没出现过的检查」而拦住谁，它只会一直等下去）。草稿 PR 照常跑检查便于自查，必需检查只在非草稿时生效；单人仓库的现实是 review 只能自审，所以 `--admin` 仍能合并 —— 但每一次绕过都在 PR 历史上留下记录（见 `docs/adr/0006-门禁第二阶段CI.md` 决策 6）。
+**job 名是契约**：`main` 的规则集（id `15828446`）把这些 job 名设成**必需状态检查**，所以**改名必须同步规则集** —— 否则必需检查会静默失效（GitHub 不会因为「一个从没出现过的检查」而拦住谁，它只会一直等下去）。实测（#103）：必需检查会让「有红检查的 PR」用普通方式合不动，报 `the base branch policy prohibits the merge`；同时本仓库的规则集还要求 1 条 review，单人仓库只能自审，所以 `--admin` 仍能合并 —— 但每一次绕过都在 PR 历史上留下记录（见 `docs/adr/0006-门禁第二阶段CI.md` 决策 6）。
 
 **依赖与缓存**：冷启动要在干净 runner 上从源码编译 ffmpeg / glfw3 / vulkan 等依赖（十几分钟量级），命中 vcpkg 二进制缓存后落到几分钟量级。缓存键 = vcpkg baseline + `vcpkg.json` 内容哈希 + triplet + runner 镜像 + clang 前缀，在 `cache-key` job 里只算一次并打进日志；**未命中不是故障**，而是「有东西变了」—— 把日志里那行键与上一次绿灯的逐段比对就知道是哪一个。冷热实测耗时、缓存路径与「CI 变慢通常意味着什么」见 `docs/adr/0006-门禁第二阶段CI.md`。
 
