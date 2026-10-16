@@ -10,10 +10,6 @@
 #include <spdlog/spdlog.h>
 #include <string>
 
-// #100 AC4 探针：故意违反 readability-identifier-naming（ClassCase: CamelCase），验证 tidy
-// 变红并点名规则与文件 （这些探针行随即撤掉）
-class prism_probe_naming_violation {};
-
 namespace Prism::Service {
 
 /* ========== 默认配置 ========== */
