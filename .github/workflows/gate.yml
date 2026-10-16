@@ -34,6 +34,9 @@ env:
   # CLANG_ROOT 让 scripts/checks/lib.sh 的 prism_require_tool 直接命中这一份，
   # 而不是 runner 自带的旧 clang。
   CLANG_ROOT: /usr/lib/llvm-23/bin
+  # CI 上 vcpkg 不在成员本机的位置；scripts/ci/setup-linux.sh 会把 baseline 那一份取到这里，
+  # 构建 job 与静态检查 job 用的是同一棵树（#99 / #100）。
+  VCPKG_ROOT: /home/runner/vcpkg
 
 jobs:
   # 「门禁机制本身」在干净的 Linux 机器上成立（#96 决策 20）：无依赖、秒级。
@@ -67,3 +70,22 @@ jobs:
         run: bash scripts/ci/setup-linux.sh llvm
       - name: 格式检查（只查本次变更范围，判定逻辑在 scripts/checks/format.sh）
         run: sh scripts/checks/format.sh ci
+
+  # 真构建（#99）：Server 的目标平台就是 Ubuntu，让它在推送当天被真实构建一遍，
+  # 并跑既有的产物契约断言（体积阈值、≥32 个 prism_player_* 导出、不含 libc++）。
+  # 「CI 说构建过了」由此有一条可核对的证据。
+  #
+  # 这是本工作流唯一「重」的 job：干净 runner 上没有依赖缓存时，vcpkg 要从源码编译
+  # ffmpeg / glfw3 / vulkan 等（本机 Linux 侧实测一次性约 14 分钟）。缓存与耗时入档见 #101。
+  build-linux-debug:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 装前置（clang 23.1.x / cmake 4.x / Linux 系统开发包 / vcpkg）
+        run: bash scripts/ci/setup-linux.sh llvm cmake system vcpkg
+      - name: 配置（linux-clang-x64-Debug：产出编译数据库与 vcpkg 依赖安装树）
+        run: bash scripts/ci/preset-linux-debug.sh configure
+      - name: 构建
+        run: bash scripts/ci/preset-linux-debug.sh build
+      - name: 产物契约断言（体积 / 导出数量 / 不含 libc++）
+        run: bash scripts/ci/preset-linux-debug.sh verify
