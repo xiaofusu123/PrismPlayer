@@ -8,8 +8,8 @@ set -u
 PRISM_TEST_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "${PRISM_TEST_ROOT}" || exit 1
 
-# shellcheck source=.githooks/common.sh
-. "${PRISM_TEST_ROOT}/.githooks/common.sh"
+# shellcheck source=scripts/checks/lib.sh
+. "${PRISM_TEST_ROOT}/scripts/checks/lib.sh"
 
 PRISM_RUN_SH=$(command -v sh) || PRISM_RUN_SH=/bin/sh
 # 覆盖环境变量一律走 env(1)：这台机器的 sh 用 `VAR=x cmd` 前缀赋值时不会把变量传给子进程
@@ -99,6 +99,8 @@ new_fixture() {
     mkdir -p "${PRISM_REPO}/scripts"
     cp "${PRISM_TEST_ROOT}/scripts/install-hooks.sh" "${PRISM_TEST_ROOT}/scripts/install-hooks.ps1" \
         "${PRISM_REPO}/scripts/"
+    # 检查入口（#97）：钩子已经把判定委托给它，夹具里少了它就等于门禁失效。
+    cp -r "${PRISM_TEST_ROOT}/scripts/checks" "${PRISM_REPO}/scripts/"
 }
 
 drop_fixture() {
@@ -276,7 +278,7 @@ start_case "install-hooks.sh：设好 core.hooksPath 并校验生效"
 run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/install-hooks.sh
 expect_status 0 "安装脚本成功"
 expect_out_has "门禁已装上" "打印安装结果"
-expect_out_has "${PRISM_CLANG_VERSION_PREFIX}" "版本要求从 common.sh 读出，不在安装脚本里硬写"
+expect_out_has "${PRISM_CLANG_VERSION_PREFIX}" "版本要求从 lib.sh 读出，不在安装脚本里硬写"
 run_in "${PRISM_REPO}" git config --get core.hooksPath
 expect_status 0 "能读回 hooksPath"
 case "${PRISM_OUT}" in
@@ -330,7 +332,7 @@ PRISM_BASE_REF=$(commit_base base)
 printf '# 又改文档\n' > "${PRISM_REPO}/README.md"
 git -C "${PRISM_REPO}" add README.md
 git -C "${PRISM_REPO}" commit -q -m doc-only
-run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh build "${PRISM_BASE_REF}"
 expect_status 0 "没有 C/C++ 改动时通过"
 expect_out_has "跳过 clang-tidy" "明确说明跳过"
 fi
@@ -344,7 +346,7 @@ PRISM_BASE_REF=$(commit_base base)
 printf 'int  PrismOther( ) { return 2; }\n' > "${PRISM_REPO}/sample.cpp"
 git -C "${PRISM_REPO}" add sample.cpp
 git -C "${PRISM_REPO}" commit -q -m change
-run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh build "${PRISM_BASE_REF}"
 expect_status_nonzero "缺数据库时失败"
 expect_out_has "找不到编译数据库" "报错说明缺数据库"
 expect_out_has "CMAKE_EXPORT_COMPILE_COMMANDS" "报错指向修复方式"
@@ -401,7 +403,7 @@ EOF
     git -C "${PRISM_REPO}" add -A
     git -C "${PRISM_REPO}" commit -q -m change
 
-    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
+    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh build "${PRISM_BASE_REF}"
     expect_status_nonzero "命名违规的推送被拒绝"
     expect_out_has "invalid case style for typedef" "报出了命名违规"
     expect_out_has "Naming.h" "点名了违规所在的头文件"
@@ -415,7 +417,7 @@ typedef int NamingSample;
 EOF
     git -C "${PRISM_REPO}" add -A
     git -C "${PRISM_REPO}" commit -q -m fix
-    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/check-clang-tidy.sh build "${PRISM_BASE_REF}"
+    run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh build "${PRISM_BASE_REF}"
     expect_status 0 "改回合规后通过"
     expect_out_has "0 处诊断" "报出 0 处诊断"
 fi
