@@ -10,6 +10,9 @@
 #include <spdlog/spdlog.h>
 #include <string>
 
+// #99 AC4 探针：故意制造一个编译错误，验证 build-linux-debug 会红并给出本地复现命令（本行随即撤掉）
+static_assert(false, "prism probe 99: deliberate compile error");
+
 namespace Prism::Service {
 
 /* ========== 默认配置 ========== */
