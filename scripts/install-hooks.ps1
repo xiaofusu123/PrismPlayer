@@ -18,15 +18,20 @@ if (-not (Get-Command $gitExe -ErrorAction SilentlyContinue)) {
     }
 }
 
-# 四个文件只列一次：存在性检查与 CRLF 自检都从它派生。
-$hooks = @("common.sh", "pre-commit", "pre-push", "check-clang-tidy.sh")
+# 钩子只列一次：存在性检查与 CRLF 自检都从它派生。
+$hooks = @("pre-commit", "pre-push", "check-clang-tidy.sh")
+# 检查入口（#97）：本地钩子与 CI 的判定都来自这里。
+$checkScripts = @("scripts/checks/lib.sh")
 
 $missing = @()
 foreach ($hook in $hooks) {
-    if (-not (Test-Path (Join-Path ".githooks" $hook))) { $missing += $hook }
+    if (-not (Test-Path (Join-Path ".githooks" $hook))) { $missing += ".githooks/$hook" }
+}
+foreach ($script in $checkScripts) {
+    if (-not (Test-Path $script)) { $missing += $script }
 }
 if ($missing.Count -gt 0) {
-    Write-Host "错误：找不到 .githooks/$($missing -join '、')，当前目录 $PROJECT_ROOT 可能不是仓库根。" -ForegroundColor Red
+    Write-Host "错误：找不到 $($missing -join '、')，当前目录 $PROJECT_ROOT 可能不是仓库根。" -ForegroundColor Red
     exit 1
 }
 
@@ -52,11 +57,11 @@ if ($crlf.Count -gt 0) {
 }
 
 # 版本要求从钩子自己的常量读，不在安装脚本里再写一遍（避免两处各说一套）。
-$commonSh = Get-Content -Raw (Join-Path ".githooks" "common.sh")
-if ($commonSh -match 'PRISM_CLANG_VERSION_PREFIX="([^"]+)"') {
+$libSh = Get-Content -Raw (Join-Path "scripts" (Join-Path "checks" "lib.sh"))
+if ($libSh -match 'PRISM_CLANG_VERSION_PREFIX="([^"]+)"') {
     $versionRequirement = "$($Matches[1]).x"
 } else {
-    $versionRequirement = "见 .githooks/common.sh 的 PRISM_CLANG_VERSION_PREFIX"
+    $versionRequirement = "见 scripts/checks/lib.sh 的 PRISM_CLANG_VERSION_PREFIX"
 }
 
 Write-Host "门禁已装上：core.hooksPath = $hooksPath（写在本仓库 .git/config，不进版本控制）"

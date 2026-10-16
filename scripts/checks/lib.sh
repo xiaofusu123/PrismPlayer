@@ -1,5 +1,6 @@
 #!/bin/sh
-# 门禁公共库：由 .githooks/pre-commit 与 pre-push 用 `.` 载入，不单独执行。
+# 门禁公共库：由本地钩子（.githooks/）与检查入口（scripts/checks/）用 `.` 载入，不单独执行。
+# 两侧共用同一份实现：本地 pre-commit 与 CI（scripts/checks/format.sh ci）必须得出同一结论。
 # 只写 POSIX sh，只依赖 git 与 coreutils（MSYS2 的 bash、Git for Windows 的 sh 都能跑）。
 
 # clang 工具链版本前缀。ADR 决策 6：Windows 23.1.3 / WSL 23.1.2，只比前缀不比补丁号。

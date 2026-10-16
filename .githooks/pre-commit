@@ -7,8 +7,8 @@
 set -u
 
 PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-# shellcheck source=.githooks/common.sh
-. "${PRISM_HOOK_DIR}/common.sh"
+# shellcheck source=scripts/checks/lib.sh
+. "${PRISM_HOOK_DIR}/../scripts/checks/lib.sh"
 
 # 第一件事：校验工具版本前缀（#67 AC）。
 if ! PRISM_CLANG_FORMAT=$(prism_require_tool clang-format); then
