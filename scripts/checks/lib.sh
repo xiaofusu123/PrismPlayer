@@ -156,3 +156,180 @@ prism_merge_base_with_default() {
     done
     return 1
 }
+
+# ---------- 变更范围（#97）----------
+# 范围参数语法（scripts/checks/format.sh 的 usage 里有同一份，改一处要一起改）：
+#   staged      暂存内容：文件取自 `git diff --cached`，内容取自 index（`git show :<路径>`）
+#   ci          从 GitHub Actions 环境解析出 <base>...<head>，之后与 <a>...<b> 走同一条路
+#   <rev>       与默认分支的分叉点：文件取自 `git diff <rev>...HEAD`，内容取自 `HEAD:<路径>`
+#   <a>...<b>   任意范围：文件取自 `git diff <a>...<b>`，内容取自 `<b>:<路径>`
+#
+# 这几个 helper 只负责「取范围」：判定与文案留在入口里，本地钩子与 CI 于是共用同一份判定。
+
+# prism_range_target_rev <范围参数> -> 内容取自哪个版本；staged 没有版本（回显空串）。
+prism_range_target_rev() {
+    case "$1" in
+        staged) : ;;
+        ci)
+            _prism_rt_ci=$(prism_ci_range_from_env) || return 1
+            printf '%s\n' "${_prism_rt_ci#*...}"
+            ;;
+        *...*) printf '%s\n' "${1#*...}" ;;
+        *) printf '%s\n' "HEAD" ;;
+    esac
+}
+
+# prism_range_source <范围参数> <路径> -> 该路径的内容所在 git 对象，形如 :foo.cpp / main:foo.cpp。
+prism_range_source() {
+    if [ "$1" = "staged" ]; then
+        printf ':%s\n' "$2"
+    else
+        _prism_rsr_rev=$(prism_range_target_rev "$1") || return 1
+        printf '%s:%s\n' "${_prism_rsr_rev}" "$2"
+    fi
+}
+
+# prism_range_files <范围参数> <输出文件> -> 范围内的改动文件名（换行分隔）写进 <输出文件>。
+# -z + tr：文件名含非 ASCII 时避开 core.quotePath 转义；--diff-filter 必须带 R（`git mv` 在 index 里
+# 默认记成 R100，漏掉 R 就会让改名后的文件整条绕过门禁）。
+# git 失败一律返回 1，绝不留下一个空列表让调用方当成「没改动」——那是 fail-open。
+prism_range_files() {
+    _prism_rf_spec=$1
+    _prism_rf_out=$2
+    case "${_prism_rf_spec}" in
+        '') return 1 ;;
+        staged)
+            git diff --cached --name-only --diff-filter=ACMR -z > "${_prism_rf_out}.z" || return 1
+            ;;
+        ci)
+            _prism_rf_ci=$(prism_ci_range_from_env) || return 1
+            git diff --name-only --diff-filter=ACMR -z "${_prism_rf_ci}" > "${_prism_rf_out}.z" || return 1
+            ;;
+        -*)
+            # 未知选项（--help 由入口自己先处理掉）：当成用法错误，不要掉进「当 revision 用」。
+            return 1
+            ;;
+        *...*)
+            _prism_rf_a=${_prism_rf_spec%%...*}
+            _prism_rf_b=${_prism_rf_spec#*...}
+            if [ -z "${_prism_rf_a}" ] || [ -z "${_prism_rf_b}" ]; then
+                return 1
+            fi
+            git diff --name-only --diff-filter=ACMR -z "${_prism_rf_a}...${_prism_rf_b}" \
+                > "${_prism_rf_out}.z" || return 1
+            ;;
+        *)
+            git diff --name-only --diff-filter=ACMR -z "${_prism_rf_spec}...HEAD" \
+                > "${_prism_rf_out}.z" || return 1
+            ;;
+    esac
+    tr '\0' '\n' < "${_prism_rf_out}.z" > "${_prism_rf_out}"
+}
+
+# prism_range_show <范围参数> <路径> <输出文件> -> 把该路径在该范围内应检查的内容写进 <输出文件>。
+# stdout 是内容，stderr 交给调用方重定向；读不到返回非零（空输入会让 clang-format 以 0 退出）。
+prism_range_show() {
+    _prism_rsh_spec=$1
+    _prism_rsh_path=$2
+    _prism_rsh_out=$3
+    if [ "${_prism_rsh_spec}" = "staged" ]; then
+        git show ":${_prism_rsh_path}" > "${_prism_rsh_out}"
+    else
+        _prism_rsh_rev=$(prism_range_target_rev "${_prism_rsh_spec}") || return 1
+        git show "${_prism_rsh_rev}:${_prism_rsh_path}" > "${_prism_rsh_out}"
+    fi
+}
+
+# ---------- CI（GitHub Actions）环境 → 变更范围（#97）----------
+# 口径必须与本地一致：CI 只负责把「这次改了什么」翻译成一个范围，翻译不出来就硬失败。
+# 不静默退化成空范围 —— 空范围会让门禁「全绿」放行本该拦住的改动（fail-open）。
+
+# prism_event_json_flat <JSON 文件> <顶层键> -> 回显该键的字符串值；取不到返回 1。
+prism_event_json_flat() {
+    _prism_evf_file=${1:-}
+    _prism_evf_key=${2:-}
+    if [ -z "${_prism_evf_file}" ] || [ ! -f "${_prism_evf_file}" ]; then
+        return 1
+    fi
+    _prism_evf_raw=$(grep -o "\"${_prism_evf_key}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "${_prism_evf_file}" 2>/dev/null | head -n 1)
+    if [ -z "${_prism_evf_raw}" ]; then
+        return 1
+    fi
+    printf '%s\n' "${_prism_evf_raw}" | sed 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//'
+}
+
+# prism_event_json_child_sha <JSON 文件> <父键> -> 回显 "<父键>": { … } 里的第一个 sha；取不到返回 1。
+# GitHub 的事件 payload 是缩进好的 JSON，门禁真正要的那两个对象（pull_request 的 base / head）里
+# sha 排在 user / repo 这些嵌套对象之前，所以压成一行后「父键之后、遇到 } 之前的第一个 sha」就是它。
+# 只依赖 grep / sed，不要求 runner 上有 jq —— 本地 Git-for-Windows 的 sh 也跑同一条路径。
+# 取不到时由调用方决定退路（GITHUB_SHA / GITHUB_BASE_SHA），绝不猜一个 sha 出来。
+prism_event_json_child_sha() {
+    _prism_evs_file=${1:-}
+    _prism_evs_key=${2:-}
+    if [ -z "${_prism_evs_file}" ] || [ ! -f "${_prism_evs_file}" ]; then
+        return 1
+    fi
+    _prism_evs_sha=$(tr -d '\r\n' < "${_prism_evs_file}" \
+        | sed -n 's/.*"'"${_prism_evs_key}"'"[^{]*{[^}]*"sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+        | head -n 1)
+    if [ -z "${_prism_evs_sha}" ]; then
+        return 1
+    fi
+    printf '%s\n' "${_prism_evs_sha}"
+}
+
+# prism_ci_range_from_env -> 回显 <base>...<head>；环境给不出可信范围时返回 1 并说明缺什么。
+prism_ci_range_from_env() {
+    _prism_ci_event=${GITHUB_EVENT_NAME:-}
+    _prism_ci_head=${GITHUB_SHA:-}
+    _prism_ci_base=${GITHUB_BASE_SHA:-}
+    _prism_ci_path=${GITHUB_EVENT_PATH:-}
+
+    case "${_prism_ci_event}" in
+        pull_request|pull_request_target)
+            # base 优先用 GitHub 直接给的 GITHUB_BASE_SHA，其次读事件的 .pull_request.base.sha。
+            if [ -z "${_prism_ci_base}" ]; then
+                _prism_ci_base=$(prism_event_json_child_sha "${_prism_ci_path}" base || :)
+            fi
+            # head 优先用 .pull_request.head.sha（PR 的改动侧），取不到才退回 GITHUB_SHA。
+            _prism_ci_head=$(prism_event_json_child_sha "${_prism_ci_path}" head || :)
+            if [ -z "${_prism_ci_head}" ]; then
+                _prism_ci_head=${GITHUB_SHA:-}
+            fi
+            ;;
+        push)
+            _prism_ci_base=$(prism_event_json_flat "${_prism_ci_path}" before || :)
+            if [ -z "${_prism_ci_base}" ]; then
+                _prism_ci_base=${GITHUB_BASE_SHA:-}
+            fi
+            _prism_ci_head=${GITHUB_SHA:-}
+            # push 的 .before 全零 = 新建分支 / 首次推送：没有可信的 base，不许悄悄放大范围。
+            case "${_prism_ci_base}" in
+                *[!0]*) ;;
+                *)
+                    prism_error "CI 范围解析失败：事件里的 .before 为空或全零（新建分支的首次推送？），没有可信的 base。"
+                    prism_error "处理：显式给 GITHUB_BASE_SHA，或改用 <a>...<b> 直接指定范围。"
+                    return 1
+                    ;;
+            esac
+            ;;
+        '')
+            prism_error "CI 范围解析失败：没有 GITHUB_EVENT_NAME，无法判定这次是 pull_request 还是 push。"
+            prism_error "处理：在 GitHub Actions 里跑（这些变量由 runner 注入），或改用 staged / <rev> / <a>...<b>。"
+            return 1
+            ;;
+        *)
+            prism_error "CI 范围解析失败：不支持的事件类型 '${_prism_ci_event}'。"
+            prism_error "支持的事件（GITHUB_EVENT_NAME）：pull_request、pull_request_target、push。"
+            return 1
+            ;;
+    esac
+
+    if [ -z "${_prism_ci_base}" ] || [ -z "${_prism_ci_head}" ]; then
+        prism_error "CI 范围解析失败：base='${_prism_ci_base:-未取到}'，head='${_prism_ci_head:-未取到}'。"
+        prism_error "处理：确认 GITHUB_EVENT_PATH 指向真实的事件 JSON，且 GITHUB_SHA / GITHUB_BASE_SHA 可用。"
+        return 1
+    fi
+
+    printf '%s...%s\n' "${_prism_ci_base}" "${_prism_ci_head}"
+}
