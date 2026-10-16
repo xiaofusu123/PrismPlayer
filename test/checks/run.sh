@@ -368,7 +368,9 @@ good_cpp > "${PRISM_REPO}/sample.cpp"
 commit_all "good cpp"
 PRISM_REV_GOOD=$(git -C "${PRISM_REPO}" rev-parse HEAD)
 
-# 事件 JSON 照抄 GitHub 的形状（base/head 里 sha 先于任何嵌套对象出现）。
+# 事件 JSON 照抄 GitHub 的形状（base/head 里 sha 先于任何嵌套对象出现），并且 user / repo 里
+# 各放一个同名的 sha 诱饵：取法一旦贪婪（把「父键之后遇到的第一个 sha」算成「最后一个」），
+# 拿到的就是诱饵，`git diff 诱饵...head` 直接报 unknown revision，范围判定整条失效。
 cat > "${PRISM_REPO}/event-pr.json" <<EOF
 {
   "action": "opened",
@@ -380,10 +382,12 @@ cat > "${PRISM_REPO}/event-pr.json" <<EOF
       "ref": "main",
       "sha": "${PRISM_REV_BASE}",
       "user": {
-        "login": "example"
+        "login": "example",
+        "sha": "decoy-in-base-user"
       },
       "repo": {
-        "id": 1
+        "id": 1,
+        "sha": "decoy-in-base-repo"
       }
     },
     "head": {
@@ -391,10 +395,12 @@ cat > "${PRISM_REPO}/event-pr.json" <<EOF
       "ref": "topic",
       "sha": "${PRISM_REV_GOOD}",
       "user": {
-        "login": "example"
+        "login": "example",
+        "sha": "decoy-in-head-user"
       },
       "repo": {
-        "id": 1
+        "id": 1,
+        "sha": "decoy-in-head-repo"
       }
     }
   }
@@ -425,6 +431,7 @@ cat > "${PRISM_REPO}/event-push.json" <<EOF
     {
       "id": "${PRISM_REV_BAD}",
       "message": "bad cpp",
+      "before": "decoy-in-commit",
       "added": [
         "sample.cpp"
       ]
@@ -435,6 +442,7 @@ EOF
 run_entry_ci push "${PRISM_REPO}/event-push.json" "${PRISM_REV_BAD}" ""
 expect_status_nonzero "push：.before..GITHUB_SHA 的坏内容被拦"
 expect_out_has "sample.cpp" "点名坏文件"
+expect_out_lacks "decoy-in-commit" "顶层 .before 没被 commits[] 里的同名键顶掉"
 
 # .before 是全零（新建分支）时不能悄悄把整个历史当成变更范围。
 cat > "${PRISM_REPO}/event-push-zero.json" <<EOF
