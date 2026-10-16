@@ -368,41 +368,46 @@ good_cpp > "${PRISM_REPO}/sample.cpp"
 commit_all "good cpp"
 PRISM_REV_GOOD=$(git -C "${PRISM_REPO}" rev-parse HEAD)
 
-# 事件 JSON 照抄 GitHub 的形状（base/head 里 sha 先于任何嵌套对象出现），并且 user / repo 里
-# 各放一个同名的 sha 诱饵：取法一旦贪婪（把「父键之后遇到的第一个 sha」算成「最后一个」），
-# 拿到的就是诱饵，`git diff 诱饵...head` 直接报 unknown revision，范围判定整条失效。
+# 事件 JSON 照抄 GitHub 现在的真实形状：键按**字母序**排，所以 base / head 里的 `repo`（一个很大的
+# 嵌套对象）排在 `sha` **之前**。user / repo 里各放一个同名 sha 诱饵，且都排在真 sha 前面：
+# 「父键之后遇到的第一个 sha」这种朴素取法会直接拿到诱饵，`git diff 诱饵...head` 报
+# unknown revision，范围判定整条失效。（#98 的第一次 CI 运行就是这么红的：base 未取到。）
 cat > "${PRISM_REPO}/event-pr.json" <<EOF
 {
   "action": "opened",
+  "after": "${PRISM_REV_GOOD}",
+  "before": "${PRISM_REV_BASE}",
+  "number": 97,
   "pull_request": {
-    "url": "https://api.github.com/repos/example/repo/pulls/97",
-    "number": 97,
+    "additions": 12,
     "base": {
       "label": "example:main",
       "ref": "main",
+      "repo": {
+        "id": 1,
+        "default_branch": "main",
+        "sha": "decoy-in-base-repo"
+      },
       "sha": "${PRISM_REV_BASE}",
       "user": {
         "login": "example",
         "sha": "decoy-in-base-user"
-      },
-      "repo": {
-        "id": 1,
-        "sha": "decoy-in-base-repo"
       }
     },
     "head": {
       "label": "example:topic",
       "ref": "topic",
+      "repo": {
+        "id": 1,
+        "sha": "decoy-in-head-repo"
+      },
       "sha": "${PRISM_REV_GOOD}",
       "user": {
         "login": "example",
         "sha": "decoy-in-head-user"
-      },
-      "repo": {
-        "id": 1,
-        "sha": "decoy-in-head-repo"
       }
-    }
+    },
+    "url": "https://api.github.com/repos/example/repo/pulls/97"
   }
 }
 EOF

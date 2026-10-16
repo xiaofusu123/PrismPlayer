@@ -258,12 +258,13 @@ prism_event_json_flat() {
     printf '%s\n' "${_prism_evf_raw}" | sed 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//'
 }
 
-# prism_event_json_child_sha <JSON 文件> <父键> -> 回显 "<父键>": { … } 里的第一个 sha；取不到返回 1。
-# GitHub 的事件 payload 是缩进好的 JSON，门禁真正要的那两个对象（pull_request 的 base / head）里
-# sha 排在 user / repo 这些嵌套对象之前，所以「父键之后、遇到 } 之前的第一个 sha」就是它。
-# 故意用参数展开而不是正则：`${var#模式}` 去的是最短前缀，天生非贪婪；sed/grep 的 `.*` 是贪婪的，
-# 会把 user / repo 里的同名 sha 当成结果挑出来（见 test/checks/run.sh 里带诱饵的 CI 夹具）。
-# 只依赖 tr 与参数展开，不要求 runner 上有 jq —— 本地 Git-for-Windows 的 sh 也跑同一条路径。
+# prism_event_json_child_sha <JSON 文件> <父键> -> 回显 "<父键>": { … } 里**直接子键** sha 的值；取不到返回 1。
+# 为什么不是「父键之后遇到的第一个 sha」：GitHub 的 payload 键按字母序排，`repo` 这种嵌套大对象
+# 排在 `sha` **之前**，朴素启发式会在真实 payload 上直接取不到（#98 第一次 CI 运行就是这么红的：
+# base 未取到，head 只能退回 GITHUB_SHA）。所以这里按 JSON 的嵌套层级判定：只看深度正好比父对象
+# 深一层的那个 sha，与嵌套对象里的同名键无关。
+# 用 awk 手写这一层深度扫描，是为了不引入 jq 依赖：本地 Git-for-Windows 的 sh 与 runner 上的 sh
+# 跑的是同一份实现（#96 决策 8），多一个可选依赖就会多一条「本机能过、CI 不能过」的路径。
 # 取不到时由调用方决定退路（GITHUB_SHA / GITHUB_BASE_SHA），绝不猜一个 sha 出来。
 prism_event_json_child_sha() {
     _prism_evs_file=${1:-}
@@ -271,31 +272,61 @@ prism_event_json_child_sha() {
     if [ -z "${_prism_evs_file}" ] || [ ! -f "${_prism_evs_file}" ]; then
         return 1
     fi
-    # 压成一行，再去掉父键之前的所有内容（最短前缀 = 第一个出现的父键）。
-    _prism_evs_rest=$(tr -d '\r\n' < "${_prism_evs_file}")
-    # 父键的字面量（连引号一起拼出来）再进模式：展开若直接写在模式里会被当成通配符。
-    _prism_evs_needle='"'"${_prism_evs_key}"'"'
-    case "${_prism_evs_rest}" in
-        *"${_prism_evs_needle}"*) ;;
-        *) return 1 ;;
-    esac
-    _prism_evs_rest=${_prism_evs_rest#*"${_prism_evs_needle}"}
-    _prism_evs_rest=${_prism_evs_rest#*\{}   # 到父键对象的 { 之后
-    case "${_prism_evs_rest}" in
-        *\"sha\"*) ;;
-        *) return 1 ;;
-    esac
-    # 第一个 "sha" 之前先出现了 }：说明父键对象里第一个 sha 属于嵌套对象，不是这一层的，宁可不取。
-    case "${_prism_evs_rest%%\"sha\"*}" in
-        *\}*) return 1 ;;
-    esac
-    _prism_evs_rest=${_prism_evs_rest#*\"sha\"}
-    _prism_evs_rest=${_prism_evs_rest#*\"}
-    _prism_evs_sha=${_prism_evs_rest%%\"*}
-    if [ -z "${_prism_evs_sha}" ]; then
-        return 1
-    fi
-    printf '%s\n' "${_prism_evs_sha}"
+    tr -d '\r\n' < "${_prism_evs_file}" | awk -v parent="\"${_prism_evs_key}\"" -v child='"sha"' '
+        { text = text $0 }
+        END {
+            n = length(text)
+            p = index(text, parent)
+            if (p == 0) { exit 1 }
+            i = p + length(parent)
+            # 父键的值必须是对象：跳到它的 "{"
+            while (i <= n && substr(text, i, 1) != "{") { i++ }
+            if (i > n) { exit 1 }
+            depth = 0
+            while (i <= n) {
+                ch = substr(text, i, 1)
+                if (ch == "\"") {
+                    # 读一个字符串字面量（含转义）
+                    j = i + 1
+                    lit = ""
+                    while (j <= n) {
+                        c2 = substr(text, j, 1)
+                        if (c2 == "\\") { lit = lit substr(text, j, 2); j += 2; continue }
+                        if (c2 == "\"") { break }
+                        lit = lit c2
+                        j++
+                    }
+                    next_i = j + 1
+                    # 深度 1 = 父对象的直接子键
+                    if (depth == 1 && ("\"" lit "\"") == child) {
+                        k = next_i
+                        while (k <= n && substr(text, k, 1) != ":") { k++ }
+                        k++
+                        while (k <= n && substr(text, k, 1) ~ /[ \t\r\n]/) { k++ }
+                        if (substr(text, k, 1) == "\"") {
+                            m = k + 1
+                            val = ""
+                            while (m <= n) {
+                                c3 = substr(text, m, 1)
+                                if (c3 == "\\") { val = val substr(text, m, 2); m += 2; continue }
+                                if (c3 == "\"") { break }
+                                val = val c3
+                                m++
+                            }
+                            print val
+                            exit 0
+                        }
+                    }
+                    i = next_i
+                    continue
+                }
+                if (ch == "{") { depth++ }
+                else if (ch == "}") { depth--; if (depth <= 0) { exit 1 } }
+                i++
+            }
+            exit 1
+        }
+    '
 }
 
 # prism_ci_range_from_env -> 回显 <base>...<head>；环境给不出可信范围时返回 1 并说明缺什么。
