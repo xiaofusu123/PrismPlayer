@@ -2,13 +2,9 @@
 
 namespace Prism::Engine {
 
-VideoEngineVulkan::VideoEngineVulkan() {
+VideoEngineVulkan::VideoEngineVulkan() = default;
 
-}
-
-VideoEngineVulkan::~VideoEngineVulkan() {
-    
-}
+VideoEngineVulkan::~VideoEngineVulkan() = default;
 
 bool VideoEngineVulkan::init() {
     return true;
