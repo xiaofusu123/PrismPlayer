@@ -1,6 +1,6 @@
 #!/bin/sh
-# 门禁公共库：由本地钩子（.githooks/）与检查入口（scripts/checks/）用 `.` 载入，不单独执行。
-# 两侧共用同一份实现：本地 pre-commit 与 CI（scripts/checks/format.sh ci）必须得出同一结论。
+# 门禁公共库（#97）：本地钩子（.githooks/）与检查入口（scripts/checks/）用 `.` 载入，不单独执行。
+# 契约：两侧共用同一份实现，本地 pre-commit 与 CI（format.sh ci）必须得出同一结论。
 # 只写 POSIX sh，只依赖 git 与 coreutils（MSYS2 的 bash、Git for Windows 的 sh 都能跑）。
 
 # clang 工具链版本前缀。ADR 决策 6：Windows 23.1.3 / WSL 23.1.2，只比前缀不比补丁号。
@@ -126,8 +126,8 @@ prism_check_build_prerequisites() {
     return 0
 }
 
-# 取本地 HEAD 与默认分支的分叉点，供 clang-tidy 判定「本次推送改了什么」（#69）。
-# $1 = 远端名；找不到任何默认分支时返回 1，由调用方决定退路。
+# prism_merge_base_with_default <远端名> -> HEAD 与默认分支的分叉点，供 clang-tidy 判定本次推送改了什么（#69）。
+# 找不到任何默认分支时返回 1，退路由调用方决定。
 prism_merge_base_with_default() {
     _prism_mb_remote=${1:-}
     _prism_mb_sym=""
@@ -157,13 +157,8 @@ prism_merge_base_with_default() {
     return 1
 }
 
-# ---------- 变更范围（#97）----------
-# 范围参数语法（scripts/checks/format.sh 的 usage 里有同一份，改一处要一起改）：
-#   staged      暂存内容：文件取自 `git diff --cached`，内容取自 index（`git show :<路径>`）
-#   ci          从 GitHub Actions 环境解析出 <base>...<head>，之后与 <a>...<b> 走同一条路
-#   <rev>       与默认分支的分叉点：文件取自 `git diff <rev>...HEAD`，内容取自 `HEAD:<路径>`
-#   <a>...<b>   任意范围：文件取自 `git diff <a>...<b>`，内容取自 `<b>:<路径>`
-#
+# ---------- 变更范围（#97）：staged | ci | <rev> | <a>...<b> ----------
+# 语法在 scripts/checks/format.sh 的 usage 里有同一份，改一处要一起改；staged 取 index 内容，其余取目标版本。
 # 这几个 helper 只负责「取范围」：判定与文案留在入口里，本地钩子与 CI 于是共用同一份判定。
 
 # prism_range_target_rev <范围参数> -> 内容取自哪个版本；staged 没有版本（回显空串）。
@@ -190,9 +185,8 @@ prism_range_source() {
 }
 
 # prism_range_files <范围参数> <输出文件> -> 范围内的改动文件名（换行分隔）写进 <输出文件>。
-# -z + tr：文件名含非 ASCII 时避开 core.quotePath 转义；--diff-filter 必须带 R（`git mv` 在 index 里
-# 默认记成 R100，漏掉 R 就会让改名后的文件整条绕过门禁）。
-# git 失败一律返回 1，绝不留下一个空列表让调用方当成「没改动」——那是 fail-open。
+# 必须带 --diff-filter=R：`git mv` 在 index 里记成 R100，漏 R 会让改名后的文件整条绕过门禁。
+# -z + tr：文件名含非 ASCII 时避开 core.quotePath 转义；git 失败一律返回 1，绝不留下空列表（fail-open）。
 prism_range_files() {
     _prism_rf_spec=$1
     _prism_rf_out=$2
@@ -258,14 +252,9 @@ prism_event_json_flat() {
     printf '%s\n' "${_prism_evf_raw}" | sed 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//'
 }
 
-# prism_event_json_child_sha <JSON 文件> <父键> -> 回显 "<父键>": { … } 里**直接子键** sha 的值；取不到返回 1。
-# 为什么不是「父键之后遇到的第一个 sha」：GitHub 的 payload 键按字母序排，`repo` 这种嵌套大对象
-# 排在 `sha` **之前**，朴素启发式会在真实 payload 上直接取不到（#98 第一次 CI 运行就是这么红的：
-# base 未取到，head 只能退回 GITHUB_SHA）。所以这里按 JSON 的嵌套层级判定：只看深度正好比父对象
-# 深一层的那个 sha，与嵌套对象里的同名键无关。
-# 用 awk 手写这一层深度扫描，是为了不引入 jq 依赖：本地 Git-for-Windows 的 sh 与 runner 上的 sh
-# 跑的是同一份实现（#96 决策 8），多一个可选依赖就会多一条「本机能过、CI 不能过」的路径。
-# 取不到时由调用方决定退路（GITHUB_SHA / GITHUB_BASE_SHA），绝不猜一个 sha 出来。
+# prism_event_json_child_sha <JSON 文件> <父键> -> 回显该父对象**直接子键** sha 的值；取不到返回 1。
+# 坑：不能取「父键之后遇到的第一个 sha」——payload 键按字母序排，嵌套的 `repo` 排在 `sha` 之前，
+# 朴素启发式在真实 payload 上直接取不到（#98）。故按嵌套层级只看深一层；用 awk 手写是为不引入 jq（#96 决策 8）。
 prism_event_json_child_sha() {
     _prism_evs_file=${1:-}
     _prism_evs_key=${2:-}

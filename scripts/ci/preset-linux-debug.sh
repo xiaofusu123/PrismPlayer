@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-# Linux CI 上的构建编排（spec #96 决策 8）：workflow 只做编排，预设名、失败提示、本地复现命令
-# 都只写一遍 —— build / tidy / ctest 三个 job 调的是同一份。
-#
-# 用法：bash scripts/ci/preset-linux-debug.sh <configure|build|verify>
-#   configure  按 linux-clang-x64-Debug 预设配置（产出 compile_commands.json，并把 vcpkg 依赖装进
-#              build/Linux/debug/vcpkg_installed；命中二进制缓存时只要几十秒，未命中要编译依赖）
-#   build      构建该预设
-#   verify     跑既有的产物契约断言（scripts/verify-build.sh 1）
+# Linux CI 的构建编排（spec #96 决策 8）：把 workflow 里的构建步骤收敛成一份脚本。
+# 契约：预设名、失败提示、本地复现命令都只写一遍，build / tidy / ctest 三个 job 调的是同一份。
+# 用法：bash scripts/ci/preset-linux-debug.sh <configure|build|verify>。
+# 退出码：0 通过；任一步失败或产物契约断言不通过则非 0，提示见 on_error。
 
 set -euo pipefail
 
@@ -40,10 +36,8 @@ on_error() {
 }
 trap 'on_error' ERR
 
-# 构建用的编译器由预设写死成裸 `clang` / `clang++`（CMakePresets.json 的 linux-base，CC / CXX 也是），
-# 所以先问一句：PATH 上第一个 clang 是不是门禁钉死的那一版。runner 自带的 /usr/bin/clang 是 18，
-# 装前置时会把 llvm-23 放到 PATH 最前面；这一步是「真的生效了吗」的现场证据，而不是一句声明
-# —— #99 的第一次真实运行就是拿着 18 一路配置下去的（C compiler identification = Clang 18.1.3）。
+# 预设（CMakePresets.json 的 linux-base）写死裸 `clang` / `clang++`，所以先问 PATH 上第一个 clang 是哪一版。
+# 这是「llvm-23 真的排到最前了吗」的现场证据：#99 的第一次真实运行就是拿着 18 一路配置下去的。
 check_compiler() {
     local prefix version
     prefix=$(sed -n 's/^[[:space:]]*PRISM_CLANG_VERSION_PREFIX="\([^"]*\)".*$/\1/p' \

@@ -1,16 +1,7 @@
-# 门禁第二阶段（spec #96）：服务端的「不可绕过层」。
-#
-# 本文件只做编排 —— 装工具链、还原缓存、按预设配置与构建、调用检查入口。
-# 判定逻辑一律住在 scripts/checks/ 与 test/ 里：本地钩子与 CI 调用同一份，
-# 「CI 说绿、本机说红」这类口径漂移在结构上不可能出现（#96 决策 6/8）。
-#
-# job 名即契约：main 的规则集按名字把它们设成必需检查，改名必须同步规则集，
-# 否则必需检查会静默失效（#96 决策 27 / #103）。
-#
-# 本地复现：
-#   sh test/hooks/run.sh              钩子自测
-#   sh test/checks/run.sh             检查入口自测
-#   sh scripts/checks/format.sh ci    格式检查（与 CI 同源的判定）
+# 服务端门禁（spec #96）：GitHub Actions 上的「不可绕过层」。
+# 契约：job 名是 main 规则集里的必需检查，改名必须同步规则集，否则会静默失效（#96 决策 27 / #103）。
+# 本地复现：sh test/hooks/run.sh、sh test/checks/run.sh、sh scripts/checks/format.sh ci。
+# 判定逻辑一律住在 scripts/checks/ 与 test/ 下，本地钩子与 CI 调用同一份（#96 决策 6/8）。
 
 name: 门禁
 
@@ -19,8 +10,7 @@ on:
   push:
     branches: [main] # 留痕：合进 main 的每一次推送也跑一遍
 
-# 只读权限、不使用任何 secret、不用 pull_request_target（#96 决策 4）：
-# 仓库是公开的，fork 的 PR 会执行我们的编排，任何凭据都不进 workflow。
+# 只读权限、不使用任何 secret、不用 pull_request_target（#96 决策 4）：fork 的 PR 会执行本编排。
 permissions:
   contents: read
 
@@ -30,21 +20,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # 门禁钉死的 23.1.x 必须来自 apt.llvm.org 的 noble-23 仓（#96 决策 12）。
-  # CLANG_ROOT 让 scripts/checks/lib.sh 的 prism_require_tool 直接命中这一份，
-  # 而不是 runner 自带的旧 clang。
+  # 门禁钉死的 23.1.x 必须来自 apt.llvm.org 的 noble-23 仓，CLANG_ROOT 让工具校验直接命中这一份（#96 决策 12）。
   CLANG_ROOT: /usr/lib/llvm-23/bin
-  # CI 上 vcpkg 不在成员本机的位置；scripts/ci/setup-linux.sh 会把 baseline 那一份取到这里，
-  # 构建 job 与静态检查 job 用的是同一棵树（#99 / #100）。
+  # CI 上 vcpkg 不在成员本机的位置；取 baseline 那一份，构建与静态检查 job 共用（#99 / #100）。
   VCPKG_ROOT: /home/runner/vcpkg
 
 jobs:
-  # vcpkg 二进制缓存的键只算一次（#101）：baseline + manifest 内容 + triplet + runner 镜像 +
-  # clang 版本前缀。键的构成就是「CI 什么时候会变慢」的答案，所以只有这一处定义 ——
-  # 复制进每个 job 里迟早会漂移，而键一漂移就退化成每次都冷编译，且很难看出是为什么。
-  #
-  # 刻意**不用** restore-keys 做部分命中：键不匹配就是一次干净的冷编译。部分命中会让
-  # 「这次为什么慢」变得不可解释，而这一票要回答的正是这个问题。
+  # vcpkg 缓存键只在这一处算（#101）：baseline + manifest + triplet + 镜像 + clang 前缀。
+  # 刻意不用 restore-keys 做部分命中：键不匹配就是干净冷编译，部分命中会让「这次为什么慢」不可解释。
   cache-key:
     runs-on: ubuntu-24.04
     outputs:
@@ -62,7 +45,7 @@ jobs:
           printf '缓存键：%s\n' "${key}"
           printf 'key=%s\n' "${key}" >> "$GITHUB_OUTPUT"
 
-  # 「门禁机制本身」在干净的 Linux 机器上成立（#96 决策 20）：无依赖、秒级。
+  # 门禁机制本身在干净 Linux 机器上成立（#96 决策 20）：无依赖、秒级。
   hooks-self-test:
     runs-on: ubuntu-24.04
     steps:
@@ -72,7 +55,7 @@ jobs:
       - name: 在临时仓库里跑真钩子，断言退出码与 stderr
         run: sh test/hooks/run.sh
 
-  # 检查入口自己的自测（#96 决策 21）：同样无依赖、秒级。
+  # 检查入口自己的 CLI 契约自测（#96 决策 21）：同样无依赖、秒级。
   checks-self-test:
     runs-on: ubuntu-24.04
     steps:
@@ -82,7 +65,7 @@ jobs:
       - name: 检查入口 CLI 契约自测
         run: sh test/checks/run.sh
 
-  # 格式检查：只查本次变更范围（#96 决策 7/10 —— 全仓会让 CI 从第一天起常年飘红）。
+  # 格式检查只查本次变更范围（#96 决策 7/10）：全仓会让 CI 从第一天起常年飘红。
   format:
     runs-on: ubuntu-24.04
     steps:
@@ -94,13 +77,9 @@ jobs:
       - name: 格式检查（只查本次变更范围，判定逻辑在 scripts/checks/format.sh）
         run: sh scripts/checks/format.sh ci
 
-  # 真构建（#99）：Server 的目标平台就是 Ubuntu，让它在推送当天被真实构建一遍，
-  # 并跑既有的产物契约断言（体积阈值、≥32 个 prism_player_* 导出、不含 libc++）。
-  # 「CI 说构建过了」由此有一条可核对的证据。
-  #
-  # 这是本工作流唯一「重」的 job：干净 runner 上没有依赖缓存时，vcpkg 要从源码编译
-  # ffmpeg / glfw3 / vulkan 等。实测（#101）：未命中时配置一步 795 秒、整个 job 845 秒；
-  # 命中后同一个 job 77 秒。缓存与耗时的完整口径见 docs/adr/0006-门禁第二阶段CI.md 决策 5。
+  # 真构建（#99）：Server 的目标平台就是 Ubuntu，跑真实构建并断言产物契约。
+  # 本工作流唯一「重」的 job：未命中缓存时要源码编译 ffmpeg / glfw3 / vulkan 等依赖。
+  # 实测（#101）：未命中 845 秒、命中 77 秒；完整口径见 docs/adr/0006-门禁第二阶段CI.md 决策 5。
   build-linux-debug:
     needs: cache-key
     runs-on: ubuntu-24.04
@@ -110,8 +89,7 @@ jobs:
         id: vcpkg-cache
         uses: actions/cache/restore@v4
         with:
-          # .vcpkg-cache 是仓库自己的二进制缓存位置（CMakePresets.json 的 VCPKG_BINARY_SOURCES
-          # 指向 ${sourceDir}/.vcpkg-cache），downloads 是 vcpkg 的源码包缓存。
+          # .vcpkg-cache 是仓库自己的二进制缓存位置（VCPKG_BINARY_SOURCES），downloads 是 vcpkg 的源码包缓存。
           path: |
             .vcpkg-cache
             /home/runner/vcpkg/downloads
@@ -120,10 +98,8 @@ jobs:
         run: bash scripts/ci/setup-linux.sh llvm cmake system vcpkg
       - name: 配置（linux-clang-x64-Debug：产出编译数据库与 vcpkg 依赖安装树）
         run: bash scripts/ci/preset-linux-debug.sh configure
-      # 存缓存这一步显式做、并且 `if: always()`：`actions/cache` 自带的「job 结束时保存」在 job
-      # 失败时不会发生（#101 实测：未命中 + configure 红 → Post 步骤 skipped），于是「依赖刚编完、
-      # 项目还没编」这种最需要复用的中间状态恰好留不下来，每次修 CI 都得重编 40 个依赖。
-      # 键已命中就跳过保存（cache-hit == true 时没有新东西可存）。
+      # 显式保存并 if: always()：actions/cache 自带的「job 结束保存」在 job 失败时不会发生（#101 实测）。
+      # 「依赖刚编完、项目还没编」的中间状态最需要复用；键已命中就没有新东西可存。
       - name: 保存 vcpkg 二进制缓存（键已存在则跳过）
         if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -137,13 +113,9 @@ jobs:
       - name: 产物契约断言（体积 / 导出数量 / 不含 libc++）
         run: bash scripts/ci/preset-linux-debug.sh verify
 
-  # 静态检查（#100）：与本地 pre-push 调用**同一份入口**（scripts/checks/tidy.sh）。
-  # 范围不同（这里查「这个 PR 改了什么」，钩子查「这次推送改了什么」），判定相同：
-  # 同一段代码范围在两处得到同一个结论，「CI 说绿、本机说红」在结构上不可能出现。
-  #
-  # 顺序不能反 —— 编译数据库与 vcpkg 依赖头文件树都来自配置阶段。#100 只靠 needs 保证先后，
-  # 不把 compile_commands.json 用 artifact 传过来（依赖头文件树 537 MB vs 数据库 1 MB），
-  # 理由见 ADR 0006「后果」。缓存与构建 job 同一个键：这个 job 自己配置一次同样靠它才快。
+  # 静态检查（#100）：与本地 pre-push 同一份判定（scripts/checks/tidy.sh），只是范围不同。
+  # 必须等 build-linux-debug：编译数据库与 vcpkg 头文件树都来自配置阶段，只靠 needs 保证先后。
+  # 不用 artifact 传 compile_commands.json（依赖头文件树 537 MB vs 数据库 1 MB），见 ADR 0006「后果」。
   tidy:
     needs: [cache-key, build-linux-debug]
     runs-on: ubuntu-24.04
@@ -174,9 +146,8 @@ jobs:
       - name: 静态检查（scripts/checks/tidy.sh —— 与本地 pre-push 同一份判定）
         run: sh scripts/checks/tidy.sh build/Linux/debug ci
 
-  # 测试接入点（#102）：这一票只做骨架与语义 —— `test/` 还没接回根构建，所以这个 job
-  # 现在会**明确说「没有测试可跑」**并写进 PR 摘要，而不是静默绿灯。等 `add_test()` 出现，
-  # 同一个 job 自动变成真检查（判定从构建系统里问，不从 CMake 源码里猜），不需要改 CI。
+  # 测试接入点（#102）：这一票只做骨架与语义，`test/` 还没接回根构建。
+  # 所以现在明确说「没有测试可跑」而不是静默绿灯；等 add_test() 出现，同一个 job 自动变成真检查。
   ctest:
     needs: [cache-key, build-linux-debug]
     runs-on: ubuntu-24.04

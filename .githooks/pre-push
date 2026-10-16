@@ -1,5 +1,5 @@
 #!/bin/sh
-# pre-push：先跑 Debug 预设构建（#70），成功后对本次推送改动的 C/C++ 文件跑 clang-tidy（#69）。
+# pre-push 门禁（#69 / #70）：先跑 Debug 预设构建，成功后对本次推送改动的 C/C++ 文件跑 clang-tidy。
 # 顺序不能反：clang-tidy 依赖构建产出的 compile_commands.json。只跑 Debug，不跑 ctest/Release（ADR 决策 3）。
 # Git 传入 $1=远端名 $2=远端 URL；stdin 每行 <local ref> <local oid> <remote ref> <remote oid>。
 
@@ -9,13 +9,13 @@ PRISM_HOOK_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=scripts/checks/lib.sh
 . "${PRISM_HOOK_DIR}/../scripts/checks/lib.sh"
 
-# 耗时预算，可用环境变量覆盖（默认与 AGENTS.md 记录的值一致，超了只提示不拒绝）。
+# 耗时预算，可被环境变量覆盖；默认与 AGENTS.md 一致，超了只提示不拒绝。
 PRISM_TIME_BUDGET_SECONDS=${PRISM_TIME_BUDGET_SECONDS:-900}
 
 prism_blank
 prism_info "pre-push 门禁：Debug 构建 + 本次改动文件的 clang-tidy"
 
-# 第一件事：校验工具版本前缀（#67 AC）。
+# 先校验工具版本前缀（#67 AC），不符合就别动手。
 if ! PRISM_CLANG_TIDY=$(prism_require_tool clang-tidy); then
     exit 1
 fi
@@ -75,9 +75,8 @@ fi
 
 PRISM_START=$(date +%s)
 
-# 命令在流水线左侧跑，退出码写进文件：既能看输出、留日志，又不依赖 bash 的 PIPESTATUS。
-# 不要把本函数的 stdout 捕获进变量，否则构建输出会被一起吞掉。
-# 用法：prism_run_logged <日志> <退出码文件> <命令...>
+# prism_run_logged <日志> <退出码文件> <命令...>：命令跑在流水线左侧，退出码另写文件（不依赖 bash PIPESTATUS）。
+# 本函数恒返回 0，所以别把它的 stdout 捕获进变量，否则构建输出会被一起吞掉。
 prism_run_logged() {
     _prism_log=$1
     _prism_status_file=$2
@@ -116,7 +115,6 @@ if [ ! -f "${PRISM_BUILD_DIR}/CMakeCache.txt" ] || [ ! -f "${PRISM_BUILD_DIR}/co
     prism_info "配置完成。"
 fi
 
-# ---- 构建 ----
 prism_info "构建中：cmake --build --preset ${PRISM_PRESET}（输出同时写入 ${PRISM_LOG_DIR}/build.log）"
 prism_run_logged \
     "${PRISM_LOG_DIR}/build.log" "${PRISM_TMP}/build.status" \
@@ -149,8 +147,7 @@ if [ -z "${PRISM_BASE}" ]; then
     fi
 fi
 
-# 判定由共享入口承担（#100）：与 CI 的 tidy job 调的是同一个 scripts/checks/tidy.sh，
-# 区别只在范围（这里传本次推送的基线，CI 传这个 PR 的 base...head）。
+# 判定交给共享入口（#100）：与 CI 的 tidy job 调同一个 scripts/checks/tidy.sh，区别只在范围。
 PRISM_TIDY_RANGE=${PRISM_BASE:-all}
 if ! sh "${PRISM_HOOK_DIR}/../scripts/checks/tidy.sh" "${PRISM_BUILD_DIR}" "${PRISM_TIDY_RANGE}"; then
     prism_blank

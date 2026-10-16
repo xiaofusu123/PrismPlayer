@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
-# 一条命令装上门禁（#67）：把 core.hooksPath 指向版本控制里的 .githooks/。
-# 用 hooksPath 而不是往 .git/hooks/ 拷贝：拷贝出来的钩子不进版本控制，别人 clone 完是裸奔的。
+# 门禁安装脚本（#67）：把 core.hooksPath 指向版本控制里的 .githooks/。
+# 用 hooksPath 而不是拷进 .git/hooks/：拷出来的钩子不进版本控制，别人 clone 完是裸奔的。
 # 用法：pwsh -File scripts/install-hooks.ps1
 
 $ErrorActionPreference = "Stop"
@@ -37,8 +37,7 @@ if ($missing.Count -gt 0) {
 
 & $gitExe config core.hooksPath .githooks
 
-# 判据是读回来的值，不是 $LASTEXITCODE：从 Git Bash 里起的 pwsh 拿不到它（会是空值），
-# 拿它当判据会在写成功时误报失败。
+# 判据是读回来的值，不是 $LASTEXITCODE：从 Git Bash 起的 pwsh 拿不到它，会在写成功时误报失败。
 $hooksPath = & $gitExe config --local --get core.hooksPath
 if ($hooksPath -ne ".githooks") {
     Write-Host "错误：core.hooksPath 没设成 .githooks（读回来是 '$hooksPath'）。" -ForegroundColor Red

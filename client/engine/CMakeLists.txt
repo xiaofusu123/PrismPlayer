@@ -9,10 +9,8 @@ endif()
 find_package(FFMPEG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
-# SoundTouch 的 vcpkg 包装出来的是 SoundTouchConfig.cmake（大小写就是这个），所以包名必须写
-# SoundTouch：CMake 的 config 模式按「<包名>Config.cmake」和「<包名小写>-config.cmake」精确匹配。
-# 写成小写 soundtouch 只在大小写不敏感的文件系统上碰巧能命中（Windows / WSL 的 /mnt/d 都是），
-# 干净的 Linux（ext4）上直接 find_package 失败 —— #99 的 CI 首次真跑就是这么红的。
+# vcpkg 的包装文件是 SoundTouchConfig.cmake，所以包名必须精确写 SoundTouch；
+# 写成小写只在大小写不敏感的文件系统上碰巧命中，干净的 Linux 会 find_package 失败（#99）。
 find_package(SoundTouch REQUIRED)
 find_package(spdlog REQUIRED)
 
