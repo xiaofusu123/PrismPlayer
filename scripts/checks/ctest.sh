@@ -1,11 +1,6 @@
 #!/bin/sh
-# ctest 接入点（spec #96 决策 25 / #102）。
-#
-# 它要回答的问题不是「测试全过了吗」，而是「**这次到底有没有跑测试**」：
-#   - test/ 还没有注册任何测试用例时明确 SKIP 并写明原因，不假装绿；
-#   - 等测试跑道（#54）落地、根构建里出现 add_test() 之后，同一个 job 自动变成真检查，
-#     不需要重新设计 CI（判定从构建系统里问，而不是从 CMake 源码里猜）。
-#
+# ctest 接入点（#102 / spec #96 决策 25）：回答「这次到底有没有跑测试」，不是「测试全过了吗」。
+# 契约：test/ 没注册用例时明确 SKIP 并写明原因，不假装绿；根构建出现 add_test() 后自动变成真检查。
 # 用法：ctest.sh <构建目录>
 # 退出码：0 = 通过或明确 SKIP；1 = 有测试挂了，或无法判定（缺构建目录 / 没有测试清单）。
 
@@ -63,8 +58,8 @@ if [ "${PRISM_TOTAL}" -eq 0 ]; then
     prism_info "原因：test/ 还没接回根 CMake，注册测试属测试跑道票（#54）的范围，本 job 只预留接入点。"
     prism_info "这不是「测试都过了」，是「没有测试可跑」—— 所以用警告标注而不是静默绿灯。"
     prism_info "等 add_test() 出现，这个 job 会自动变成真检查，不需要改 CI。"
-    # GitHub Actions 里 job 无法从步骤内部把自己标成 neutral；警告标注 + job 摘要是最接近
-    # 「明确 SKIP」的诚实表达（#102 AC：不出现「假装绿」）。
+    # GitHub Actions 的 job 无法从步骤内部把自己标成 neutral；警告标注 + job 摘要是最接近「明确 SKIP」的
+    # 诚实表达（#102 AC：不出现「假装绿」）。
     if [ -n "${GITHUB_ACTIONS:-}" ]; then
         printf '::warning title=ctest SKIP::没有任何注册的测试用例（Total Tests: 0）；test/ 接回根构建后本 job 自动变成真检查（#54）。\n'
     fi

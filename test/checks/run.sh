@@ -1,9 +1,7 @@
 #!/bin/sh
-# 检查入口自测（#97 / #100）：在临时 git 仓库里造变更集，断言 scripts/checks/ 下入口的退出码与 stderr。
-# format.sh（#97）覆盖三种输入（全合规 → 0 / 含未格式化 → 非 0 / 空范围 → 0）、vendor 例外、<rev> 与
-# <a>...<b> 两种范围写法、非 C/C++ 忽略、git 失败绝不 fail-open，以及 ci（GitHub Actions 环境解析范围）。
-# tidy.sh（#100）覆盖三种输入（有违规 → 非 0 / 无 C/C++ 改动 → 0 且不要求编译数据库 / 空范围 → 0）。
-# 不联网、不依赖 CI。用法：sh test/checks/run.sh
+# 检查入口自测（#97 / #100）：在临时 git 仓库夹具里跑真实入口，断言退出码与 stderr。
+# 覆盖范围语义（staged / ci / <rev> / <a>...<b>）、vendor 例外、非 C/C++ 忽略、git 失败绝不 fail-open。
+# 也用 tidy.sh 跑真 clang-tidy；不联网、不依赖 CI。用法：sh test/checks/run.sh，有失败项则退出 1。
 
 set -u
 
@@ -15,7 +13,7 @@ cd "${PRISM_TEST_ROOT}" || exit 1
 
 PRISM_RUN_SH=$(command -v sh) || PRISM_RUN_SH=/bin/sh
 PRISM_CLANG_FORMAT_REAL=$(prism_find_tool clang-format || :)
-# tidy.sh 的用例要真 clang-tidy（入口第一步就校验它）与真 clang++（手写编译数据库要用它当编译器）。
+# tidy.sh 用例要真 clang-tidy（入口第一步就校验它）与真 clang++（手写编译数据库拿它当编译器）。
 PRISM_CLANG_TIDY_REAL=$(prism_find_tool clang-tidy || :)
 PRISM_CLANGXX_REAL=$(prism_find_tool clang++ || :)
 
@@ -54,7 +52,7 @@ expect_out_lacks() {
     esac
 }
 
-# 逐字比对：用来断言「pre-commit 与入口是同一份判定」。
+# 逐字比对，用来断言 pre-commit 与入口是同一份判定。
 expect_out_equals() {
     if [ "${PRISM_OUT}" = "$1" ]; then
         ok "$2"
@@ -65,7 +63,7 @@ expect_out_equals() {
     fi
 }
 
-# run_in <目录> <命令...>：cwd 切到目录执行，合并捕获 stdout+stderr，stdin 接 /dev/null 防卡住。
+# run_in <目录> <命令...>：切 cwd 执行，合并捕获 stdout+stderr，stdin 接 /dev/null 防卡住。
 run_in() {
     _prism_dir=$1
     shift
@@ -73,12 +71,12 @@ run_in() {
     PRISM_STATUS=$?
 }
 
-# 跑检查入口；cwd 在仓库内即可，入口自己会 cd 到仓库根。
+# 跑格式入口；cwd 在仓库内即可，入口自己会 cd 到仓库根。
 run_entry() {
     run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/format.sh "$@"
 }
 
-# 跑入口的 ci token，显式传全部 CI 环境变量（含空值）：本机/CI 已有的同名变量不能漏进来影响判定。
+# 跑 ci token，显式传全部 CI 环境变量（含空值）：本机已有的同名变量漏进来会影响判定。
 run_entry_ci() {
     _prism_ci_event_name=$1
     _prism_ci_event_path=$2
@@ -91,18 +89,16 @@ run_entry_ci() {
     PRISM_STATUS=$?
 }
 
-# 跑静态检查入口（#100）；参数是 <编译数据库目录> <变更范围>。
+# 跑 tidy 入口（#100）；参数是 <编译数据库目录> <变更范围>。
 run_entry_tidy() {
     run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh "$@"
 }
 
 # ---------- 夹具 ----------
-# 夹具放在仓库的 build/ 下（已 gitignore）。不要用 /tmp：Git Bash 的 /tmp 与 git.exe 认的
-# /tmp 不是同一个目录，-C 会直接找不到目录。
+# 夹具放仓库的 build/ 下（已 gitignore）；别用 /tmp —— Git Bash 的 /tmp 与 git.exe 认的不是同一个，-C 会找不到。
 PRISM_CASE_ROOT="${PRISM_TEST_ROOT}/build/check-tests"
 PRISM_CASE_SEQ=0
 
-# 每个用例一个全新 git 仓库，拷入入口真正会用到的门禁文件。
 new_fixture() {
     PRISM_CASE_SEQ=$((PRISM_CASE_SEQ + 1))
     PRISM_CASE_DIR="${PRISM_CASE_ROOT}/case-${PRISM_CASE_SEQ}"
@@ -135,13 +131,13 @@ start_case() {
     new_fixture
 }
 
-# 用真 clang-format 生成「一定合规」的内容，保证夹具本身不会因为手写格式被判违规。
+# 用真 clang-format 生成一定合规的内容，免得夹具自己手写格式被判违规。
 good_cpp() {
     printf 'int PrismSample(int a, int b) {\n    return a + b;\n}\n' \
         | "${PRISM_CLANG_FORMAT_REAL}" --assume-filename=sample.cpp -
 }
 
-# 含两处违规：空格不规整 + 超过 ColumnLimit 100 的长行。
+# 两处违规：空格不规整 + 一行超过 ColumnLimit 100。
 bad_cpp() {
     cat <<'EOF'
 int  PrismSample(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l) {
@@ -162,24 +158,21 @@ commit_base() {
 
 # ---------- #100：tidy.sh 用的夹具 ----------
 
-# clang-tidy 是原生 exe，编译数据库里的 directory / file 必须是它认得的原生路径：Windows 上得是
-# D:/...，MSYS 的 /d/... 一条也匹配不上 —— clang-tidy 自己把编译单元绝对化成 D:/...，于是查不到
-# 编译命令，只打印「Compile command not found」并以 0 退出（假绿）。MSYS2 / Git Bash 的 `pwd -W`
-# 直接给出原生形式；Linux 没有 -W，退回 pwd -P（那里本来就是原生形式）。
-# 刻意不用 cygpath：它只在 MSYS 系存在，会多出一条「本机能过、CI 不能过」的路径。
+# clang-tidy 是原生 exe，编译数据库里的 directory / file 必须是它认得的原生路径（Windows 要 D:/...）：
+# MSYS 的 /d/... 一条也匹配不上，它会报「Compile command not found」却以 0 退出（假绿）。
+# 用 pwd -W 取原生形式、Linux 退回 pwd -P；不用 cygpath —— 它只在 MSYS 系存在，会多出「本机能过、CI 不能过」的路径。
 fixture_native_dir() {
     if _prism_native=$(cd "${PRISM_REPO}" && pwd -W 2>/dev/null) && [ -n "${_prism_native}" ]; then
         _prism_native_out=${_prism_native}
     else
         _prism_native_out=$(cd "${PRISM_REPO}" && pwd -P)
     fi
-    # 编译数据库是 JSON：路径里出现反斜杠（`\P` 之类）会直接把文件读坏，一律换成正斜杠。
+    # 编译数据库是 JSON：路径里的反斜杠会把文件读坏，一律换成正斜杠。
     printf '%s\n' "${_prism_native_out}" | tr '\\' '/'
 }
 
-# 夹具自己的最小规则集，不复用仓库根的 .clang-tidy：那份规则集由别的工单在改，自测跟着它漂就不是
-# 在测入口本身。InheritParentConfig: false 是关键 —— 夹具就在仓库的 build/ 下，不拦住向上查找，
-# 仓库根那份配置会被并进来。
+# 夹具用自己的最小规则集，不复用仓库根 .clang-tidy（那份由别的工单在改，跟着它漂就不是在测入口）。
+# InheritParentConfig: false 是关键：夹具就在 build/ 下，不拦住向上查找会把仓库根那份配置并进来。
 write_tidy_config() {
     cat > "${PRISM_REPO}/.clang-tidy" <<'EOF'
 InheritParentConfig: false
@@ -191,9 +184,8 @@ CheckOptions:
 EOF
 }
 
-# 夹具里没有 CMake，编译数据库手写。command 里用真 clang++（prism_find_tool 解析出的路径，反斜杠
-# 换成 JSON 安全的正斜杠）。clang-tidy 只解析这条命令的参数、不执行它，所以 argv[0] 用 POSIX 形式
-# 也无妨；所有路径都从夹具自己的 pwd 推出来。
+# 夹具里没有 CMake，编译数据库手写：command 用真 clang++（路径换成 JSON 安全的正斜杠）。
+# clang-tidy 只解析这条命令的参数、不执行它，所以 argv[0] 用 POSIX 形式也无妨。
 write_tidy_db() {
     mkdir -p "${PRISM_REPO}/build"
     _prism_tidy_native=$(fixture_native_dir)
@@ -220,9 +212,7 @@ if [ -z "${PRISM_CLANG_FORMAT_REAL}" ]; then
     exit 1
 fi
 
-# ============================================================
-# AC1/AC3：三种输入 —— 全合规 / 未格式化 / 空范围
-# ============================================================
+# ---- AC1/AC3：三种输入 —— 全合规 / 未格式化 / 空范围 ----
 
 start_case "入口：全合规的变更集 → 0，通过文案与 pre-commit 逐字一致"
 good_cpp > "${PRISM_REPO}/sample.cpp"
@@ -257,9 +247,7 @@ run_entry HEAD~1
 expect_status 0 "只有文档改动放行"
 expect_out_has "通过" "给出通过信息"
 
-# ============================================================
-# AC2：pre-commit 调用同一份入口
-# ============================================================
+# ---- AC2：pre-commit 调用同一份入口 ----
 
 start_case "入口：pre-commit 与 format.sh staged 是同一份判定（输出逐字相同）"
 bad_cpp > "${PRISM_REPO}/sample.cpp"
@@ -284,9 +272,7 @@ run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" .githooks/pre-commit
 expect_out_equals "${PRISM_ENTRY_OUT}" "合规路径下两边输出逐字相同"
 expect_status 0 "两边都放行"
 
-# ============================================================
-# AC1：vendor/** 只豁免文件名检查
-# ============================================================
+# ---- AC1：vendor/** 只豁免文件名检查 ----
 
 start_case "入口：vendor/** 下的 CmakeLists.txt 跳过文件名检查，格式检查照做"
 mkdir -p "${PRISM_REPO}/vendor/memorypool"
@@ -308,9 +294,7 @@ run_entry staged
 expect_status_nonzero "vendor 下的 C/C++ 格式违规仍被拦"
 expect_out_has "vendor/third_party/thing.cc" "报错点名 vendor 下的文件"
 
-# ============================================================
-# AC1/AC3：范围写法 —— <rev> 与 <a>...<b>
-# ============================================================
+# ---- AC1/AC3：范围写法 —— <rev> 与 <a>...<b> ----
 
 start_case "入口：<rev> 范围里 vendor 之外的 CmakeLists.txt → 非 0 并给出 git mv"
 printf '# base\n' > "${PRISM_REPO}/README.md"
@@ -356,9 +340,7 @@ run_entry "${PRISM_REV_MAIN}...${PRISM_REV_SIDE}"
 expect_status_nonzero "a...b 取 b（side 上的坏内容）"
 expect_out_has "sample.cpp" "点名 side 上的坏文件"
 
-# ============================================================
-# AC3：非 C/C++ 忽略、改名不漏、非 ASCII 文件名
-# ============================================================
+# ---- AC3：非 C/C++ 忽略、改名不漏、非 ASCII 文件名 ----
 
 start_case "入口：非 C/C++ 文件被忽略"
 printf '  这不是 C++，随便写   \n' > "${PRISM_REPO}/notes.md"
@@ -384,9 +366,7 @@ expect_status_nonzero "非 ASCII 文件名的违规被拦"
 expect_out_has "样例.cpp" "报错里的文件名没有被转义"
 expect_out_has "-i -- 样例.cpp" "修复命令可直接复制"
 
-# ============================================================
-# AC3/AC8：git 失败绝不 fail-open
-# ============================================================
+# ---- AC3/AC8：git 失败绝不 fail-open ----
 
 start_case "入口：取不到变更范围 / 参数不合法 → 非 0，绝不静默放行"
 run_entry no-such-rev-abc123
@@ -414,9 +394,7 @@ expect_out_has "staged" "usage 里写明三种范围写法"
 run_entry --nope
 expect_status_nonzero "不认识的参数被拦"
 
-# ============================================================
-# AC6（CI 同源）：ci token 从 GitHub Actions 环境解析范围
-# ============================================================
+# ---- AC6（CI 同源）：ci token 从 GitHub Actions 环境解析范围 ----
 
 start_case "入口：ci 从 GitHub Actions 环境解析变更范围（pull_request / push）"
 printf '# base\n' > "${PRISM_REPO}/README.md"
@@ -429,10 +407,8 @@ good_cpp > "${PRISM_REPO}/sample.cpp"
 commit_all "good cpp"
 PRISM_REV_GOOD=$(git -C "${PRISM_REPO}" rev-parse HEAD)
 
-# 事件 JSON 照抄 GitHub 现在的真实形状：键按**字母序**排，所以 base / head 里的 `repo`（一个很大的
-# 嵌套对象）排在 `sha` **之前**。user / repo 里各放一个同名 sha 诱饵，且都排在真 sha 前面：
-# 「父键之后遇到的第一个 sha」这种朴素取法会直接拿到诱饵，`git diff 诱饵...head` 报
-# unknown revision，范围判定整条失效。（#98 的第一次 CI 运行就是这么红的：base 未取到。）
+# 事件 JSON 照抄 GitHub 现在的真实形状：键按字母序排，base / head 里的 repo（大嵌套对象）排在 sha 之前。
+# user / repo 里各埋一个同名 sha 诱饵：「父键后第一个 sha」的朴素取法会中招，范围判定整条失效（#98 首次 CI 即如此）。
 cat > "${PRISM_REPO}/event-pr.json" <<EOF
 {
   "action": "opened",
@@ -473,7 +449,7 @@ cat > "${PRISM_REPO}/event-pr.json" <<EOF
 }
 EOF
 
-# head 取自事件 JSON（REV_GOOD，合规），不是 GITHUB_SHA（REV_BAD，坏）：所以放行。
+# head 取自事件 JSON（合规）而不是 GITHUB_SHA（坏），所以放行。
 run_entry_ci pull_request "${PRISM_REPO}/event-pr.json" "${PRISM_REV_BAD}" ""
 expect_status 0 "pull_request：head 取自事件 JSON 而不是 GITHUB_SHA"
 expect_out_has "通过：1 个改动的 C/C++ 文件" "范围落在 base...head 上"
@@ -537,10 +513,7 @@ expect_out_has "GITHUB_EVENT_NAME" "报错说明支持哪些事件"
 run_entry_ci pull_request "${PRISM_REPO}/no-such-event.json" "${PRISM_REV_BASE}" ""
 expect_status_nonzero "事件文件不存在且没有 GITHUB_BASE_SHA 时被拦"
 
-# ============================================================
-# #100：共享静态检查入口 tidy.sh —— 三种输入
-# 有违规 → 非 0（点名规则与文件）/ 无 C/C++ 改动 → 0（且不要求编译数据库）/ 变更范围为空 → 0
-# ============================================================
+# ---- #100：共享静态检查入口 tidy.sh —— 有违规→非 0 / 无 C/C++ 改动→0（不要求编译数据库）/ 空范围→0 ----
 
 start_case "入口（tidy.sh）：有违规 → 非 0，报出规则名与违规文件"
 if [ -z "${PRISM_CLANG_TIDY_REAL}" ] || [ -z "${PRISM_CLANGXX_REAL}" ]; then
@@ -611,8 +584,6 @@ expect_out_has "没有 C/C++ 改动" "空范围同样走「没有 C/C++ 改动�
 run_entry_tidy build "${PRISM_REV_BASE}...${PRISM_REV_BASE}"
 expect_status 0 "两端相同的 a...b 空范围也放行"
 fi
-
-# ============================================================
 
 drop_fixture
 rm -rf "${PRISM_CASE_ROOT}"

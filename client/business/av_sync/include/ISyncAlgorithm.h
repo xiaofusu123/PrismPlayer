@@ -12,7 +12,7 @@ namespace Prism::Business {
  * 输出渲染决策（RENDER / WAIT / DROP）。
  */
 class ISyncAlgorithm {
-public:
+  public:
     virtual ~ISyncAlgorithm() = default;
 
     /**
@@ -33,7 +33,7 @@ public:
      * @brief 获取当前漂移信息
      * @return DriftInfo 漂移信息
      */
-    virtual DriftInfo get_drift_info() const = 0;
+    [[nodiscard]] virtual DriftInfo get_drift_info() const = 0;
 
     /**
      * @brief 重置同步算法状态

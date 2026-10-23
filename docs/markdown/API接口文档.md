@@ -1,9 +1,9 @@
 # PrismPlayer API 接口文档
 
-> 基于项目实际代码生成，最后更新：2026-10-09
+> 基于项目实际代码生成，最后更新：2026-10-23
 > 版本：0.0.1
 >
-> **本文档记录的是「接口的形状」，每个接口的实现状态见各节标题下的「状态」行。** 完整的实现状态汇总见 `项目计划书.md` §11；术语以根目录 `GLOSSARY.md` 为准。
+> **本文档记录的是「接口的形状」，每个接口的实现状态见各节标题下的「实现状态」行。** 完整的实现状态汇总见 `项目计划书.md` §11；术语以根目录 `GLOSSARY.md` 为准。
 >
 > 修复说明：§1 与 §6 原先都写「27 个 C API」，实测 `client/service/include/Player.h` 中 `PRISM_API` 宏出现 **32** 次，与 `Player.cpp:135-572` 的 32 个 `extern "C"` 定义一一对应，已改为 32。本文档的 API 覆盖是完整的：32 个函数名与头文件逐一比对后**无遗漏、无多余**。
 
@@ -11,32 +11,70 @@
 
 ## 1. Service 层 — 公开 C API
 
-> 头文件：`client/service/include/Player.h`、`client/service/include/Types.h`
-> 命名空间：`extern "C"`
-> 构建产物：动态库 (`client-service`)
-> 状态：✅ **完整实现**（**32** 个 C API + 6 个结构体 + 5 个枚举；`Player.cpp` 448 行，全仓最大实现文件）
+> **头文件**：`client/service/include/Player.h`、`client/service/include/Types.h`
+>
+> **命名空间**：`extern "C"`
+>
+> **构建产物**：动态库 (`client-service`)
+>
+> **实现状态**：✅ **完整实现**（**32** 个 C API + 6 个结构体 + 5 个枚举；`Player.cpp` 448 行，全仓最大实现文件）
+>
 > ⚠️ 其中涉及网络/认证/房间的 API（§1.5 用户认证、§1.6 房间管理）当前由 `IServiceNetwork` 的**默认桩实现**兜底，返回成功但无真实网络行为 —— 见 §5。
+
+下图只串起文档明写的先后：`create` → 依赖注入 → `login` → `join_room`，`open` → `MEDIA_LOADED` → `get_media_info`，`destroy` 收尾。播放控制（`play`/`pause`/`stop`/`seek`）不在主线上，见 §1.8。
+
+```mermaid
+sequenceDiagram
+    accTitle: C API 生命周期主线
+    accDescr: 按文档明写的顺序约束，展示 C API 从创建实例、依赖注入、登录进房、打开媒体到销毁的主线调用。
+
+    participant APP as 调用方
+    participant API as C API
+
+    APP->>API: prism_player_create()
+    Note over APP,API: 可选注入
+    APP->>API: prism_player_set_audio_factory() / prism_player_set_video_factory()
+    Note over APP,API: create 之后、首次 open/play 之前
+    APP->>API: prism_player_set_network_client()
+    Note over APP,API: create 之后、login 之前
+    APP->>API: prism_player_login()
+    API-->>APP: LOGIN_SUCCESS / LOGIN_FAILED
+    APP->>API: prism_player_join_room()
+    API-->>APP: ROOM_JOINED
+    APP->>API: prism_player_open()
+    API-->>APP: MEDIA_LOADED
+    APP->>API: prism_player_get_media_info()
+    Note over APP,API: 播放控制：play / pause / stop / seek（见 §1.8）
+    APP->>API: prism_player_leave_room()
+    API-->>APP: ROOM_LEFT
+    APP->>API: prism_player_logout()
+    APP->>API: prism_player_destroy()
+```
 
 ### 1.1 版本
 
+版本号由下面三个宏组成；`prism_player_get_version()` 返回的字符串格式见 §1.14。
+
 | 宏 | 值 |
-|----|-----|
+|---|---|
 | `PRISM_VERSION_MAJOR` | 0 |
 | `PRISM_VERSION_MINOR` | 0 |
 | `PRISM_VERSION_PATCH` | 1 |
 
 ### 1.2 通用类型
 
+本节是全部 C API 共用的类型：句柄、枚举与事件回调。
+
 **句柄**
 
 | 类型 | 定义 |
-|------|------|
+|---|---|
 | `PrismPlayerHandle` | `void*` —— 不透明句柄，所有 API 的第一个参数 |
 
 **播放状态 `PrismState`**
 
 | 值 | 说明 |
-|----|------|
+|---|---|
 | `PRISM_STATE_IDLE = 0` | 空闲状态，未加载媒体 |
 | `PRISM_STATE_LOADING` | 媒体加载中 |
 | `PRISM_STATE_PLAYING` | 播放中 |
@@ -47,7 +85,7 @@
 **事件类型 `PrismEventType`**
 
 | 值 | 触发时机 |
-|----|----------|
+|---|---|
 | `PRISM_EVENT_MEDIA_LOADED = 0` | 媒体加载完成 |
 | `PRISM_EVENT_PLAYBACK_COMPLETED` | 播放完成 |
 | `PRISM_EVENT_SEEK_COMPLETED` | Seek 操作完成 |
@@ -62,7 +100,7 @@
 **错误码 `PrismErrorCode`**
 
 | 值 | 数值 | 说明 |
-|----|------|------|
+|---|---|---|
 | `PRISM_OK` | 0 | 操作成功 |
 | `PRISM_ERROR_UNKNOWN` | -1 | 未知错误 |
 | `PRISM_ERROR_INVALID_HANDLE` | -2 | 无效的播放器句柄 |
@@ -75,14 +113,14 @@
 **Seek 模式 `PrismSeekMode`**
 
 | 值 | 说明 |
-|----|------|
+|---|---|
 | `PRISM_SEEK_ABSOLUTE = 0` | 绝对跳转，参数为目标位置 |
 | `PRISM_SEEK_RELATIVE = 1` | 相对跳转，参数为偏移量 |
 
 **房间连接状态 `PrismRoomState`**
 
 | 值 | 说明 |
-|----|------|
+|---|---|
 | `PRISM_ROOM_DISCONNECTED = 0` | 未连接 |
 | `PRISM_ROOM_CONNECTING` | 连接中 |
 | `PRISM_ROOM_CONNECTED` | 已连接 |
@@ -90,15 +128,17 @@
 **事件回调**
 
 | 签名 | 说明 |
-|------|------|
-| `void (*PrismEventCallback)(PrismEventType type, const void* data, void* user_data)` | type=事件类型；data=附加数据(可为NULL)；user_data=注册时透传 |
+|---|---|
+| `void (*PrismEventCallback)(PrismEventType type, const void* data, void* user_data)` | `type`=事件类型；`data`=附加数据（可为 `NULL`）；`user_data`=注册时透传 |
 
 ### 1.3 结构体
+
+§1 各 API 的输入/输出结构体。
 
 **PrismConfig — 播放器初始化配置**
 
 | 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
+|---|---|---|---|
 | `video_output_width` | `int` | 0 | 视频输出宽度（像素），0 表示使用原始分辨率 |
 | `video_output_height` | `int` | 0 | 视频输出高度（像素），0 表示使用原始分辨率 |
 | `audio_sample_rate` | `int` | 0 | 音频采样率（Hz），0 表示使用原始采样率 |
@@ -110,7 +150,7 @@
 **PrismMediaInfo — 媒体详细信息**
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `video_width` | `int` | 视频宽度（像素），无视频流时为 0 |
 | `video_height` | `int` | 视频高度（像素），无视频流时为 0 |
 | `duration_ms` | `int64_t` | 媒体总时长（毫秒），直播流为 -1 |
@@ -120,7 +160,7 @@
 **PrismLoginParams — 登录认证参数**
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `username` | `const char*` | 用户名 |
 | `password` | `const char*` | 密码 |
 | `server_url` | `const char*` | 服务器地址 |
@@ -128,7 +168,7 @@
 **PrismRoomInfo — 房间信息**
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `room_id` | `char[256]` | 房间 ID |
 | `member_count` | `int` | 房间在线人数 |
 
@@ -136,55 +176,69 @@
 
 ### 1.4 生命周期
 
+播放器实例的创建与销毁；结束时 `destroy` 释放全部资源。
+
 | 签名 | 说明 |
-|------|------|
-| `PrismPlayerHandle prism_player_create(const PrismConfig* config, PrismEventCallback callback, void* user_data)` | 创建播放器实例。config 为 NULL 则使用默认值；callback 为 NULL 则不接收事件。失败返回 NULL |
-| `void prism_player_destroy(PrismPlayerHandle player)` | 销毁播放器实例，释放所有资源。自动断开网络连接并离开房间。传入 NULL 无操作 |
+|---|---|
+| `PrismPlayerHandle prism_player_create(const PrismConfig* config, PrismEventCallback callback, void* user_data)` | 创建播放器实例。`config` 为 `NULL` 则使用默认值；`callback` 为 `NULL` 则不接收事件。失败返回 `NULL` |
+| `void prism_player_destroy(PrismPlayerHandle player)` | 销毁播放器实例，释放所有资源。自动断开网络连接并离开房间。传入 `NULL` 无操作 |
 
 ### 1.5 用户认证
 
+登录服务器、登出并断开连接。
+
 | 签名 | 说明 |
-|------|------|
+|---|---|
 | `int prism_player_login(PrismPlayerHandle player, const PrismLoginParams* params)` | 登录服务器进行身份认证。完成后触发 `LOGIN_SUCCESS` 或 `LOGIN_FAILED` 回调 |
 | `int prism_player_logout(PrismPlayerHandle player)` | 登出并断开与服务器的连接。若当前在房间内则自动离开房间 |
 
 ### 1.6 房间管理
 
+加入/离开房间，查询房间信息与连接状态。
+
 | 签名 | 说明 |
-|------|------|
-| `int prism_player_join_room(PrismPlayerHandle player, const char* room_id)` | 加入指定房间，建立 WebSocket 连接。必须在 login 成功后调用。成功后触发 `ROOM_JOINED` |
+|---|---|
+| `int prism_player_join_room(PrismPlayerHandle player, const char* room_id)` | 加入指定房间，建立 WebSocket 连接。必须在 `login` 成功后调用。成功后触发 `ROOM_JOINED` |
 | `int prism_player_leave_room(PrismPlayerHandle player)` | 离开当前房间，断开房间级 WebSocket。触发 `ROOM_LEFT` |
 | `int prism_player_get_room_info(PrismPlayerHandle player, PrismRoomInfo* info)` | 获取当前房间信息。调用方分配 `PrismRoomInfo` 内存。未在房间中返回错误 |
 | `PrismRoomState prism_player_get_room_state(PrismPlayerHandle player)` | 获取当前房间连接状态 |
 
 ### 1.7 媒体源
 
+打开/关闭媒体源及其解码资源。
+
 | 签名 | 说明 |
-|------|------|
+|---|---|
 | `int prism_player_open(PrismPlayerHandle player, const char* uri)` | 打开媒体源（本地文件路径或网络 URL）。状态变为 `LOADING`，完成后触发 `MEDIA_LOADED` |
 | `int prism_player_close(PrismPlayerHandle player)` | 关闭当前媒体，释放解码资源。状态回到 `IDLE` |
 
 ### 1.8 播放控制
 
+播放、暂停、停止与 Seek；状态变化见各条说明。
+
 | 签名 | 说明 |
-|------|------|
+|---|---|
 | `int prism_player_play(PrismPlayerHandle player)` | 开始/恢复播放。状态变为 `PLAYING`。播放完毕后触发 `PLAYBACK_COMPLETED`，状态回到 `STOPPED` |
 | `int prism_player_pause(PrismPlayerHandle player)` | 暂停播放，保留解码资源。状态变为 `PAUSED` |
-| `int prism_player_stop(PrismPlayerHandle player)` | 停止播放并释放解码资源。状态变为 `STOPPED`。与 close 的区别：stop 保留媒体信息，可再次 play 从头播放 |
+| `int prism_player_stop(PrismPlayerHandle player)` | 停止播放并释放解码资源。状态变为 `STOPPED`。与 `close` 的区别：`stop` 保留媒体信息，可再次 `play` 从头播放 |
 | `int prism_player_seek(PrismPlayerHandle player, int64_t position_ms, PrismSeekMode mode)` | 跳转到指定位置。完成后触发 `SEEK_COMPLETED`。未加载媒体返回 `NO_MEDIA` |
 
 ### 1.9 状态查询
 
+轮询播放状态、位置与时长。
+
 | 签名 | 说明 |
-|------|------|
-| `PrismState prism_player_get_state(PrismPlayerHandle player)` | 获取当前播放状态。player 为 NULL 返回 `ERROR` |
+|---|---|
+| `PrismState prism_player_get_state(PrismPlayerHandle player)` | 获取当前播放状态。`player` 为 `NULL` 返回 `ERROR` |
 | `int64_t prism_player_get_position(PrismPlayerHandle player)` | 获取当前播放位置（毫秒）。无媒体返回 -1 |
 | `int64_t prism_player_get_duration(PrismPlayerHandle player)` | 获取媒体总时长（毫秒）。直播流或无媒体返回 -1 |
 
 ### 1.10 音量控制
 
+音量与静音状态的设置、读取。
+
 | 签名 | 说明 |
-|------|------|
+|---|---|
 | `int prism_player_set_volume(PrismPlayerHandle player, float volume)` | 设置音量 0.0-1.0，超出范围自动钳位 |
 | `float prism_player_get_volume(PrismPlayerHandle player)` | 获取当前音量 0.0-1.0。无效句柄返回 0.0 |
 | `int prism_player_set_mute(PrismPlayerHandle player, bool mute)` | 设置静音状态 |
@@ -192,8 +246,10 @@
 
 ### 1.11 播放属性
 
+倍速与循环播放。
+
 | 签名 | 说明 |
-|------|------|
+|---|---|
 | `int prism_player_set_playback_speed(PrismPlayerHandle player, float speed)` | 设置播放速度，范围 0.5x-2.0x，超出自动钳位 |
 | `float prism_player_get_playback_speed(PrismPlayerHandle player)` | 获取当前速度倍率。无效句柄返回 1.0 |
 | `int prism_player_set_loop(PrismPlayerHandle player, bool loop)` | 设置循环播放。true=单曲循环，false=播完停止 |
@@ -201,48 +257,63 @@
 
 ### 1.12 视频窗口
 
+把视频渲染目标绑到原生窗口。
+
 | 签名 | 说明 |
-|------|------|
-| `int prism_player_set_video_window(PrismPlayerHandle player, void* native_window)` | 设置视频渲染目标窗口。Windows 下传入 HWND 转 void*；传入 NULL 解除绑定 |
+|---|---|
+| `int prism_player_set_video_window(PrismPlayerHandle player, void* native_window)` | 设置视频渲染目标窗口。Windows 下传入 `HWND` 转 `void*`；传入 `NULL` 解除绑定 |
 
 ### 1.13 媒体信息
 
+读取已加载媒体的详细信息。
+
 | 签名 | 说明 |
-|------|------|
+|---|---|
 | `int prism_player_get_media_info(PrismPlayerHandle player, PrismMediaInfo* info)` | 获取已加载媒体的详细信息。应在收到 `MEDIA_LOADED` 后调用。调用方分配内存 |
 
 ### 1.14 诊断工具
 
+错误码与版本号查询。
+
 | 签名 | 说明 |
-|------|------|
+|---|---|
 | `PrismErrorCode prism_player_get_last_error(PrismPlayerHandle player)` | 获取最后一次失败操作的详细错误码 |
 | `const char* prism_player_get_version(void)` | 获取 SDK 版本字符串，格式 `"PrismPlayer x.y.z"` |
 
 ### 1.15 依赖注入（可选）
 
-| 签名 | 说明 |
-|------|------|
-| `int prism_player_set_audio_factory(PrismPlayerHandle player, void* factory)` | 注入音频引擎工厂。应在 create 之后、首次 open/play 之前调用。不调用则使用默认实现 |
-| `int prism_player_set_video_factory(PrismPlayerHandle player, void* factory)` | 注入视频引擎工厂。应在 create 之后、首次 open/play 之前调用。不调用则使用默认实现 |
-| `int prism_player_set_network_client(PrismPlayerHandle player, void* network)` | 注入网络客户端实现。应在 create 之后、login 之前调用。不调用则使用默认实现 |
+替换默认的引擎与网络实现；不注入则使用默认实现。
 
-> 参数使用 `void*` 以保持 C ABI 纯净，实际类型为 `AudioEngineFactory*` / `VideoEngineFactory*` / `IServiceNetwork*`。
+| 签名 | 说明 |
+|---|---|
+| `int prism_player_set_audio_factory(PrismPlayerHandle player, void* factory)` | 注入音频引擎工厂。应在 `create` 之后、首次 `open`/`play` 之前调用。不调用则使用默认实现 |
+| `int prism_player_set_video_factory(PrismPlayerHandle player, void* factory)` | 注入视频引擎工厂。应在 `create` 之后、首次 `open`/`play` 之前调用。不调用则使用默认实现 |
+| `int prism_player_set_network_client(PrismPlayerHandle player, void* network)` | 注入网络客户端实现。应在 `create` 之后、`login` 之前调用。不调用则使用默认实现 |
+
+> **注意**：参数使用 `void*` 以保持 C ABI 纯净，实际类型为 `AudioEngineFactory*` / `VideoEngineFactory*` / `IServiceNetwork*`。
 
 ---
 
 ## 2. Engine 层 API
 
-> 命名空间：`Prism::Engine`
-> 头文件：`client/engine/include/`
-> 状态：🟡 **仅骨架** —— 抽象接口与工厂已定义，`src/` 下只有 4 个 `.cpp` 共 **75 行**（`AudioEngineWasapiShared.cpp` 29 / `AudioEngineWasapiSharedFactory.cpp` 7 / `VideoEngineVulkan.cpp` 32 / `VideoEngineVulkanFactory.cpp` 7）。**没有真实的 WASAPI 调用、没有 Vulkan 初始化/交换链/纹理上传，`src/` 下没有任何 FFmpeg 源文件。** 因此 §2.1 的同步结构体目前没有任何地方会真正返回它们。
-> 调用方：Business 层
+> **命名空间**：`Prism::Engine`
+>
+> **头文件**：`client/engine/include/`
+>
+> **实现状态**：🟡 **仅骨架** —— 抽象接口与工厂已定义，`src/` 下只有 4 个 `.cpp` 共 **75 行**（`AudioEngineWasapiShared.cpp` 29 / `AudioEngineWasapiSharedFactory.cpp` 7 / `VideoEngineVulkan.cpp` 32 / `VideoEngineVulkanFactory.cpp` 7）。**没有真实的 WASAPI 调用、没有 Vulkan 初始化/交换链/纹理上传，`src/` 下没有任何 FFmpeg 源文件。** 因此 §2.1 的同步结构体目前没有任何地方会真正返回它们。
+>
+> **调用方**：Business 层
+
+音频与视频两套对称的抽象接口，外加跨层交换的同步数据结构与工厂。
 
 ### 2.1 同步数据结构
+
+跨线程交换的同步信息与渲染结果。
 
 **AudioSyncInfo — 音频同步信息**
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `current_pts` | `std::atomic<uint64_t>` | 当前音频帧解码时间戳（ms） |
 | `next_pts` | `std::atomic<uint64_t>` | 下一帧音频解码时间戳（ms） |
 | `start_time` | `std::atomic<uint32_t>` | 流开始的时间 |
@@ -251,7 +322,7 @@
 **VideoSyncInfo — 视频同步信息**
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `current_pts` | `std::atomic<uint64_t>` | 当前视频帧解码时间戳（ms） |
 | `next_pts` | `std::atomic<uint64_t>` | 下一帧视频解码时间戳（ms） |
 | `start_time` | `std::atomic<uint32_t>` | 流开始的时间 |
@@ -260,7 +331,7 @@
 **RenderMetadata — 渲染元数据**
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `handle` | `RenderResultHandle` | 渲染结果句柄（Windows: HANDLE） |
 | `valid` | `bool` | 句柄是否有效 |
 | `width` | `uint32_t` | 渲染宽度 |
@@ -268,69 +339,84 @@
 | `format` | `uint32_t` | 像素格式 |
 | `timestamp` | `uint64_t` | 时间戳 |
 
-> 以上结构体均使用 `std::atomic` 保证跨线程读写安全，默认值为 0。
+> **注意**：只有 `AudioSyncInfo` 与 `VideoSyncInfo` 的字段是 `std::atomic`（默认值 0），用于跨线程读写；`RenderMetadata` 是普通类型（`RenderResultHandle`、`bool`、`uint32_t`、`uint64_t`），作为一次渲染结果的只读快照。另：`VideoEngine.h` 里视频结构体最后一个字段拼作 `draution`（代码侧笔误），语义即上表的 `duration`。
 
 ### 2.2 AudioEngine — 音频引擎抽象接口
 
+音频引擎的抽象接口：初始化、播放/暂停、跳转、倍速与同步信息读取。
+
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `init()` | `bool` | 初始化音频引擎 |
 | `play()` | `bool` | 播放音频 |
 | `pause()` | `bool` | 暂停音频 |
 | `close()` | `bool` | 关闭音频，释放资源 |
 | `set_play_speed()` | `bool` | 设置播放速度（倍速播放） |
-| `seek(uint64_t pts, int seek_mode)` | `bool` | 音频跳转。seek_mode: 0=绝对模式(pts为非负目标位置)，1=相对模式(快进/倒退) |
+| `seek(uint64_t pts, int seek_mode)` | `bool` | 音频跳转。`seek_mode`：0=绝对模式（`pts` 为非负目标位置），1=相对模式（快进/倒退） |
 | `get_sync_info()` | `AudioSyncInfo` | 获取音频同步信息 |
 
 ### 2.3 AudioEngineFactory — 音频引擎工厂
 
+创建音频引擎的抽象工厂与现有平台实现。
+
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `create_audio_engine()` | `std::unique_ptr<AudioEngine>` | 创建音频引擎实例 |
 
-**平台实现：**
+**平台实现**
 
 | 工厂类 | 引擎类 | 平台 |
-|--------|--------|------|
+|---|---|---|
 | `AudioEngineWasapiSharedFactory` | `AudioEngineWasapiShared` | Windows (WASAPI 共享模式) |
 | `AudioEngineAAudio`（计划） | — | Android |
 | `AudioEngineAudioUnit`（计划） | — | iOS/macOS |
 
 ### 2.4 VideoEngine — 视频引擎抽象接口
 
+视频引擎的抽象接口：初始化、播放/暂停、跳转、倍速、同步信息与渲染结果读取。
+
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `init()` | `bool` | 初始化视频引擎 |
 | `play()` | `bool` | 播放视频 |
 | `pause()` | `bool` | 暂停视频 |
 | `close()` | `bool` | 关闭视频 |
 | `set_play_speed(float speed)` | `bool` | 设置播放速度（倍速播放） |
-| `seek(uint64_t pts, int seek_mode)` | `bool` | 视频跳转。seek_mode: 0=绝对模式，1=相对模式 |
+| `seek(uint64_t pts, int seek_mode)` | `bool` | 视频跳转。`seek_mode`：0=绝对模式，1=相对模式 |
 | `get_sync_info()` | `VideoSyncInfo` | 获取视频同步信息 |
 | `get_render_result()` | `RenderMetadata` | 获取视频渲染结果（纹理句柄+元数据） |
 
 ### 2.5 VideoEngineFactory — 视频引擎工厂
 
+创建视频引擎的抽象工厂与现有平台实现。
+
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `create_video_engine()` | `std::unique_ptr<VideoEngine>` | 创建视频引擎实例 |
 
-**平台实现：**
+**平台实现**
 
 | 工厂类 | 引擎类 | 平台 |
-|--------|--------|------|
+|---|---|---|
 | `VideoEngineVulkanFactory` | `VideoEngineVulkan` | 跨平台 (Vulkan) |
 
 ---
 
 ## 3. Business 层 API
 
-> 命名空间：`Prism::Business`
-> 头文件：`client/business/{av_sync,network}/include/`
-> 状态：§3.1 AV Sync ✅ **完整实现**（`src/` 5 个 `.cpp` 共 323 行）；§3.2 Network ⛔ **占位（接口已定义，无实现）**（`internal/NetImpl.h` 是 0 字节，`src/tmp.cpp` 已于 2026-10-11 删除，`client-network` 目标不再生成）
-> 调用方：Service 层
+> **命名空间**：`Prism::Business`
+>
+> **头文件**：`client/business/{av_sync,network}/include/`
+>
+> **实现状态**：§3.1 AV Sync ✅ **完整实现**（`src/` 5 个 `.cpp` 共 323 行）；§3.2 Network ⛔ **占位（接口已定义，无实现）**（`internal/NetImpl.h` 是 0 字节，`src/tmp.cpp` 已于 2026-10-11 删除，`client-network` 目标不再生成）
+>
+> **调用方**：Service 层
+
+AV Sync 与 Network 两个模块的接口。
 
 ### 3.1 AV Sync 模块 — 音视频同步
+
+以音频时钟为主时钟，计算视频帧的漂移并输出渲染决策。
 
 #### 同步类型定义
 
@@ -339,7 +425,7 @@
 以音频时钟为主时钟的七状态模型：
 
 | 值 | 说明 |
-|----|------|
+|---|---|
 | `UNINIT` | 音频引擎未初始化 |
 | `CALIBATING` | 音频校准中（初始缓冲阶段） |
 | `SYNCHRONIZED` | 音频已同步 |
@@ -353,7 +439,7 @@
 **SyncAction — 同步算法渲染决策**
 
 | 值 | 说明 |
-|----|------|
+|---|---|
 | `RENDER` | 正常渲染当前帧 |
 | `WAIT` | 视频超前，等待音频追赶 |
 | `DROP` | 视频滞后，丢弃当前帧 |
@@ -361,15 +447,15 @@
 **SyncConfig — 同步算法配置**
 
 | 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `ahead_threshold_ms` | `uint32_t` | 30 | 视频超前超过此值则 WAIT（ms） |
-| `behind_threshold_ms` | `uint32_t` | 50 | 视频滞后超过此值则 DROP（ms） |
+|---|---|---|---|
+| `ahead_threshold_ms` | `uint32_t` | 30 | 视频超前超过此值则 `WAIT`（ms） |
+| `behind_threshold_ms` | `uint32_t` | 50 | 视频滞后超过此值则 `DROP`（ms） |
 | `calibrate_duration_ms` | `uint32_t` | 500 | 初始校准缓冲时长（ms） |
 
 **DriftInfo — 漂移信息**
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `drift_ms` | `int64_t` | 音视频漂移值（ms），正数=视频超前 |
 | `audio_pts` | `uint64_t` | 当前音频 PTS（ms） |
 | `video_pts` | `uint64_t` | 当前视频 PTS（ms） |
@@ -381,7 +467,7 @@
 控制播放/暂停/Seek 状态转换，校验转换合法性。
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `transition(SyncState target)` | `bool` | 状态转换，非法转换返回 false |
 | `get_state()` | `SyncState` | 获取当前同步状态 |
 | `can_play()` | `bool` | 当前状态是否允许播放 |
@@ -393,7 +479,7 @@
 以音频时钟为主时钟，计算视频帧与音频时钟的漂移值，输出渲染决策。
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `calibrate(uint64_t audio_pts, uint64_t video_pts)` | `SyncAction` | 校准音视频同步，计算漂移并输出决策 |
 | `configure(const SyncConfig& config)` | `void` | 配置同步参数（阈值、缓冲时长） |
 | `get_drift_info()` | `DriftInfo` | 获取当前漂移信息 |
@@ -401,13 +487,13 @@
 
 #### ICommandDispatcher — 指令分发器
 
-封装对 AudioEngine/VideoEngine 的直接调用，使上层无需直接操作 Engine。
+封装对 `AudioEngine`/`VideoEngine` 的直接调用，使上层无需直接操作 Engine。
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `dispatch_play()` | `bool` | 下发播放指令 |
 | `dispatch_pause()` | `bool` | 下发暂停指令 |
-| `dispatch_seek(uint64_t pts, int seek_mode)` | `bool` | 下发跳转指令。mode: 0=绝对，1=相对 |
+| `dispatch_seek(uint64_t pts, int seek_mode)` | `bool` | 下发跳转指令。`mode`：0=绝对，1=相对 |
 | `dispatch_speed(float speed)` | `bool` | 下发倍速指令 |
 | `set_audio_engine(AudioEngine* engine)` | `void` | 绑定音频引擎（不持有所有权） |
 | `set_video_engine(VideoEngine* engine)` | `void` | 绑定视频引擎（不持有所有权） |
@@ -416,10 +502,10 @@
 
 #### IEngineObserver — 引擎帧观察者
 
-接收 Engine 层的帧回调，驱动同步算法校准。在帧到达时触发 calibrate。
+接收 Engine 层的帧回调，驱动同步算法校准。在帧到达时触发 `calibrate`。
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `on_audio_frame(const AudioSyncInfo& info)` | `void` | 音频帧到达回调 |
 | `on_video_frame(const VideoSyncInfo& info)` | `void` | 视频帧到达回调 |
 | `on_render_ready(const RenderMetadata& metadata)` | `void` | 渲染就绪回调 |
@@ -429,7 +515,7 @@
 #### SyncFactory — 工厂函数
 
 | 函数 | 返回 |
-|------|------|
+|---|---|
 | `create_playback_state_machine()` | `std::unique_ptr<IPlaybackStateMachine>` |
 | `create_sync_algorithm()` | `std::unique_ptr<ISyncAlgorithm>` |
 | `create_command_dispatcher()` | `std::unique_ptr<ICommandDispatcher>` |
@@ -439,12 +525,14 @@
 
 ### 3.2 Network 模块 — 网络通信
 
+账号、房间与信令三个子模块的接口；当前为占位，无实现（见本节状态）。
+
 #### 网络类型定义
 
 **NetworkState — 连接状态**
 
 | 值 | 说明 |
-|----|------|
+|---|---|
 | `DISCONNECTED` | 未连接 |
 | `CONNECTING` | 连接中 |
 | `CONNECTED` | 已连接 |
@@ -453,7 +541,7 @@
 **LoginResult — 登录结果**
 
 | 值 | 说明 |
-|----|------|
+|---|---|
 | `SUCCESS` | 登录成功 |
 | `INVALID_CREDENTIALS` | 用户名或密码错误 |
 | `NETWORK_ERROR` | 网络连接失败 |
@@ -463,7 +551,7 @@
 **PlaybackCommand — 联机播放指令**
 
 | 值 | 说明 |
-|----|------|
+|---|---|
 | `PLAY` | 播放 |
 | `PAUSE` | 暂停 |
 | `SEEK` | 跳转 |
@@ -472,7 +560,7 @@
 **RoomInfo — 房间信息**
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `room_id` | `char[256]` | 房间 ID |
 | `member_count` | `int` | 房间在线人数 |
 
@@ -483,7 +571,7 @@
 上层（Service）实现此接口以接收网络层的异步事件回调。各网络子模块通过此接口向上通知。
 
 | 回调 | 说明 |
-|------|------|
+|---|---|
 | `on_login_result(LoginResult result)` | 登录结果回调 |
 | `on_room_joined(const RoomInfo& info)` | 成功加入房间回调 |
 | `on_room_left()` | 离开房间回调 |
@@ -495,7 +583,7 @@
 负责用户登录/登出及登录状态查询。登录为异步操作，结果通过 `on_login_result()` 回调。
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `login(const char* username, const char* password, const char* server_url)` | `bool` | 发起异步登录请求 |
 | `logout()` | `bool` | 登出并断开与服务器的连接 |
 | `is_logged_in()` | `bool` | 查询当前登录状态 |
@@ -506,7 +594,7 @@
 负责房间加入/离开及房间信息查询。加入/离开为异步操作。
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `join_room(const char* room_id)` | `bool` | 加入指定房间，结果通过 `on_room_joined` 回调 |
 | `leave_room()` | `bool` | 离开当前房间，结果通过 `on_room_left` 回调 |
 | `get_room_info(RoomInfo* info)` | `bool` | 获取当前房间信息 |
@@ -518,7 +606,7 @@
 负责与服务器的实时信令通信，包括播放控制同步消息的收发。
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `connect(const char* url)` | `bool` | 连接到信令服务器 |
 | `disconnect()` | `void` | 断开与信令服务器的连接 |
 | `send_message(const char* message)` | `bool` | 向服务器发送消息 |
@@ -528,7 +616,7 @@
 #### NetworkFactory — 工厂函数
 
 | 函数 | 返回 |
-|------|------|
+|---|---|
 | `create_account_manager()` | `std::unique_ptr<IAccountManager>` |
 | `create_room_manager()` | `std::unique_ptr<IRoomManager>` |
 | `create_signaling_client()` | `std::unique_ptr<ISignalingClient>` |
@@ -537,20 +625,28 @@
 
 ## 4. Adapter 层 API
 
-> 命名空间：`Prism::Adapter`
-> 头文件：`client/adapter/include/`（抽象接口）+ `client/adapter/internal/`（平台实现）
-> 构建产物：静态库 (`client-adapter`)
-> 状态：🟡 **仅骨架** —— 5 个接口与 5 个平台实现（`WinFileAdapter` / `SQLiteDBAdapter` / `ASIONetworkAdapter` / `JSONConfigAdapter` / `OpenSSLCryptoAdapter`）都只有类声明；模块现在**已无任何 `.cpp`**（`src/tmp.cpp` 这个 0 字节占位已于 2026-10-11 删除，`client-adapter` 目标不再生成）。两处 `// TODO`：`internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`。
+> **命名空间**：`Prism::Adapter`
+>
+> **头文件**：`client/adapter/include/`（抽象接口）+ `client/adapter/internal/`（平台实现）
+>
+> **构建产物**：静态库 (`client-adapter`)
+>
+> **实现状态**：🟡 **仅骨架** —— 5 个接口与 5 个平台实现（`WinFileAdapter` / `SQLiteDBAdapter` / `ASIONetworkAdapter` / `JSONConfigAdapter` / `OpenSSLCryptoAdapter`）都只有类声明；模块现在**已无任何 `.cpp`**（`src/tmp.cpp` 这个 0 字节占位已于 2026-10-11 删除，`client-adapter` 目标不再生成）。两处 `// TODO`：`internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`。
+>
 > ⚠️ 本节各接口的签名取自 `include/` 下的抽象接口；`internal/` 下的实现类与之一一对应，命名更具体（如 `DBAdapter` 的实现叫 `SQLiteDBAdapter`）。对照表见根目录 `GLOSSARY.md`。
 
+客户端基础设施的抽象接口，平台实现类见 `client/adapter/internal/`。
+
 ### 4.1 FileAdapter — 文件 I/O 与媒体元数据提取
+
+文件读写接口，外加从媒体文件提取元数据的 `get_metadata()`。
 
 **FileMetadata — 媒体文件元数据**
 
 音频/视频字段共存，非适用字段为零值。
 
 | 字段 | 类型 | 说明 |
-|------|------|------|
+|---|---|---|
 | `file_path` | `std::string` | 文件路径 |
 | `file_size` | `uint64_t` | 文件大小（字节） |
 | `format` | `std::string` | 容器格式（MP4/MKV/MP3/FLAC 等） |
@@ -569,7 +665,7 @@
 **接口方法**
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `open(const std::string& file_path)` | `bool` | 打开文件 |
 | `close()` | `void` | 关闭文件 |
 | `read(uint8_t* buffer, size_t size)` | `size_t` | 读取数据，返回实际读取字节数 |
@@ -584,16 +680,16 @@
 提供表级 CRUD 操作。
 
 | 表 | 结构体 | 主要字段 |
-|----|--------|----------|
-| `accounts` | `AccountInfo` | id, username, email, password_hash |
-| `audio_files` | `AudioFileInfo` | title, file_path, duration, sample_rate, cover_path, lyrics_path... |
-| `video_files` | `VideoFileInfo` | filename, file_path, resolution, frame_rate, codec_name... |
-| `settings` | 键值对 | key, value |
+|---|---|---|
+| `accounts` | `AccountInfo` | `id`、`username`、`email`、`password_hash` |
+| `audio_files` | `AudioFileInfo` | `title`、`file_path`、`duration`、`sample_rate`、`cover_path`、`lyrics_path`... |
+| `video_files` | `VideoFileInfo` | `filename`、`file_path`、`resolution`、`frame_rate`、`codec_name`... |
+| `settings` | 键值对 | `key`、`value` |
 
 **接口方法**
 
 | 分组 | 方法 | 返回 | 说明 |
-|------|------|------|------|
+|---|---|---|---|
 | 生命周期 | `init(const std::string& db_path)` | `bool` | 初始化数据库连接 |
 | | `close()` | `void` | 关闭数据库连接 |
 | Account | `insert_account(const AccountInfo& info)` | `bool` | 插入账户 |
@@ -620,16 +716,16 @@
 **辅助类型**
 
 | 类型 | 说明 |
-|------|------|
-| `HttpResponse` | HTTP 响应：status_code + body + headers |
+|---|---|
+| `HttpResponse` | HTTP 响应：`status_code` + `body` + `headers` |
 | `WsMessageType { TEXT, BINARY }` | WebSocket 消息类型 |
-| `WsMessage` | WebSocket 消息：type + data |
-| `WsCallback` | WebSocket 事件回调接口：on_connected / on_disconnected / on_message / on_error |
+| `WsMessage` | WebSocket 消息：`type` + `data` |
+| `WsCallback` | WebSocket 事件回调接口：`on_connected` / `on_disconnected` / `on_message` / `on_error` |
 
 **接口方法**
 
 | 分组 | 方法 | 返回 | 说明 |
-|------|------|------|------|
+|---|---|---|---|
 | 生命周期 | `init()` | `bool` | 初始化网络通信 |
 | | `shutdown()` | `void` | 关闭网络通信 |
 | HTTP | `http_get(const std::string& url, ...)` | `HttpResponse` | 发送 GET 请求 |
@@ -640,8 +736,10 @@
 
 ### 4.4 ConfigAdapter — JSON 配置文件读写
 
+配置文件 `load`/`save`/`save_as`，以及按字符串、整数、浮点数、布尔四类值存取键。
+
 | 分组 | 方法 | 返回 | 说明 |
-|------|------|------|------|
+|---|---|---|---|
 | 文件 | `load(const std::string& file_path)` | `bool` | 加载配置文件 |
 | | `save()` | `bool` | 保存到当前文件 |
 | | `save_as(const std::string& file_path)` | `bool` | 另存为指定路径 |
@@ -660,7 +758,7 @@
 基于 OpenSSL 实现 SHA-256 哈希和 AES-256-GCM 加解密。
 
 | 分组 | 方法 | 返回 | 说明 |
-|------|------|------|------|
+|---|---|---|---|
 | 密码 | `hash_password(const std::string& password)` | `HashResult` | SHA-256 + 随机 Salt 哈希 |
 | | `verify_password(const std::string& password, const std::string& hash, const std::string& salt)` | `bool` | 验证密码是否匹配 |
 | 文件 | `encrypt_file(const std::string& input, const std::string& output, const std::string& key)` | `bool` | AES-256-GCM 加密文件 |
@@ -671,7 +769,7 @@
 **辅助类型**
 
 | 类型 | 字段 | 说明 |
-|------|------|------|
+|---|---|---|
 | `HashResult` | `.hash` `.salt` | 密码哈希结果（哈希值 + 随机盐） |
 | `EncryptResult` | `.cipher_data` `.iv` `.tag` | AES 加密结果（密文 + IV + GCM 认证标签） |
 
@@ -679,12 +777,16 @@
 
 ## 5. Service 内部接口 — IServiceNetwork
 
-> 命名空间：`Prism::Service`
-> 头文件：`client/service/internal/IServiceNetwork.h`
-> 隔离 Service 层与具体网络实现，当前为默认桩实现，后续替换为真实网络模块。
+> **命名空间**：`Prism::Service`
+>
+> **头文件**：`client/service/internal/IServiceNetwork.h`
+>
+> **实现状态**：隔离 Service 层与具体网络实现，当前为默认桩实现，后续替换为真实网络模块。
+
+Service 层依赖的网络能力抽象接口：登录/登出、房间进出与连接状态查询。
 
 | 方法 | 返回 | 说明 |
-|------|------|------|
+|---|---|---|
 | `login(const char* username, const char* password, const char* server_url)` | `int` | 登录服务器 |
 | `logout()` | `int` | 登出 |
 | `join_room(const char* room_id)` | `int` | 加入房间 |
@@ -696,8 +798,10 @@
 
 ## 6. 接口索引
 
+按层级汇总：命名空间、接口数与头文件目录。
+
 | 层级 | 命名空间 | 接口数 | 头文件目录 |
-|------|----------|--------|------------|
+|---|---|---|---|
 | Service (C API) | `extern "C"` | **32** 个函数 + 6 个结构体 + 5 个枚举 | `client/service/include/` |
 | Service (内部) | `Prism::Service` | 1 个接口 + 1 个实现头 | `client/service/internal/` |
 | Business (AV Sync) | `Prism::Business` | 4 个接口 + 1 个工厂 + 1 个类型头 | `client/business/av_sync/include/` |
@@ -705,7 +809,7 @@
 | Engine | `Prism::Engine` | 2 个接口 + 4 个工厂 + 3 个结构体 | `client/engine/include/` |
 | Adapter | `Prism::Adapter` | 5 个接口（+ 5 个平台实现） | `client/adapter/include/` |
 
-> ⚠️ 本表旧版有三处计数错误，已按 `include/` 下的实际文件重数：
+> ⚠️ 本表旧版有四处计数错误，已按 `include/` 下的实际文件重数：
 > - Service (C API)：27 → **32**；
 > - Business (AV Sync)：写成「4 个接口 + 4 个工厂」，实际 `include/` 下是 4 个接口 + `SyncFactory.h` + `SyncTypes.h`；
 > - Business (Network)：写成「3 个接口 + 1 个观察者 + 3 个工厂」，实际 `include/` 下是 4 个接口（`ISignalingClient` / `IRoomManager` / `IAccountManager` / `INetworkObserver`）+ `NetworkFactory.h` + `NetworkTypes.h`（§3.2 正文内容本身是对的，错的只是本表这一行）；

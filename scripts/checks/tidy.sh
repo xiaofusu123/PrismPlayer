@@ -1,16 +1,8 @@
 #!/bin/sh
-# 静态检查入口（#100）：把 clang-tidy 的判定从 Git 钩子里抽出来，本地 pre-push 与 CI 跑同一份。
-#
-# 为什么抽：钩子只查「本次推送改了什么」，CI 要查「这个 PR 改了什么」—— 范围不同、判定必须相同。
-# 范围用与 scripts/checks/format.sh 同一套 helper（scripts/checks/lib.sh 的 prism_range_*），
-# 于是同一段代码范围内，钩子与 CI 得出同一个结论。
-#
-# 用法：sh scripts/checks/tidy.sh <编译数据库目录> <变更范围>
-#   <变更范围>：staged | ci | all | <rev> | <a>...<b>（见 scripts/checks/format.sh 的 usage）
-#   all        仓库里全部 tracked 的 C/C++ 文件（全仓扫描；钩子在找不到基线时走这条路）
-#   注意：clang-tidy 分析的是**工作区里的文件**，范围只用来挑「哪些文件/编译单元要查」。
-#
-# 退出码：0 = 通过（含「范围内没有 C/C++ 改动」）；1 = 有违规，或检查无法完成。
+# 静态检查入口（#100）：clang-tidy 的判定抽出来，本地 pre-push 与 CI 跑同一份。
+# 契约：范围走 lib.sh 的 prism_range_*，所以钩子与 CI 在同一段代码范围内结论相同。
+# 用法：sh scripts/checks/tidy.sh <编译数据库目录> <变更范围>（staged | ci | all | <rev> | <a>...<b>）。
+# 退出码：0 = 通过（含范围内无 C/C++ 改动）；1 = 有违规，或检查无法完成。
 
 set -u
 
@@ -177,16 +169,15 @@ while [ "${PRISM_ROUND}" -lt 3 ] && [ -s "${PRISM_TMP}/frontier" ]; do
     : > "${PRISM_TMP}/found"
     while IFS= read -r PRISM_F; do
         PRISM_BASE_NAME=$(basename -- "${PRISM_F}")
-        # 固定字符串匹配（只按基名，本项目无重名头文件）：不用正则，省掉转义，
-        # 也避开不同 sed 对 `\\&` 的处理差异。文件名经 xargs -0 传入，避免空格被拆词。
+        # 固定字符串匹配（只按基名，本项目无重名头文件）：免转义，也避开不同 sed 对 `\\&` 的处理差异；
+        # 文件名经 xargs -0 传入，避免空格被拆词。
         tr '\n' '\0' < "${PRISM_TMP}/all_c" \
             | xargs -0 -r grep -l -F -e "#include \"${PRISM_BASE_NAME}\"" -e "#include <${PRISM_BASE_NAME}>" \
                 2>/dev/null >> "${PRISM_TMP}/found"
     done < "${PRISM_TMP}/frontier"
     sort -u -o "${PRISM_TMP}/found" "${PRISM_TMP}/found"
 
-    # 本轮的 frontier 与刚找到的 includer 都算「走到过」：最后一轮找到的 includer
-    # 不会再作为下一轮 frontier，漏掉它就会漏掉跨 3 层头文件的编译单元。
+    # frontier 与刚找到的 includer 都算「走到过」：漏掉最后一轮找到的 includer，就会漏掉跨 3 层头文件的编译单元。
     cat "${PRISM_TMP}/frontier" >> "${PRISM_TMP}/walked"
     sort -u "${PRISM_TMP}/walked" > "${PRISM_TMP}/walked.sorted"
     comm -23 "${PRISM_TMP}/found" "${PRISM_TMP}/walked.sorted" > "${PRISM_TMP}/frontier.next"

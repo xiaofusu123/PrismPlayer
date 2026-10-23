@@ -14,7 +14,7 @@ namespace Prism::Business {
  *   DISABLE（单独播放模式）/ SYNC_ERROR（错误）
  */
 class IPlaybackStateMachine {
-public:
+  public:
     virtual ~IPlaybackStateMachine() = default;
 
     /**
@@ -28,19 +28,19 @@ public:
      * @brief 获取当前同步状态
      * @return SyncState 当前状态
      */
-    virtual SyncState get_state() const = 0;
+    [[nodiscard]] virtual SyncState get_state() const = 0;
 
     /**
      * @brief 当前状态是否允许播放
      * @return true 允许播放
      */
-    virtual bool can_play() const = 0;
+    [[nodiscard]] virtual bool can_play() const = 0;
 
     /**
      * @brief 当前状态是否允许跳转
      * @return true 允许跳转
      */
-    virtual bool can_seek() const = 0;
+    [[nodiscard]] virtual bool can_seek() const = 0;
 
     /**
      * @brief 重置状态机到 UNINIT

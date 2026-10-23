@@ -1,10 +1,8 @@
 #!/bin/sh
-# pre-commit：只查本次提交 staged 的内容（index，不是工作区）。
-#   ① 文件名不得是 CmakeLists.txt（#52；vendor/** 只豁免这一条，#39 决策 29）；
-#   ② staged 的 C/C++ 文件必须已经 clang-format 过。
-# 判定逻辑已抽成可复用入口 scripts/checks/format.sh（#97）：本文件只做与工具无关的准备再 exec 它，
-# 于是本地提交与 CI（format.sh ci）用的是同一份判定，退出码与报错文案也不会两处各说一套。
-# 不跑 clang-tidy（要编译数据库且慢，ADR 决策 3）。绕过只允许一次性格式批量整理，且须在 PR 里说明。
+# pre-commit 门禁（#52 / #97）：只查 index，不查工作区。
+# 文件名不得是 CmakeLists.txt（vendor/** 只豁免这一条）；staged 的 C/C++ 必须 clang-format 过。
+# 判定委托 scripts/checks/format.sh，与 CI 同源；不跑 clang-tidy（要编译数据库且慢，ADR 决策 3）。
+# 绕过只允许一次性格式批量整理，且须在 PR 里说明。
 
 set -u
 
@@ -18,7 +16,7 @@ PRISM_ROOT=$(prism_repo_root) || {
 }
 cd "${PRISM_ROOT}" || exit 1
 
-# 入口不在就硬失败：钩子只剩「调用入口」这一件事，调用不到就等于门禁失效，绝不静默放行。
+# 入口不在就硬失败：钩子只剩调用入口这一件事，静默放行等于门禁失效。
 PRISM_ENTRY="${PRISM_HOOK_DIR}/../scripts/checks/format.sh"
 if [ ! -f "${PRISM_ENTRY}" ]; then
     prism_error "找不到检查入口 ${PRISM_ENTRY}（拒绝提交，避免静默放行）。"

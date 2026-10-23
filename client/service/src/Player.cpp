@@ -51,7 +51,7 @@ class DefaultNetworkClient : public IServiceNetwork {
             *info = {};
         return PRISM_OK;
     }
-    PrismRoomState get_room_state() const override { return PRISM_ROOM_DISCONNECTED; }
+    [[nodiscard]] PrismRoomState get_room_state() const override { return PRISM_ROOM_DISCONNECTED; }
 };
 
 /* ========== PrismPlayerInternal 实现 ========== */
