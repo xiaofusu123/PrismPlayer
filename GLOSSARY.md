@@ -70,7 +70,7 @@
 | `ConfigAdapter`（接口） / `JSONConfigAdapter`（实现） | `SettingsAdapter`、`ConfigManager` | 同上 |
 | `NetworkAdapter`（接口） / `ASIONetworkAdapter`（实现） | `SocketAdapter`、`NetAdapter` | 同上 |
 
-> ⚠️ 说「适配器」时**指明是接口还是实现**：文档里列组件清单时用左边的接口名（这也是 `项目框架.md` 的做法，它没错），说具体实现时才用右边的名字。当前这些文件**都只有声明骨架**；`client/adapter/src/tmp.cpp`（0 字节占位）已于 2026-10-11 删除，`client-adapter` 目标不再生成。
+> ⚠️ 说「适配器」时**指明是接口还是实现**：文档里列组件清单时用左边的接口名（这也是 `项目框架.md` 的做法，它没错），说具体实现时才用右边的名字。`FileAdapter` → `WinFileAdapter` 与 `ConfigAdapter` → `JSONConfigAdapter` **已有实现**（分别在 `src/WinFileAdapter.cpp`、`src/JSONConfigAdapter.cpp`），`SQLiteDBAdapter` / `ASIONetworkAdapter` / `OpenSSLCryptoAdapter` **仍只有声明骨架**（后两者的 `// TODO` 保留在 `internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`）。`client-adapter` 目标现在会产出非空静态库。
 
 ## 版本、数值与标识
 
