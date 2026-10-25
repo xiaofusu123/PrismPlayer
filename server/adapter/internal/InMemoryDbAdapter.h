@@ -12,7 +12,7 @@ namespace Prism::Server::Adapter {
  * @class InMemoryDbAdapter
  * @brief 内存数据库实现
  */
-class InMemoryDbAdapter:public DBAdapter {
+class InMemoryDbAdapter : public DBAdapter {
   public:
     InMemoryDbAdapter() = default;
     ~InMemoryDbAdapter() override = default;
