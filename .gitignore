@@ -10,3 +10,4 @@ practice
 vendor/*/bin
 vendor/*/lib
 .vcpkg-cache
+task-current
