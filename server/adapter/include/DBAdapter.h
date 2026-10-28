@@ -57,11 +57,11 @@ class DBAdapter {
      */
     virtual void close() = 0;
 
-    /*
-    * @brief 检查数据库连接是否有效
+    /** 
+     * @brief 检查数据库连接是否有效
      * @return 有效返回 true
      */
-    virtual bool is_connected() const = 0;
+    virtual bool is_connected() = 0;
 
     /**
      * @brief 插入用户

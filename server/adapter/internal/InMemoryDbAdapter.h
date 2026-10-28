@@ -19,7 +19,7 @@ class InMemoryDbAdapter : public DBAdapter {
 
     bool connect() override;
     void close() override;
-    bool is_connected() const override;
+    bool is_connected() override;
 
     bool insert_user(const UserRecord& user) override;
     std::optional<UserRecord> query_user_by_username(const std::string& username) override;

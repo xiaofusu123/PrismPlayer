@@ -23,8 +23,8 @@ void InMemoryDbAdapter::close() {
     spdlog::info("InMemoryDbAdapter: closed (in-memory store cleared)");
 }
 
-bool InMemoryDbAdapter::is_connected() const{
-    std::lock_guard<std::mutex> lock(const int mutex_);
+bool InMemoryDbAdapter::is_connected() {
+    std::lock_guard<std::mutex> lock(mutex_);
     return true;
 }
 
