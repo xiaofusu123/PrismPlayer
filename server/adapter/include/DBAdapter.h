@@ -47,6 +47,23 @@ class DBAdapter {
     virtual ~DBAdapter() = default;
 
     /**
+     * @brief 建立数据库连接
+     * @return 成功返回 true
+     */
+    virtual bool connect() = 0;
+
+    /**
+     * @brief 关闭数据库连接
+     */
+    virtual void close() = 0;
+
+    /*
+    * @brief 检查数据库连接是否有效
+     * @return 有效返回 true
+     */
+    virtual bool is_connected() const = 0;
+
+    /**
      * @brief 插入用户
      * @param user 用户记录
      * @return 成功返回 true，用户名重复返回 false

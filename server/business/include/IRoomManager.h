@@ -8,13 +8,6 @@
 
 namespace Prism::Server::Business {
 
-struct RoomRecord {
-  std::string room_id;
-  std::string name;
-  int64_t owner_id;
-  int32_t max_members{0};
-};
-
 /**
  * @class IRoomManager
  * @brief 房间管理抽象接口
@@ -53,7 +46,7 @@ class IRoomManager {
      * @brief 列出全部房间
      * @return 房间列表
      */
-    virtual std::vector<RoomRecord> list_rooms() = 0;
+    virtual std::vector<Adapter::RoomRecord> list_rooms() = 0;
 };
 
 } // namespace Prism::Server::Business

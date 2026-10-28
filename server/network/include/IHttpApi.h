@@ -1,13 +1,14 @@
 #pragma once
 
 #include <cstdint>
+#include <stdint.h>
 #include <string>
 
 namespace Prism::Server::Network {
 
 /**
  * @class IHttpApi
- * @brief HTTP API 抽象接口（接口先行，本阶段不实现）
+ * @brief 服务端与客户端之间的 HTTP 连接（REST API：登录、房间列表等）
  *
  * 预留：后续用 asio 实现 REST 接口。本阶段不建实现、不接线、不参与构建。
  */
@@ -16,7 +17,7 @@ class IHttpApi {
     virtual ~IHttpApi() = default;
 
     /**
-     * @brief 启动 HTTP 服务
+     * @brief 启动 HTTP 服务，监听客户端连接
      * @param host 监听地址
      * @param port 监听端口
      * @return 成功返回 true
