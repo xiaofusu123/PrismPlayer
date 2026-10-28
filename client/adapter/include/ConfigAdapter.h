@@ -9,9 +9,13 @@ namespace Prism::Adapter {
 /**
  * @class ConfigAdapter
  * @brief JSON 配置文件读写抽象接口
+ *
+ * @note 键名支持 `.` 分隔的层级路径（如 `audio.sample_rate`）。
+ *       类型化读取按目标类型判定，类型不符返回 nullopt；
+ *       唯一例外是 get_double()，它接受 JSON 里写成整数的数值。
  */
 class ConfigAdapter {
-public:
+  public:
     virtual ~ConfigAdapter() = default;
 
     /**

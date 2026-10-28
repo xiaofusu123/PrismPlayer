@@ -10,24 +10,24 @@ namespace Prism::Adapter {
  * @brief 媒体文件元数据，音频/视频字段共存，非适用字段为零值
  */
 struct FileMetadata {
-    std::string file_path;               /**< 文件路径 */
-    uint64_t file_size{0};               /**< 文件大小（字节） */
-    std::string format;                  /**< 容器格式（MP4/MKV/MP3/FLAC 等） */
-    uint64_t duration{0};                /**< 总时长（ms） */
-    uint64_t bit_rate{0};                /**< 总比特率（bps） */
+    std::string file_path; /**< 文件路径 */
+    uint64_t file_size{0}; /**< 文件大小（字节） */
+    std::string format;    /**< 容器格式（MP4/MKV/MP3/FLAC 等） */
+    uint64_t duration{0};  /**< 总时长（ms） */
+    uint64_t bit_rate{0};  /**< 总比特率（bps） */
 
     /** 音频专属字段 */
-    uint32_t sample_rate{0};             /**< 采样率（Hz） */
-    uint32_t channels{0};                /**< 声道数（1/2/6/8） */
-    uint32_t bit_depth{0};               /**< 位深（16/24/32） */
-    std::string channel_layout;          /**< 声道布局（mono/stereo/5.1/7.1） */
+    uint32_t sample_rate{0};    /**< 采样率（Hz） */
+    uint32_t channels{0};       /**< 声道数（1/2/6/8） */
+    uint32_t bit_depth{0};      /**< 位深（16/24/32） */
+    std::string channel_layout; /**< 声道布局（mono/stereo/5.1/7.1） */
 
     /** 视频专属字段 */
-    uint32_t resolution_width{0};        /**< 分辨率宽度 */
-    uint32_t resolution_height{0};       /**< 分辨率高度 */
-    uint32_t color_depth{0};             /**< 色深（8/10 bit） */
-    double frame_rate{0.0};              /**< 帧率（fps） */
-    std::string codec_name;              /**< 编码器名称（H.264/H.265/AV1 等） */
+    uint32_t resolution_width{0};  /**< 分辨率宽度 */
+    uint32_t resolution_height{0}; /**< 分辨率高度 */
+    uint32_t color_depth{0};       /**< 色深（8/10 bit） */
+    double frame_rate{0.0};        /**< 帧率（fps） */
+    std::string codec_name;        /**< 编码器名称（H.264/H.265/AV1 等） */
 };
 
 /**
@@ -35,7 +35,7 @@ struct FileMetadata {
  * @brief 文件 I/O 与媒体元数据提取的抽象接口
  */
 class FileAdapter {
-public:
+  public:
     virtual ~FileAdapter() = default;
 
     /**
@@ -83,6 +83,10 @@ public:
     /**
      * @brief 获取媒体文件元数据
      * @return FileMetadata 元数据结构体
+     *
+     * @note 当前实现（WinFileAdapter）只能填出 file_path / file_size / format；
+     *       依赖解封装的字段（duration、bit_rate、采样率、分辨率、codec_name 等）
+     *       一律为零值，等 Engine 层的 FFmpeg Demuxer 接入后补齐。
      */
     virtual FileMetadata get_metadata() = 0;
 

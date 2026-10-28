@@ -631,7 +631,7 @@ AV Sync 与 Network 两个模块的接口。
 >
 > **构建产物**：静态库 (`client-adapter`)
 >
-> **实现状态**：🟡 **仅骨架** —— 5 个接口与 5 个平台实现（`WinFileAdapter` / `SQLiteDBAdapter` / `ASIONetworkAdapter` / `JSONConfigAdapter` / `OpenSSLCryptoAdapter`）都只有类声明；模块现在**已无任何 `.cpp`**（`src/tmp.cpp` 这个 0 字节占位已于 2026-10-11 删除，`client-adapter` 目标不再生成）。两处 `// TODO`：`internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`。
+> **实现状态**：🟡 **部分实现** —— `FileAdapter`（`WinFileAdapter`）与 `ConfigAdapter`（`JSONConfigAdapter`）已落地真实实现，`libclient-adapter.a` 不再是空归档；`DBAdapter` / `NetworkAdapter` / `CryptoAdapter` 三个接口及其实现仍只有类声明。两处 `// TODO` 原样保留：`internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`。
 >
 > ⚠️ 本节各接口的签名取自 `include/` 下的抽象接口；`internal/` 下的实现类与之一一对应，命名更具体（如 `DBAdapter` 的实现叫 `SQLiteDBAdapter`）。对照表见根目录 `GLOSSARY.md`。
 
@@ -674,6 +674,10 @@ AV Sync 与 Network 两个模块的接口。
 | `get_size()` | `uint64_t` | 获取文件大小（字节） |
 | `get_metadata()` | `FileMetadata` | 获取媒体文件元数据 |
 | `is_open()` | `bool` | 判断文件是否已打开 |
+
+> **`get_metadata()` 的当前实现边界**：只填 `file_path`（`weakly_canonical` 规范化后的路径）、`file_size`、`format`（扩展名去掉点、转大写）。`duration` / `bit_rate` / `sample_rate` / 分辨率 / `codec_name` 等必须解封装容器才能拿到，保持零值，等 Engine 层 FFmpeg Demuxer 接入后补齐。
+>
+> **`open()` 的语义**：路径先规范化；文件已存在则原样以二进制读写方式打开（**不清空**），不存在则新建空文件并记 info 日志。
 
 ### 4.2 DBAdapter — SQLite 数据库操作
 
@@ -737,6 +741,12 @@ AV Sync 与 Network 两个模块的接口。
 ### 4.4 ConfigAdapter — JSON 配置文件读写
 
 配置文件 `load`/`save`/`save_as`，以及按字符串、整数、浮点数、布尔四类值存取键。
+
+> **键名**：支持 `.` 分隔的层级路径（如 `audio.sample_rate`），`set_*` 会自动补齐缺失的中间对象。
+>
+> **类型化读取**：按目标类型判定，类型不符返回 `nullopt` 而不是强转；唯一例外是 `get_double()`，它接受 JSON 里写成整数的数值（`60` 视同 `60.0`）。
+>
+> **当前实现边界**：`save()` 要求先 `load()` 或 `save_as()` 过一次，否则返回 false；落盘用 4 空格缩进。
 
 | 分组 | 方法 | 返回 | 说明 |
 |---|---|---|---|

@@ -3,6 +3,7 @@ project(client-adapter)
 message(STATUS "${PROJECT_NAME} is building")
 
 find_package(spdlog REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
@@ -21,8 +22,11 @@ if(SRC)
     )
 
     target_link_libraries(${PROJECT_NAME}
-        PRIVATE
-            spdlog::spdlog_header_only
+    PUBLIC
+        nlohmann_json::nlohmann_json
+
+    PRIVATE
+        spdlog::spdlog_header_only
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")
