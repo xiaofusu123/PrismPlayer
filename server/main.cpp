@@ -10,6 +10,11 @@ int main() {
     auto db = Prism::Server::Adapter::create_db_adapter();
     auto crypto = Prism::Server::Adapter::create_crypto_adapter();
 
+    if (!db->connect()) {
+        spdlog::error("Prism-server: failed to connect to database");
+        return 1;
+    }
+
     auto server = Prism::Server::Network::create_signaling_server();
     auto notifier = server->notifier();
 
