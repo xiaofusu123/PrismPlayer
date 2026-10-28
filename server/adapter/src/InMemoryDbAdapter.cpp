@@ -4,6 +4,30 @@
 
 namespace Prism::Server::Adapter {
 
+bool InMemoryDbAdapter::connect() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    users_.clear();
+    rooms_.clear();
+    room_members_.clear();
+    next_user_id_ = 1;
+    spdlog::info("InMemoryDbAdapter: connected (in-memory store initialized)");
+    return true;
+}
+
+void InMemoryDbAdapter::close() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    users_.clear();
+    rooms_.clear();
+    room_members_.clear();
+    next_user_id_ = 1;
+    spdlog::info("InMemoryDbAdapter: closed (in-memory store cleared)");
+}
+
+bool InMemoryDbAdapter::is_connected() const{
+    std::lock_guard<std::mutex> lock(const int mutex_);
+    return true;
+}
+
 bool InMemoryDbAdapter::insert_user(const UserRecord& user) {
     std::lock_guard<std::mutex> lock(mutex_);
     for (const auto& entry : users_) {

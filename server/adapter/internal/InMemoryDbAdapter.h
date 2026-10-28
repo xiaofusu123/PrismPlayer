@@ -12,10 +12,14 @@ namespace Prism::Server::Adapter {
  * @class InMemoryDbAdapter
  * @brief 内存数据库实现
  */
-class InMemoryDbAdapter:public DBAdapter {
+class InMemoryDbAdapter : public DBAdapter {
   public:
     InMemoryDbAdapter() = default;
     ~InMemoryDbAdapter() override = default;
+
+    bool connect() override;
+    void close() override;
+    bool is_connected() const override;
 
     bool insert_user(const UserRecord& user) override;
     std::optional<UserRecord> query_user_by_username(const std::string& username) override;

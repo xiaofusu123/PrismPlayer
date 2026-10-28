@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -18,8 +20,7 @@ class IAuthService {
      * @param password 明文密码
      * @return 成功返回 true，用户名已存在返回 false
      */
-    virtual bool register_user(const std::string& username, 
-      const std::string& password) = 0;
+    virtual bool register_user(const std::string& username, const std::string& password) = 0;
 
     /**
      * @brief 登录
@@ -27,8 +28,8 @@ class IAuthService {
      * @param password 明文密码
      * @return 成功返回用户 ID，否则 nullopt
      */
-    virtual std::optional<std::int64_t> login(const std::string& username,
-      const std::string& password) = 0;
+    virtual std::optional<int64_t> login(const std::string& username,
+                                         const std::string& password) = 0;
 };
 
 } // namespace Prism::Server::Business
