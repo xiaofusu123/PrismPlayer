@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <stdint.h>
 #include <string>
+typedef unsigned short int uint16_t;
 
 namespace Prism::Server::Network {
 

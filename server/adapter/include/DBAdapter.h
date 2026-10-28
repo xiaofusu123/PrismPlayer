@@ -21,7 +21,6 @@ struct UserRecord {
  * @struct RoomRecord
  * @brief 房间记录
  */
-
 struct RoomRecord {
     std::string room_id;    /**< 房间 ID */
     std::string name;       /**< 房间名 */
@@ -57,7 +56,7 @@ class DBAdapter {
      */
     virtual void close() = 0;
 
-    /** 
+    /**
      * @brief 检查数据库连接是否有效
      * @return 有效返回 true
      */

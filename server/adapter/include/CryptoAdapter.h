@@ -8,7 +8,6 @@ namespace Prism::Server::Adapter {
  * @struct HashResult
  * @brief 密码哈希结果
  */
-
 struct HashResult {
     std::string hash; /**< 哈希值（十六进制） */
     std::string salt; /**< 随机盐（十六进制） */
