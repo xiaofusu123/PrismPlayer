@@ -3,6 +3,8 @@ project(Prism-server VERSION 0.0.1)
 message(STATUS "")
 message(STATUS "${PROJECT_NAME} is building, version is ${PROJECT_VERSION}")
 
+find_package(spdlog REQUIRED)
+
 add_subdirectory(adapter)
 add_subdirectory(network)
 add_subdirectory(business)
@@ -21,4 +23,5 @@ target_link_libraries(${PROJECT_NAME}
         $<$<TARGET_EXISTS:server-adapter>:server-adapter>
         $<$<TARGET_EXISTS:server-network>:server-network>
         $<$<TARGET_EXISTS:server-business>:server-business>
+        spdlog::spdlog_header_only
 )
