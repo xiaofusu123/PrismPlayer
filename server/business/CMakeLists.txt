@@ -2,6 +2,9 @@ project(server-business)
 
 message(STATUS "${PROJECT_NAME} is building")
 
+find_package(spdlog REQUIRED)
+find_package(nlohmann_json REQUIRED)
+
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
 if(SRC)
@@ -12,10 +15,19 @@ if(SRC)
     endforeach()
     message(STATUS "")
 
-    add_library(${PROJECT_NAME} ${SRC})
+    add_library(${PROJECT_NAME} STATIC ${SRC})
     target_include_directories(${PROJECT_NAME}
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/internal
+    )
+
+    target_link_libraries(${PROJECT_NAME}
+    PUBLIC
+        $<$<TARGET_EXISTS:server-adapter>:server-adapter>
+
+    PRIVATE
+        nlohmann_json
+        spdlog::spdlog_header_only
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")
