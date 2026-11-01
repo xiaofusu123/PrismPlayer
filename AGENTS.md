@@ -103,7 +103,7 @@ bash scripts/install-hooks.sh
 | `format` | **本次变更范围**内 C/C++ 文件的格式（判定对象等价于 staged 内容） | `sh scripts/checks/format.sh ci` |
 | `build-linux-debug` | Ubuntu 24.04 + `linux-clang-x64-Debug` 从零配置 + 构建 + 产物契约（体积阈值、≥32 个 `prism_player_*` 导出、不含 libc++） | `scripts/ci/preset-linux-debug.sh configure` / `build` / `verify` |
 | `tidy` | 本次变更范围内的 clang-tidy（与 `pre-push` 同一份判定） | `sh scripts/checks/tidy.sh build/Linux/debug ci` |
-| `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿 | `sh scripts/checks/ctest.sh build/Linux/debug` |
+| `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿（当前 `test/engine` 6 个用例） | `sh scripts/checks/ctest.sh build/Linux/debug` |
 
 上表六个 job（`hooks-self-test`、`checks-self-test`、`format`、`build-linux-debug`、`tidy`、`ctest`）**全部**是 `main` 规则集里的**必需状态检查**；`cache-key` 只是内部步骤，不是契约的一部分（改名、增删 job 都必须同步规则集，理由见下）。
 

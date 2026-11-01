@@ -17,7 +17,7 @@
 >
 > **构建产物**：动态库 (`client-service`)
 >
-> **实现状态**：✅ **完整实现**（**32** 个 C API + 6 个结构体 + 5 个枚举；`Player.cpp` 448 行，全仓最大实现文件）
+> **实现状态**：✅ **完整实现**（**32** 个 C API + 6 个结构体 + 5 个枚举；`Player.cpp` 436 行，全仓最大实现文件）
 >
 > ⚠️ 其中涉及网络/认证/房间的 API（§1.5 用户认证、§1.6 房间管理）当前由 `IServiceNetwork` 的**默认桩实现**兜底，返回成功但无真实网络行为 —— 见 §5。
 
@@ -300,7 +300,7 @@ sequenceDiagram
 >
 > **头文件**：`client/engine/include/`
 >
-> **实现状态**：🟡 **仅骨架** —— 抽象接口与工厂已定义，`src/` 下只有 4 个 `.cpp` 共 **75 行**（`AudioEngineWasapiShared.cpp` 29 / `AudioEngineWasapiSharedFactory.cpp` 7 / `VideoEngineVulkan.cpp` 32 / `VideoEngineVulkanFactory.cpp` 7）。**没有真实的 WASAPI 调用、没有 Vulkan 初始化/交换链/纹理上传，`src/` 下没有任何 FFmpeg 源文件。** 因此 §2.1 的同步结构体目前没有任何地方会真正返回它们。
+> **实现状态**：🟡 **仅骨架** —— 抽象接口与工厂已定义，`src/` 下只有 4 个 `.cpp` 共 **69 行**（`AudioEngineWasapiShared.cpp` 26 / `AudioEngineWasapiSharedFactory.cpp` 7 / `VideoEngineVulkan.cpp` 29 / `VideoEngineVulkanFactory.cpp` 7）。**没有真实的 WASAPI 调用、没有 Vulkan 初始化/交换链/纹理上传，`src/` 下没有任何 FFmpeg 源文件。** 因此 §2.1 的同步结构体目前没有任何地方会真正返回它们。
 >
 > **调用方**：Business 层
 
