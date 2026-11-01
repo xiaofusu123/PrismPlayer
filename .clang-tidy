@@ -3,6 +3,8 @@
 # 五条规则全部设为致命错误（后两条为 #85 新增）；加规则走「先加检查 → 先清零 → 再启用」，一次一条。
 # 本文件由 pre-push 钩子消费（pre-commit 不跑 clang-tidy，理由见 ADR 决策 3）。
 ---
+ExcludeHeaderFilterRegex: 'vcpkg_installed'
+
 Checks: >
   -*,
   readability-identifier-naming,

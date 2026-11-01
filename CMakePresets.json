@@ -95,5 +95,31 @@
       "name": "linux-clang-x64-Release",
       "configurePreset": "linux-clang-x64-Release"
     }
+  ],
+
+  "testPresets": [
+    {
+      "name": "windows-clang-x64-Debug",
+      "configurePreset": "windows-clang-x64-Debug",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "windows-clang-x64-Release",
+      "configurePreset": "windows-clang-x64-Release",
+      "output": { "outputOnFailure": true }
+    },
+
+    {
+      "name": "linux-clang-x64-Debug",
+      "configurePreset": "linux-clang-x64-Debug",
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error" }
+    },
+    {
+      "name": "linux-clang-x64-Release",
+      "configurePreset": "linux-clang-x64-Release",
+      "output": { "outputOnFailure": true }
+    }
   ]
 }
