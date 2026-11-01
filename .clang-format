@@ -11,4 +11,5 @@ PointerAlignment: Left
 BreakBeforeBraces: Attach
 NamespaceIndentation: None
 AllowShortFunctionsOnASingleLine: Inline
+IndentPPDirectives: BeforeHash
 ...
