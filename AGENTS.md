@@ -134,7 +134,7 @@ sh scripts/checks/ctest.sh build/Linux/debug
 
 ### Issue tracker
 
-Issues and specs live as GitHub issues on `xiaofusu123/Prism-Player`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues and specs live as GitHub issues on `xiaofusu123/Prism-Player`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`. Issue 的关闭由 owner（`@xiaofusu123`）审核：交付说明只写成评论并 @owner 等待确认，**不自行 `gh issue close`**。
 
 ### Triage labels
 
