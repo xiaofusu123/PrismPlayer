@@ -8,7 +8,7 @@ How the engineering skills should consume this repo's domain documentation when 
   <!-- This repo is single-context: there is no `GLOSSARY-MAP.md`, and no per-context `GLOSSARY.md`. All terminology lives in the one root file. -->
 - **`docs/adr/`**: read ADRs that touch the area you're about to work in. This repo is single-context, so there are no context-scoped `src/<context>/docs/adr/` directories.
 
-Also relevant to this repo specifically: **`docs/markdown/*.md` is the single source of truth for design documents** (see `docs/adr/0003-文档真源.md`). `docs/archive/` holds superseded Word documents — read them only for history, never as current fact.
+Also relevant to this repo specifically: **`docs/markdown/*.md` is the single source of truth for design documents** (see `docs/adr/0003-文档真源.md`). `docs/archive/` held two superseded Word documents; it was deleted on 2026-11-02 after their unique content had been merged into the markdown docs.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
