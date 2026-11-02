@@ -9,7 +9,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
-- **Close**: 关闭由仓库 owner（`@xiaofusu123`）审核后执行。交付说明写成评论（已完成 / 缺口 / 证据），**不要自行 `gh issue close`**；agent 或贡献者提交交付说明后 @owner 等待确认，由 owner 关闭。
+- **Close**: 交付说明先写成评论（完成了什么 / 缺口 / 证据）并 @owner。**PR 合并即视为 owner 审核通过**——合并后由 agent 执行 `gh issue close`（PR body 写 `Closes #<n>` 时随合并自动关闭），不再单独等一轮关闭确认。关闭时附上交付证据（命令 / 输出 / 文档链接）。
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
