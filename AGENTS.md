@@ -136,7 +136,7 @@ bash scripts/coverage.sh   # 覆盖率报告（报告型，不阻断；需要 ll
 
 ### Issue tracker
 
-Issues and specs live as GitHub issues on `xiaofusu123/Prism-Player`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`. Issue 的关闭由 owner（`@xiaofusu123`）审核：交付说明只写成评论并 @owner 等待确认，**不自行 `gh issue close`**。
+Issues and specs live as GitHub issues on `xiaofusu123/Prism-Player`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`. 交付说明写成评论（完成了什么 / 缺口 / 证据）并 @owner；**PR 合并即视为审核通过**，合并后由 agent 执行 `gh issue close`（PR body 写 `Closes #<n>` 时随合并自动关闭），**不再单独等一轮关闭确认**。
 
 ### Triage labels
 
