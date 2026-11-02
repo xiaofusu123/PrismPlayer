@@ -9,8 +9,6 @@ endif()
 find_package(FFMPEG REQUIRED)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
-# vcpkg 的包装文件是 SoundTouchConfig.cmake，所以包名必须精确写 SoundTouch；
-# 写成小写只在大小写不敏感的文件系统上碰巧命中，干净的 Linux 会 find_package 失败（#99）。
 find_package(SoundTouch REQUIRED)
 find_package(spdlog REQUIRED)
 

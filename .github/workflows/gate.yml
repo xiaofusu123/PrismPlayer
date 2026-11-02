@@ -1,5 +1,5 @@
 # 服务端门禁（spec #96）：GitHub Actions 上的「不可绕过层」。
-# 契约：job 名是 main 规则集里的必需检查，改名必须同步规则集，否则会静默失效（#96 决策 27 / #103）。
+# 契约：六个**必需**检查的 job 名是 main 规则集里的必需状态检查，改名/增删必须同步规则集，否则会静默失效（#96 决策 27 / #103）；非必需的附加 job（如报告型 coverage）不参与合并判定，登记在 AGENTS.md 即可。
 # 本地复现：sh test/hooks/run.sh、sh test/checks/run.sh、sh scripts/checks/format.sh ci。
 # 判定逻辑一律住在 scripts/checks/ 与 test/ 下，本地钩子与 CI 调用同一份（#96 决策 6/8）。
 
@@ -177,3 +177,30 @@ jobs:
         run: bash scripts/ci/preset-linux-debug.sh build
       - name: 跑测试（没有注册用例时明确 SKIP，判定在 scripts/checks/ctest.sh）
         run: sh scripts/checks/ctest.sh build/Linux/debug
+
+  # 覆盖率报告（#84）：一条命令（scripts/coverage.sh）构建 → ctest → llvm-cov，产出 coverage-report.txt。
+  # 只出数字、不设阈值、不阻断，所以**不是必需状态检查**（main 规则集只要求上面六个 job）。
+  # 测试一到位，这个 job 自动产出对应模块的数字；验收报告（#93）直接引用 artifact。
+  coverage:
+    needs: [cache-key, build-linux-debug]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 还原 vcpkg 二进制缓存
+        id: vcpkg-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            .vcpkg-cache
+            /home/runner/vcpkg/downloads
+          key: ${{ needs.cache-key.outputs.key }}
+      - name: 装前置（clang 23.1.x / cmake 4.x / Linux 系统开发包 / vcpkg / llvm-cov）
+        run: bash scripts/ci/setup-linux.sh llvm coverage cmake system vcpkg
+      - name: 构建、跑测试并生成覆盖率报告（scripts/coverage.sh）
+        run: bash scripts/coverage.sh
+      - name: 上传报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/Linux/coverage/coverage-report.txt
+          if-no-files-found: error
