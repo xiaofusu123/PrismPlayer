@@ -19,13 +19,11 @@ else()
 endif()
 message(STATUS "")
 
-# LLVM source-based coverage（#84）。默认关闭；只有 *-Coverage 预设会打开它。
 option(PRISM_COVERAGE "Instrument project targets for LLVM source-based coverage" OFF)
 if(PRISM_COVERAGE)
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
     add_link_options(-fprofile-instr-generate)
-    # MinGW 的 GNU ld 会把覆盖率的 .lcovmap / .lcovfun 段放到镜像基址以下，
-    # 链接"成功"但产出的 exe 无法启动；lld 没有这个问题（随 mingw-w64-x86_64-llvm-tools 安装）。
+
     if(WIN32)
         add_link_options(-fuse-ld=lld)
     endif()
