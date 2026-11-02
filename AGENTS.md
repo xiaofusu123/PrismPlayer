@@ -20,8 +20,10 @@ bash scripts/verify-build.sh
 
 | 平台 | 工具链 | 依赖管理器 |
 |------|--------|-----------|
-| Windows | MSYS2 **mingw64** 环境的 clang / clang++ 23.1.3、ninja 1.13.2、GCC 16.2.0（vcpkg 用它编译依赖）；cmake 用独立安装的 4.3.2（`D:\Program\App\CMake\bin\cmake.exe`） | vcpkg checkout（`D:\Program\App\Vcpkg\vcpkg`） |
-| WSL / Linux | clang / clang++ / clang-format / clang-tidy 23.1.2（Ubuntu 包）、cmake 4.4.4、ninja 1.11.1 | vcpkg checkout（Linux 可执行文件，`$HOME/vcpkg`） |
+| Windows | MSYS2 **mingw64** 环境的 clang / clang++ 23.1.x、ninja 1.13.x、GCC 16.2.x（vcpkg 用它编译依赖）；cmake 用独立安装的 4.4.x（`D:\Program\App\CMake\bin\cmake.exe`） | vcpkg checkout（`D:\Program\App\Vcpkg\vcpkg`） |
+| WSL / Linux | clang / clang++ / clang-format / clang-tidy 23.1.x（Ubuntu 包）、cmake 4.x、ninja 1.11.x | vcpkg checkout（Linux 可执行文件，`$HOME/vcpkg`） |
+
+> 版本一律写到次版本并以 `x` 结尾（补丁位随安装更新；本机 2026-11-02 实测 clang 23.1.4、cmake 4.4.4、ninja 1.13.2、Flutter 3.44.1，见 `docs/markdown/项目计划书.md` §3）。门禁只比对前缀 `23.1`。
 
 Windows 侧**必须用 mingw64 的 clang**，不能用已卸载的 clang64：vcpkg 的 `x64-mingw-dynamic` 依赖由同环境 GCC / libstdc++ 编译，clang64 的 clang 默认 libc++，跨标准库会让 `fmt` / `spdlog` 符号解析成两套 ABI，`libclient-service.dll` 链接失败（完整报错见 `docs/markdown/项目框架.md` 7.1）。
 
@@ -38,7 +40,7 @@ vcpkg baseline（`vcpkg-configuration.json` 的 `default-registry`）固定为 `
 
 ### 本阶段「可复现」的边界
 
-到此为止：**同一工具链 + 同一 vcpkg baseline + 同一预设名 ⇒ 同一组产物**（4 个真实目标 `client-engine`、`client-av_sync`、`client-service`、`Prism-server`），并由 `scripts/verify-build.*` 断言存在与体积。
+到此为止：**同一工具链 + 同一 vcpkg baseline + 同一预设名 ⇒ 同一组产物**（2026-11-02 实测 Debug 下共 9 个链接目标：`client-engine`、`client-service`、`client-adapter`、`client-av_sync`、`server-adapter`、`server-business`、`server-network`、`Prism-server`，以及仅 Debug 的 `test-engine`）；其中 4 个业务产物 `client-engine`、`client-av_sync`、`client-service`、`Prism-server` 由 `scripts/verify-build.*` 断言存在与体积。
 
 明确**不**保证：跨机器逐字节一致（路径、时间戳、缓存命中都会改变二进制）；容器化 / 隔离环境；`.vcpkg-cache`（仓库内、已 gitignore）在别的机器上可复用。
 
@@ -124,11 +126,15 @@ sh scripts/checks/ctest.sh build/Linux/debug
 
 **依赖与缓存**：冷启动要在干净 runner 上从源码编译 ffmpeg / glfw3 / vulkan 等依赖（十几分钟量级），命中 vcpkg 二进制缓存后落到几分钟量级。缓存键 = vcpkg baseline + `vcpkg.json` 内容哈希 + triplet + runner 镜像 + clang 前缀，在 `cache-key` job 里只算一次并打进日志；**未命中不是故障**，而是「有东西变了」—— 把日志里那行键与上一次绿灯的逐段比对就知道是哪一个。冷热实测耗时、缓存路径与「CI 变慢通常意味着什么」见 `docs/adr/0006-门禁第二阶段CI.md`。
 
+### Git 工作流（分支命名与合并）
+
+每票一分支、base 永远是 `main`；分支命名、PR 与合并的完整路径（本地钩子 → 六个 CI 必需检查 → 1 条 review / `--admin` → merge commit → 收尾）见 `docs/markdown/代码规范.md` §8。唯一允许的绕过是一次性批量格式整理的 `--no-verify`，且必须在 PR 描述里说明。
+
 ## Agent skills
 
 ### Issue tracker
 
-Issues and specs live as GitHub issues on `xiaofusu123/Prism-Player`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues and specs live as GitHub issues on `xiaofusu123/Prism-Player`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`. Issue 的关闭由 owner（`@xiaofusu123`）审核：交付说明只写成评论并 @owner 等待确认，**不自行 `gh issue close`**。
 
 ### Triage labels
 

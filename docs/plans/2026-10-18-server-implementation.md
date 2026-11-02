@@ -8,7 +8,7 @@
 
 **Tech Stack:** C++17、CMake + Ninja、ixwebsocket（WebSocket）、OpenSSL（SHA-256）、nlohmann-json、spdlog。
 
-**Spec:** `docs/superpowers/specs/2026-10-18-server-implementation-design.md`
+**Spec:** `docs/specs/2026-10-18-server-implementation-design.md`
 
 ---
 
