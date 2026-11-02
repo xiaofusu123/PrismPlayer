@@ -20,8 +20,8 @@ bash scripts/verify-build.sh
 
 | 平台 | 工具链 | 依赖管理器 |
 |------|--------|-----------|
-| Windows | MSYS2 **mingw64** 环境的 clang / clang++ 23.1.x、ninja 1.13.x、GCC 16.2.x（vcpkg 用它编译依赖）；cmake 用独立安装的 4.4.x（`D:\Program\App\CMake\bin\cmake.exe`） | vcpkg checkout（`D:\Program\App\Vcpkg\vcpkg`） |
-| WSL / Linux | clang / clang++ / clang-format / clang-tidy 23.1.x（Ubuntu 包）、cmake 4.x、ninja 1.11.x | vcpkg checkout（Linux 可执行文件，`$HOME/vcpkg`） |
+| Windows | MSYS2 **mingw64** 环境的 clang / clang++ 23.1.x、ninja 1.13.x、GCC 16.2.x（vcpkg 用它编译依赖）；cmake 用独立安装的 4.4.x（`D:\Program\App\CMake\bin\cmake.exe`）；覆盖率另需 `mingw-w64-x86_64-llvm-tools`（`llvm-cov` / `llvm-profdata` / `lld`）与 `mingw-w64-x86_64-compiler-rt`（profile 运行时） | vcpkg checkout（`D:\Program\App\Vcpkg\vcpkg`） |
+| WSL / Linux | clang / clang++ / clang-format / clang-tidy 23.1.x（Ubuntu 包）、cmake 4.x、ninja 1.11.x；覆盖率另需 `llvm-23`（`llvm-cov` / `llvm-profdata`） | vcpkg checkout（Linux 可执行文件，`$HOME/vcpkg`） |
 
 > 版本一律写到次版本并以 `x` 结尾（补丁位随安装更新；本机 2026-11-02 实测 clang 23.1.4、cmake 4.4.4、ninja 1.13.2、Flutter 3.44.1，见 `docs/markdown/项目计划书.md` §3）。门禁只比对前缀 `23.1`。
 
@@ -106,8 +106,9 @@ bash scripts/install-hooks.sh
 | `build-linux-debug` | Ubuntu 24.04 + `linux-clang-x64-Debug` 从零配置 + 构建 + 产物契约（体积阈值、≥32 个 `prism_player_*` 导出、不含 libc++） | `scripts/ci/preset-linux-debug.sh configure` / `build` / `verify` |
 | `tidy` | 本次变更范围内的 clang-tidy（与 `pre-push` 同一份判定） | `sh scripts/checks/tidy.sh build/Linux/debug ci` |
 | `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿（当前 `test/engine` 6 个用例） | `sh scripts/checks/ctest.sh build/Linux/debug` |
+| `coverage` | LLVM source-based 覆盖率报告（只出数字，不设阈值、不阻断；#84） | `bash scripts/coverage.sh` |
 
-上表六个 job（`hooks-self-test`、`checks-self-test`、`format`、`build-linux-debug`、`tidy`、`ctest`）**全部**是 `main` 规则集里的**必需状态检查**；`cache-key` 只是内部步骤，不是契约的一部分（改名、增删 job 都必须同步规则集，理由见下）。
+上表六个 job（`hooks-self-test`、`checks-self-test`、`format`、`build-linux-debug`、`tidy`、`ctest`）**全部**是 `main` 规则集里的**必需状态检查**；`coverage` 是表中的第七行，**只上传报告、不是必需检查**（原因：batch ① 的 AV Sync 还没有测试、数字没有代表性，见 `docs/adr/0002-代码门禁.md` 决策 7）；`cache-key` 只是内部步骤，不是契约的一部分。**必需检查的改名 / 增删必须同步规则集**；非必需的附加 job 不参与合并判定，不受这条约束，但新增时要登记进本表。
 
 本地复现同一个结论（WSL / Linux，仓库根）：
 
@@ -118,11 +119,12 @@ bash scripts/ci/preset-linux-debug.sh verify
 sh scripts/checks/format.sh ci
 sh scripts/checks/tidy.sh build/Linux/debug ci
 sh scripts/checks/ctest.sh build/Linux/debug
+bash scripts/coverage.sh   # 覆盖率报告（报告型，不阻断；需要 llvm-23）
 ```
 
 **CI 只跑 Linux Debug**：Windows 与 Release 由本机钩子覆盖（Server 的目标平台就是 Ubuntu，CI 对它最有说服力）。workflow 把 `CLANG_ROOT` 设成 `/usr/lib/llvm-23/bin`、`VCPKG_ROOT` 设成 `/home/runner/vcpkg`；工具版本前缀仍然必须是 `23.1`，不符即失败退出（判定复用 `scripts/checks/lib.sh`，与本机同一份）。
 
-**job 名是契约**：`main` 的规则集（id `15828446`）把这些 job 名设成**必需状态检查**，所以**改名必须同步规则集** —— 否则必需检查会静默失效（GitHub 不会因为「一个从没出现过的检查」而拦住谁，它只会一直等下去）。实测（#103）：必需检查会让「有红检查的 PR」用普通方式合不动，报 `the base branch policy prohibits the merge`；同时本仓库的规则集还要求 1 条 review，单人仓库只能自审，所以 `--admin` 仍能合并 —— 但每一次绕过都在 PR 历史上留下记录（见 `docs/adr/0006-门禁第二阶段CI.md` 决策 6）。
+**job 名是契约**：`main` 的规则集（id `15828446`）把六个**必需**检查的 job 名设成必需状态检查，所以**改名必须同步规则集** —— 否则必需检查会静默失效（GitHub 不会因为「一个从没出现过的检查」而拦住谁，它只会一直等下去）。实测（#103）：必需检查会让「有红检查的 PR」用普通方式合不动，报 `the base branch policy prohibits the merge`；同时本仓库的规则集还要求 1 条 review，单人仓库只能自审，所以 `--admin` 仍能合并 —— 但每一次绕过都在 PR 历史上留下记录（见 `docs/adr/0006-门禁第二阶段CI.md` 决策 6）。
 
 **依赖与缓存**：冷启动要在干净 runner 上从源码编译 ffmpeg / glfw3 / vulkan 等依赖（十几分钟量级），命中 vcpkg 二进制缓存后落到几分钟量级。缓存键 = vcpkg baseline + `vcpkg.json` 内容哈希 + triplet + runner 镜像 + clang 前缀，在 `cache-key` job 里只算一次并打进日志；**未命中不是故障**，而是「有东西变了」—— 把日志里那行键与上一次绿灯的逐段比对就知道是哪一个。冷热实测耗时、缓存路径与「CI 变慢通常意味着什么」见 `docs/adr/0006-门禁第二阶段CI.md`。
 
