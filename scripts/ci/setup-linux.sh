@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Linux CI 前置（spec #96 决策 12/13/15）：把干净的 ubuntu-24.04 runner 配成与成员本机同源的工具链。
 # 契约：版本判定复用门禁自己的 prism_require_tool（scripts/checks/lib.sh），CI 与本机只有一份实现。
-# 用法：[组件...] 取 llvm cmake system vcpkg（默认 llvm）；--clang-prefix / --vcpkg-baseline 只打印。
+# 用法：[组件...] 取 llvm coverage cmake system vcpkg（默认 llvm）；--clang-prefix / --vcpkg-baseline 只打印。
 # 退出码：0 成功（已装则跳过）；非 0 表示某一步失败，绝不静默降级。
 
 set -euo pipefail
@@ -37,13 +37,7 @@ install_llvm() {
     fi
 
     say "llvm：从 apt.llvm.org 的 noble-${LLVM_MAJOR} 仓安装 clang / clang-format / clang-tidy ..."
-    sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg
-    curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
-        | sudo gpg --dearmor --yes -o "${LLVM_KEYRING}"
-    printf 'deb [signed-by=%s] https://apt.llvm.org/noble/ llvm-toolchain-noble-%s main\n' \
-        "${LLVM_KEYRING}" "${LLVM_MAJOR}" \
-        | sudo tee "/etc/apt/sources.list.d/llvm-${LLVM_MAJOR}.list" > /dev/null
-    sudo apt-get update
+    ensure_llvm_repo
     sudo apt-get install -y --no-install-recommends \
         "clang-${LLVM_MAJOR}" \
         "clang-format-${LLVM_MAJOR}" \
@@ -51,6 +45,31 @@ install_llvm() {
         "clang-tools-${LLVM_MAJOR}" \
         "lld-${LLVM_MAJOR}" \
         "libclang-rt-${LLVM_MAJOR}-dev"
+}
+
+# apt.llvm.org 的软件源：install_llvm 与 install_coverage_tools 共用，避免 coverage 单独调用时找不到包。
+ensure_llvm_repo() {
+    if [ -f "/etc/apt/sources.list.d/llvm-${LLVM_MAJOR}.list" ]; then
+        return 0
+    fi
+    sudo apt-get install -y --no-install-recommends ca-certificates curl gnupg
+    curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+        | sudo gpg --dearmor --yes -o "${LLVM_KEYRING}"
+    printf 'deb [signed-by=%s] https://apt.llvm.org/noble/ llvm-toolchain-noble-%s main\n' \
+        "${LLVM_KEYRING}" "${LLVM_MAJOR}" \
+        | sudo tee "/etc/apt/sources.list.d/llvm-${LLVM_MAJOR}.list" > /dev/null
+    sudo apt-get update
+}
+
+# 覆盖率报告只需要 llvm-cov / llvm-profdata（#84）。单独一个组件，避免给其他 job 多装一份 llvm。
+install_coverage_tools() {
+    if [ -x "${LLVM_BIN}/llvm-cov" ] && [ -x "${LLVM_BIN}/llvm-profdata" ]; then
+        say "coverage：${LLVM_BIN}/llvm-cov 已就绪，跳过安装"
+        return 0
+    fi
+    say "coverage：从 apt.llvm.org 的 noble-${LLVM_MAJOR} 仓安装 llvm-${LLVM_MAJOR}（提供 llvm-cov / llvm-profdata）..."
+    ensure_llvm_repo
+    sudo apt-get install -y --no-install-recommends "llvm-${LLVM_MAJOR}"
 }
 
 # 预设（CMakePresets.json 的 linux-base）把编译器写成裸 `clang` / `clang++`，所以 PATH 上第一个 clang 就是构建用的。
@@ -194,10 +213,11 @@ main() {
     for component in "${components[@]}"; do
         case "${component}" in
             llvm) install_llvm ;;
+            coverage) install_coverage_tools ;;
             cmake) install_cmake ;;
             system) install_system_deps ;;
             vcpkg) install_vcpkg ;;
-            *) die "未知组件 '${component}'（可选：llvm cmake system vcpkg）" ;;
+            *) die "未知组件 '${component}'（可选：llvm coverage cmake system vcpkg）" ;;
         esac
     done
 

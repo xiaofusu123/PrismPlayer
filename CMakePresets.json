@@ -56,6 +56,16 @@
         "VCPKG_MANIFEST_FEATURES": "client;server"
       }
     },
+    {
+      "name": "windows-clang-x64-Coverage",
+      "binaryDir": "${sourceDir}/build/Windows/coverage",
+      "inherits": "windows-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_MANIFEST_FEATURES": "client;server;test",
+        "PRISM_COVERAGE": "ON"
+      }
+    },
 
     {
       "name": "linux-clang-x64-Debug",
@@ -74,6 +84,16 @@
         "CMAKE_BUILD_TYPE": "Release",
         "VCPKG_MANIFEST_FEATURES": "client;server"
       }
+    },
+    {
+      "name": "linux-clang-x64-Coverage",
+      "binaryDir": "${sourceDir}/build/Linux/coverage",
+      "inherits": "linux-base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "VCPKG_MANIFEST_FEATURES": "client;server;test",
+        "PRISM_COVERAGE": "ON"
+      }
     }
   ],
 
@@ -86,6 +106,10 @@
       "name": "windows-clang-x64-Release",
       "configurePreset": "windows-clang-x64-Release"
     },
+    {
+      "name": "windows-clang-x64-Coverage",
+      "configurePreset": "windows-clang-x64-Coverage"
+    },
 
     {
       "name": "linux-clang-x64-Debug",
@@ -94,6 +118,10 @@
     {
       "name": "linux-clang-x64-Release",
       "configurePreset": "linux-clang-x64-Release"
+    },
+    {
+      "name": "linux-clang-x64-Coverage",
+      "configurePreset": "linux-clang-x64-Coverage"
     }
   ],
 
@@ -109,6 +137,15 @@
       "configurePreset": "windows-clang-x64-Release",
       "output": { "outputOnFailure": true }
     },
+    {
+      "name": "windows-clang-x64-Coverage",
+      "configurePreset": "windows-clang-x64-Coverage",
+      "environment": {
+        "LLVM_PROFILE_FILE": "${sourceDir}/build/Windows/coverage/coverage-data/test-%p-%m.profraw"
+      },
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error" }
+    },
 
     {
       "name": "linux-clang-x64-Debug",
@@ -120,6 +157,15 @@
       "name": "linux-clang-x64-Release",
       "configurePreset": "linux-clang-x64-Release",
       "output": { "outputOnFailure": true }
+    },
+    {
+      "name": "linux-clang-x64-Coverage",
+      "configurePreset": "linux-clang-x64-Coverage",
+      "environment": {
+        "LLVM_PROFILE_FILE": "${sourceDir}/build/Linux/coverage/coverage-data/test-%p-%m.profraw"
+      },
+      "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error" }
     }
   ]
 }
