@@ -20,8 +20,10 @@ bash scripts/verify-build.sh
 
 | 平台 | 工具链 | 依赖管理器 |
 |------|--------|-----------|
-| Windows | MSYS2 **mingw64** 环境的 clang / clang++ 23.1.3、ninja 1.13.2、GCC 16.2.0（vcpkg 用它编译依赖）；cmake 用独立安装的 4.3.2（`D:\Program\App\CMake\bin\cmake.exe`） | vcpkg checkout（`D:\Program\App\Vcpkg\vcpkg`） |
-| WSL / Linux | clang / clang++ / clang-format / clang-tidy 23.1.2（Ubuntu 包）、cmake 4.4.4、ninja 1.11.1 | vcpkg checkout（Linux 可执行文件，`$HOME/vcpkg`） |
+| Windows | MSYS2 **mingw64** 环境的 clang / clang++ 23.1.x、ninja 1.13.x、GCC 16.2.x（vcpkg 用它编译依赖）；cmake 用独立安装的 4.4.x（`D:\Program\App\CMake\bin\cmake.exe`） | vcpkg checkout（`D:\Program\App\Vcpkg\vcpkg`） |
+| WSL / Linux | clang / clang++ / clang-format / clang-tidy 23.1.x（Ubuntu 包）、cmake 4.x、ninja 1.11.x | vcpkg checkout（Linux 可执行文件，`$HOME/vcpkg`） |
+
+> 版本一律写到次版本并以 `x` 结尾（补丁位随安装更新；本机 2026-11-02 实测 clang 23.1.4、cmake 4.4.4、ninja 1.13.2、Flutter 3.44.1，见 `docs/markdown/项目计划书.md` §3）。门禁只比对前缀 `23.1`。
 
 Windows 侧**必须用 mingw64 的 clang**，不能用已卸载的 clang64：vcpkg 的 `x64-mingw-dynamic` 依赖由同环境 GCC / libstdc++ 编译，clang64 的 clang 默认 libc++，跨标准库会让 `fmt` / `spdlog` 符号解析成两套 ABI，`libclient-service.dll` 链接失败（完整报错见 `docs/markdown/项目框架.md` 7.1）。
 
@@ -123,6 +125,10 @@ sh scripts/checks/ctest.sh build/Linux/debug
 **job 名是契约**：`main` 的规则集（id `15828446`）把这些 job 名设成**必需状态检查**，所以**改名必须同步规则集** —— 否则必需检查会静默失效（GitHub 不会因为「一个从没出现过的检查」而拦住谁，它只会一直等下去）。实测（#103）：必需检查会让「有红检查的 PR」用普通方式合不动，报 `the base branch policy prohibits the merge`；同时本仓库的规则集还要求 1 条 review，单人仓库只能自审，所以 `--admin` 仍能合并 —— 但每一次绕过都在 PR 历史上留下记录（见 `docs/adr/0006-门禁第二阶段CI.md` 决策 6）。
 
 **依赖与缓存**：冷启动要在干净 runner 上从源码编译 ffmpeg / glfw3 / vulkan 等依赖（十几分钟量级），命中 vcpkg 二进制缓存后落到几分钟量级。缓存键 = vcpkg baseline + `vcpkg.json` 内容哈希 + triplet + runner 镜像 + clang 前缀，在 `cache-key` job 里只算一次并打进日志；**未命中不是故障**，而是「有东西变了」—— 把日志里那行键与上一次绿灯的逐段比对就知道是哪一个。冷热实测耗时、缓存路径与「CI 变慢通常意味着什么」见 `docs/adr/0006-门禁第二阶段CI.md`。
+
+### Git 工作流（分支命名与合并）
+
+每票一分支、base 永远是 `main`；分支命名、PR 与合并的完整路径（本地钩子 → 六个 CI 必需检查 → 1 条 review / `--admin` → merge commit → 收尾）见 `docs/markdown/代码规范.md` §8。唯一允许的绕过是一次性批量格式整理的 `--no-verify`，且必须在 PR 描述里说明。
 
 ## Agent skills
 
