@@ -150,7 +150,7 @@ grep -o '"file"[[:space:]]*:[[:space:]]*"[^"]*"' "${PRISM_DB}" \
 
 if [ ! -s "${PRISM_TMP}/db_sources" ]; then
     prism_error "编译数据库里解析不出任何源文件条目：${PRISM_DB}"
-    prism_error "处理：删掉构建目录重新配置（scripts/build.ps1 1 --clean / scripts/build.sh 1 --clean）后重试。"
+    prism_error "处理：删掉构建目录重新配置（scripts/build/build.ps1 1 --clean / scripts/build/build.sh 1 --clean）后重试。"
     exit 1
 fi
 
@@ -260,7 +260,7 @@ if grep -q -e "Error while trying to load a compilation database" \
     prism_blank
     prism_error "clang-tidy 没能加载编译数据库，结论不可信（这种失败以退出码 0 结束，必须显式拦）。"
     prism_error "数据库：${PRISM_DB}"
-    prism_error "处理：删掉构建目录重新配置（scripts/build.ps1 1 --clean / scripts/build.sh 1 --clean）后再跑一次。"
+    prism_error "处理：删掉构建目录重新配置（scripts/build/build.ps1 1 --clean / scripts/build/build.sh 1 --clean）后再跑一次。"
     exit 1
 fi
 

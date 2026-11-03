@@ -2,7 +2,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$PROJECT_ROOT = Split-Path -Parent $PSScriptRoot
+$PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 if ($IsWindows -or $env:OS -eq "Windows_NT") {
     $platform = "windows"

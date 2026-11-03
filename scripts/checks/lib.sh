@@ -87,7 +87,7 @@ prism_require_tool() {
     return 0
 }
 
-# 构建前置条件（#70 AC：给可读提示而不是一堆 CMake 输出）。口径同 scripts/build.ps1|build.sh。
+# 构建前置条件（#70 AC：给可读提示而不是一堆 CMake 输出）。与 scripts/build/ 下的构建脚本同一口径。
 # $1 = windows|linux，$2 = 仓库根
 prism_check_build_prerequisites() {
     _prism_pre_platform=$1

@@ -5,7 +5,7 @@
 # 报告写到 build/<Platform>/coverage/coverage-report.txt，同时打印到终端。
 #
 # 用法：
-#   pwsh -File scripts/coverage.ps1
+#   pwsh -File scripts/build/coverage.ps1
 #
 # 口径：统计的是项目自己的 C/C++ 源码；test/、vendor/、vcpkg_installed/、build/
 # 全部排除（正则见下方 $IgnoreRegex）。默认构建并运行当前注册的全部测试。
@@ -13,13 +13,13 @@
 
 $ErrorActionPreference = "Stop"
 
-$PROJECT_ROOT = Split-Path -Parent $PSScriptRoot
+$PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $PROJECT_ROOT
 
 $PREREQUISITE_DOC = "docs/markdown/项目框架.md 7.1（环境与依赖基线）"
 
 if (-not ($IsWindows -or $env:OS -eq "Windows_NT")) {
-    Write-Host "错误：coverage.ps1 只覆盖 Windows；WSL / Linux 请用 bash scripts/coverage.sh。" -ForegroundColor Red
+    Write-Host "错误：coverage.ps1 只覆盖 Windows；WSL / Linux 请用 bash scripts/build/coverage.sh。" -ForegroundColor Red
     exit 1
 }
 
@@ -73,7 +73,7 @@ function Resolve-LlvmTool([string]$Name) {
     return $null
 }
 
-# ---- 前置条件（与 scripts/build.ps1 同一口径）----
+# ---- 前置条件（与 scripts/build/build.ps1 同一口径）----
 
 $missingTools = @()
 foreach ($tool in @("clang.exe", "clang++.exe", "ninja.exe")) {
