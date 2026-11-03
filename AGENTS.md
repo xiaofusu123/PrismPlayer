@@ -101,7 +101,7 @@ bash scripts/hooks/install-hooks.sh
 | job | 查什么 | 判定入口 |
 |-----|--------|---------|
 | `hooks-self-test` | 钩子自身在干净机器上成立 | `sh scripts/tests/hooks.sh` |
-| `checks-self-test` | 检查入口的 CLI 契约与范围语义 | `sh scripts/tests/checks.sh` |
+| `checks-self-test` | 检查入口的 CLI 契约与范围语义；C17 / AsyncAPI / OpenAPI 契约检查 | `sh scripts/tests/checks.sh`、`sh scripts/checks/contracts.sh` |
 | `format` | **本次变更范围**内 C/C++ 文件的格式（判定对象等价于 staged 内容） | `sh scripts/checks/format.sh ci` |
 | `build-linux-debug` | Ubuntu 24.04 + `linux-clang-x64-Debug` 从零配置 + 构建 + 产物契约（体积阈值、≥32 个 `prism_player_*` 导出、不含 libc++） | `scripts/ci/preset-linux-debug.sh configure` / `build` / `verify` |
 | `tidy` | 本次变更范围内的 clang-tidy（与 `pre-push` 同一份判定） | `sh scripts/checks/tidy.sh build/Linux/debug ci` |
@@ -119,6 +119,7 @@ bash scripts/ci/preset-linux-debug.sh verify
 sh scripts/checks/format.sh ci
 sh scripts/checks/tidy.sh build/Linux/debug ci
 sh scripts/checks/ctest.sh build/Linux/debug
+sh scripts/checks/contracts.sh   # C17 / AsyncAPI / OpenAPI 契约（无构建也可跑）
 bash scripts/build/coverage.sh   # 覆盖率报告（报告型，不阻断；需要 llvm-23）
 ```
 
@@ -131,6 +132,14 @@ bash scripts/build/coverage.sh   # 覆盖率报告（报告型，不阻断；需
 ### Git 工作流（分支命名与合并）
 
 每票一分支、base 永远是 `main`；分支命名、PR 与合并的完整路径（本地钩子 → 六个 CI 必需检查 → 1 条 review / `--admin` → merge commit → 收尾）见 `docs/markdown/代码规范.md` §8。唯一允许的绕过是一次性批量格式整理的 `--no-verify`，且必须在 PR 描述里说明。
+
+## 代码规范执行（SOLID / DRY / KISS / YAGNI 与 API 契约）
+
+规范真源是 `docs/markdown/代码规范.md`（§4.4 设计原则、§5.2 API 设计）。新增或修改代码时：
+
+- PR 描述要写清设计原则的取舍；没有结构变化就写“不适用”，不要空着。
+- 涉及 HTTP/JSON 接口时更新 `docs/openapi/openapi.yaml`；涉及 WebSocket/异步消息时更新 `docs/asyncapi/asyncapi.yaml`；涉及公开 C 接口时 `Player.h` / `Types.h` 必须能按 C17 编译。
+- 契约检查入口：`sh scripts/checks/contracts.sh`。CI 的 `checks-self-test` job 跑同一入口，失败即阻断合并。
 
 ## Agent skills
 

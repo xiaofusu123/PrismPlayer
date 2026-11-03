@@ -1,0 +1,266 @@
+asyncapi: 3.1.0
+id: 'urn:prismplayer:signaling'
+info:
+  title: PrismPlayer Signaling Protocol
+  version: 0.1.0
+  description: |
+    PrismPlayer 客户端与服务端之间的 WebSocket 信令协议（JSON 文本帧）。
+    消息类型真源为 `server/business/include/ServerTypes.h`，处理入口为
+    `server/network/src/IxWebSocketServer.cpp` 与 `server/business/src/MessageRouter.cpp`。
+    本契约只描述跨进程/跨网络的异步消息，不描述进程内 C++ 接口或 C ABI。
+  contact:
+    name: PrismPlayer
+    url: https://github.com/xiaofusu123/PrismPlayer
+defaultContentType: application/json
+servers:
+  local:
+    host: 'localhost:8080'
+    protocol: ws
+    description: 本地开发服务器（`server/main.cpp` 监听 `0.0.0.0:8080`）。
+channels:
+  clientMessages:
+    address: /
+    description: 客户端发往服务端的消息。
+    messages:
+      register:
+        $ref: '#/components/messages/register'
+      login:
+        $ref: '#/components/messages/login'
+      createRoom:
+        $ref: '#/components/messages/createRoom'
+      joinRoom:
+        $ref: '#/components/messages/joinRoom'
+      leaveRoom:
+        $ref: '#/components/messages/leaveRoom'
+      playback:
+        $ref: '#/components/messages/playback'
+      chat:
+        $ref: '#/components/messages/chat'
+  serverMessages:
+    address: /
+    description: 服务端发往客户端的消息。
+    messages:
+      ack:
+        $ref: '#/components/messages/ack'
+      error:
+        $ref: '#/components/messages/error'
+      roomBroadcast:
+        $ref: '#/components/messages/roomBroadcast'
+      roomUpdate:
+        $ref: '#/components/messages/roomUpdate'
+operations:
+  receiveClientMessages:
+    action: receive
+    summary: 服务端接收客户端信令
+    channel:
+      $ref: '#/channels/clientMessages'
+  sendServerMessages:
+    action: send
+    summary: 服务端发送 ack、错误、房间广播与房间更新
+    channel:
+      $ref: '#/channels/serverMessages'
+components:
+  messages:
+    register:
+      name: register
+      title: Register
+      summary: 注册新用户；成功回 ack，用户名已存在回 error(409)。
+      payload:
+        $ref: '#/components/schemas/Register'
+    login:
+      name: login
+      title: Login
+      summary: 登录并绑定连接与用户；成功回 ack，凭据错误回 error(401)。
+      payload:
+        $ref: '#/components/schemas/Login'
+    createRoom:
+      name: createRoom
+      title: Create room
+      summary: 创建房间；`name` 可省略，默认等于 `room_id`。
+      payload:
+        $ref: '#/components/schemas/CreateRoom'
+    joinRoom:
+      name: joinRoom
+      title: Join room
+      summary: 加入房间；未登录回 error(401)，房间不存在或已加入回 error(404)。
+      payload:
+        $ref: '#/components/schemas/JoinRoom'
+    leaveRoom:
+      name: leaveRoom
+      title: Leave room
+      summary: 离开房间；不在房间内回 error(404)。
+      payload:
+        $ref: '#/components/schemas/LeaveRoom'
+    playback:
+      name: playback
+      title: Playback control
+      summary: 房间内播放控制；由 MessageRouter 补充 `sender` 后广播给房间成员。
+      payload:
+        $ref: '#/components/schemas/Playback'
+    chat:
+      name: chat
+      title: Chat message
+      summary: 房间内聊天；由 MessageRouter 补充 `sender` 后广播给房间成员。
+      payload:
+        $ref: '#/components/schemas/Chat'
+    ack:
+      name: ack
+      title: Acknowledgement
+      summary: 请求成功；`for` 为被确认的请求类型。
+      payload:
+        $ref: '#/components/schemas/Ack'
+    error:
+      name: error
+      title: Error
+      summary: 请求失败；`code` 为 HTTP 风格状态码，`message` 为可读原因。
+      payload:
+        $ref: '#/components/schemas/Error'
+    roomBroadcast:
+      name: roomBroadcast
+      title: Room broadcast
+      summary: 房间内消息广播；保留客户端原始字段并补充 `sender`。
+      payload:
+        $ref: '#/components/schemas/RoomBroadcast'
+    roomUpdate:
+      name: roomUpdate
+      title: Room update
+      summary: 房间成员/状态变更；当前实现仅在 `ServerTypes.h` 中保留类型，尚未发送。
+      payload:
+        $ref: '#/components/schemas/RoomUpdate'
+  schemas:
+    Register:
+      type: object
+      additionalProperties: false
+      required: [type, username, password]
+      properties:
+        type:
+          const: register
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          format: password
+          minLength: 1
+    Login:
+      type: object
+      additionalProperties: false
+      required: [type, username, password]
+      properties:
+        type:
+          const: login
+        username:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          format: password
+          minLength: 1
+    CreateRoom:
+      type: object
+      additionalProperties: false
+      required: [type, room_id]
+      properties:
+        type:
+          const: create_room
+        room_id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+    JoinRoom:
+      type: object
+      additionalProperties: false
+      required: [type, room_id]
+      properties:
+        type:
+          const: join_room
+        room_id:
+          type: string
+          minLength: 1
+    LeaveRoom:
+      type: object
+      additionalProperties: false
+      required: [type, room_id]
+      properties:
+        type:
+          const: leave_room
+        room_id:
+          type: string
+          minLength: 1
+    Playback:
+      type: object
+      additionalProperties: true
+      required: [type, room_id]
+      properties:
+        type:
+          const: playback
+        room_id:
+          type: string
+          minLength: 1
+        action:
+          type: string
+          enum: [play, pause, stop, seek]
+        position_ms:
+          type: integer
+          minimum: 0
+    Chat:
+      type: object
+      additionalProperties: true
+      required: [type, room_id]
+      properties:
+        type:
+          const: chat
+        room_id:
+          type: string
+          minLength: 1
+        text:
+          type: string
+    Ack:
+      type: object
+      additionalProperties: false
+      required: [type, ok, for]
+      properties:
+        type:
+          const: ack
+        ok:
+          const: true
+        for:
+          type: string
+          enum: [register, login, create_room, join_room, leave_room]
+    Error:
+      type: object
+      additionalProperties: false
+      required: [type, code, message]
+      properties:
+        type:
+          const: error
+        code:
+          type: integer
+          minimum: 400
+          maximum: 599
+        message:
+          type: string
+    RoomBroadcast:
+      type: object
+      additionalProperties: true
+      required: [type, room_id, sender]
+      properties:
+        type:
+          type: string
+        room_id:
+          type: string
+          minLength: 1
+        sender:
+          type: integer
+          description: 发送者的 user_id，由服务端补充。
+    RoomUpdate:
+      type: object
+      additionalProperties: true
+      required: [type, room_id]
+      properties:
+        type:
+          const: room_update
+        room_id:
+          type: string
+          minLength: 1
