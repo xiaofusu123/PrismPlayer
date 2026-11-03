@@ -63,6 +63,8 @@ jobs:
         run: bash scripts/ci/setup-linux.sh llvm
       - name: 检查入口 CLI 契约自测
         run: sh scripts/tests/checks.sh
+      - name: 契约检查（C17 / AsyncAPI / OpenAPI）
+        run: sh scripts/checks/contracts.sh
 
   # 只查本次变更范围；全仓会让 CI 常年飘红。
   format:
