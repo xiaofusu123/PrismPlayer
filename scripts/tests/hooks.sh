@@ -1,7 +1,7 @@
 #!/bin/sh
-# 门禁自测（#64 决策 25）：临时仓库里跑真实钩子与安装脚本，断言退出码与关键字。
+# 门禁自测：临时仓库里跑真实钩子与安装脚本，断言退出码与关键字（#64 决策 25）。
 # 覆盖 #67（文件名/版本/安装）、#68（格式）、#69（clang-tidy）、#70（前置条件提示）。
-# 不依赖 PowerShell / cmd / Python。用法：sh test/hooks/run.sh，有失败项则退出 1。
+# 用法：sh scripts/tests/hooks.sh（或 sh scripts/tests/run.sh 一次跑两套）。
 
 set -u
 
@@ -10,123 +10,23 @@ cd "${PRISM_TEST_ROOT}" || exit 1
 
 # shellcheck source=scripts/checks/lib.sh
 . "${PRISM_TEST_ROOT}/scripts/checks/lib.sh"
+# shellcheck source=scripts/tests/lib.sh
+. "${PRISM_TEST_ROOT}/scripts/tests/lib.sh"
 
-PRISM_RUN_SH=$(command -v sh) || PRISM_RUN_SH=/bin/sh
-# 覆盖环境变量一律走 env(1)：这台机器的 sh 不把 `VAR=x cmd` 前缀传给子进程，只有 env 才生效。
+PRISM_CASE_ROOT="${PRISM_TEST_ROOT}/build/hook-tests"
+
 PRISM_CLANG_FORMAT_REAL=$(prism_find_tool clang-format || :)
 PRISM_CLANGXX_REAL=$(prism_find_tool clang++ || :)
 PRISM_CLANG_TIDY_REAL=$(prism_find_tool clang-tidy || :)
 
-# 受限环境（本机沙箱）里从 sh 起的 pwsh 拿不到原生命令 stdout（`git --version` 是空串），
-# install-hooks.ps1 的自校验因此必然误判，探测出来就只校验「钩子真装上了」。
+# 受限环境里从 sh 起的 pwsh 拿不到原生命令的 stdout（`git --version` 是空串），
+# install-hooks.ps1 的自校验会误判；探测到这种情况就只校验「钩子真装上了」。
 PRISM_PWSH_SEES_NATIVE_OUTPUT=0
 if command -v pwsh >/dev/null 2>&1; then
     if [ -n "$(pwsh -NoProfile -Command '& git.exe --version' 2>/dev/null || :)" ]; then
         PRISM_PWSH_SEES_NATIVE_OUTPUT=1
     fi
 fi
-
-PRISM_PASS=0
-PRISM_FAIL=0
-PRISM_CASE_NAME=""
-
-# ---------- 断言 ----------
-ok()  { PRISM_PASS=$((PRISM_PASS + 1)); printf '    [PASS] %s\n' "$1"; }
-bad() {
-    PRISM_FAIL=$((PRISM_FAIL + 1))
-    printf '    [FAIL] %s\n' "$1"
-    printf '          退出码=%s\n' "${PRISM_STATUS}"
-    printf '          输出：\n'
-    printf '%s\n' "${PRISM_OUT}" | sed 's/^/            | /'
-}
-
-expect_status() {
-    if [ "${PRISM_STATUS}" -eq "$1" ]; then ok "$2"; else bad "$2（期望退出码 $1）"; fi
-}
-
-expect_status_nonzero() {
-    if [ "${PRISM_STATUS}" -ne 0 ]; then ok "$1"; else bad "$1（期望非零退出码）"; fi
-}
-
-expect_out_has() {
-    case "${PRISM_OUT}" in
-        *"$1"*) ok "$2" ;;
-        *) bad "$2（输出里没有 '$1'）" ;;
-    esac
-}
-
-expect_out_lacks() {
-    case "${PRISM_OUT}" in
-        *"$1"*) bad "$2（输出里不该出现 '$1'）" ;;
-        *) ok "$2" ;;
-    esac
-}
-
-# run_in <目录> <命令...>：切 cwd 执行，合并捕获 stdout+stderr，stdin 接 /dev/null 防卡住。
-run_in() {
-    _prism_dir=$1
-    shift
-    PRISM_OUT=$(cd "${_prism_dir}" && "$@" 2>&1 < /dev/null)
-    PRISM_STATUS=$?
-}
-
-# ---------- 夹具 ----------
-# 夹具放仓库的 build/ 下（已 gitignore）；别用 /tmp —— Git Bash 的 /tmp 与 git.exe 认的不是同一个，-C 会找不到。
-PRISM_CASE_ROOT="${PRISM_TEST_ROOT}/build/hook-tests"
-PRISM_CASE_SEQ=0
-
-new_fixture() {
-    PRISM_CASE_SEQ=$((PRISM_CASE_SEQ + 1))
-    PRISM_CASE_DIR="${PRISM_CASE_ROOT}/case-${PRISM_CASE_SEQ}"
-    PRISM_REPO="${PRISM_CASE_DIR}/repo"
-    rm -rf "${PRISM_CASE_DIR}"
-    mkdir -p "${PRISM_REPO}" || exit 1
-
-    if ! git -C "${PRISM_REPO}" init -q -b main 2>/dev/null; then
-        git -C "${PRISM_REPO}" init -q
-        git -C "${PRISM_REPO}" symbolic-ref HEAD refs/heads/main
-    fi
-    git -C "${PRISM_REPO}" config user.name "gate-test"
-    git -C "${PRISM_REPO}" config user.email "gate-test@example.invalid"
-    git -C "${PRISM_REPO}" config core.autocrlf false
-
-    cp -r "${PRISM_TEST_ROOT}/.githooks" "${PRISM_REPO}/.githooks"
-    cp "${PRISM_TEST_ROOT}/.clang-format" "${PRISM_TEST_ROOT}/.clang-tidy" "${PRISM_REPO}/"
-    cp "${PRISM_TEST_ROOT}/.gitattributes" "${PRISM_REPO}/"
-    mkdir -p "${PRISM_REPO}/scripts"
-    cp "${PRISM_TEST_ROOT}/scripts/install-hooks.sh" "${PRISM_TEST_ROOT}/scripts/install-hooks.ps1" \
-        "${PRISM_REPO}/scripts/"
-    # 检查入口（#97）：钩子已把判定委托给它，夹具里少了它就等于门禁失效。
-    cp -r "${PRISM_TEST_ROOT}/scripts/checks" "${PRISM_REPO}/scripts/"
-}
-
-drop_fixture() {
-    [ -n "${PRISM_CASE_DIR:-}" ] && rm -rf "${PRISM_CASE_DIR}"
-    PRISM_CASE_DIR=""
-}
-start_case() {
-    PRISM_CASE_NAME=$1
-    printf '\n-- %s\n' "${PRISM_CASE_NAME}"
-    drop_fixture
-    new_fixture
-}
-
-# 用真 clang-format 生成一定合规的内容，免得夹具自己手写格式被判违规。
-good_cpp() {
-    printf 'int PrismSample(int a, int b) {\n    return a + b;\n}\n' \
-        | "${PRISM_CLANG_FORMAT_REAL}" --assume-filename=sample.cpp -
-}
-
-# 两处违规：空格不规整 + 一行超过 ColumnLimit 100。
-bad_cpp() {
-    cat <<'EOF'
-int  PrismSample(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l) {
-      return   a + b;
-}
-EOF
-}
-
-stage() { git -C "${PRISM_REPO}" add "$@"; }
 
 # 桩工具：只回答 --version，用于在不碰真实工具链的前提下测版本前缀检查。
 # 文件名带 .exe 是必须的：prism_find_tool 先找 $CLANG_ROOT/<名>.exe，本机（Windows）走的正是这条。
@@ -137,13 +37,6 @@ install_fake_tool() {
         printf 'echo "%s version %s"\n' "$1" "$2"
     } > "${PRISM_REPO}/fake-clang/bin/$1"
     chmod +x "${PRISM_REPO}/fake-clang/bin/$1"
-}
-
-# 把工作区提交成基线提交并回显 hash（供 clang-tidy 用例当 diff 基线）。
-commit_base() {
-    git -C "${PRISM_REPO}" add -A
-    git -C "${PRISM_REPO}" commit -q -m "$1"
-    git -C "${PRISM_REPO}" rev-parse HEAD
 }
 
 printf '门禁自测：仓库根 %s\n' "${PRISM_TEST_ROOT}"
@@ -268,7 +161,7 @@ expect_out_has "${PRISM_CLANG_VERSION_PREFIX}" "报错给出要求的前缀"
 # ---- #67：安装脚本 ----
 
 start_case "install-hooks.sh：设好 core.hooksPath 并校验生效"
-run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/install-hooks.sh
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/hooks/install-hooks.sh
 expect_status 0 "安装脚本成功"
 expect_out_has "门禁已装上" "打印安装结果"
 expect_out_has "${PRISM_CLANG_VERSION_PREFIX}" "版本要求从 lib.sh 读出，不在安装脚本里硬写"
@@ -280,7 +173,7 @@ case "${PRISM_OUT}" in
 esac
 
 start_case "装好之后 git 真的会调用钩子：git commit 被 pre-commit 拦住"
-run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/install-hooks.sh
+run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/hooks/install-hooks.sh
 bad_cpp > "${PRISM_REPO}/sample.cpp"
 git -C "${PRISM_REPO}" add sample.cpp
 run_in "${PRISM_REPO}" git commit -m "should be blocked"
@@ -289,7 +182,7 @@ expect_out_has "提交被拒绝" "拦下来自 pre-commit 门禁"
 
 start_case "install-hooks.ps1：同样设好 hooksPath（无 pwsh 时跳过）"
 if command -v pwsh >/dev/null 2>&1; then
-    run_in "${PRISM_REPO}" pwsh -NoProfile -File scripts/install-hooks.ps1
+    run_in "${PRISM_REPO}" pwsh -NoProfile -File scripts/hooks/install-hooks.ps1
     PRISM_PS_STATUS=${PRISM_STATUS}
     # 判据是「钩子真的装上了」：从 sh 侧读回，不依赖 pwsh 能否拿到 git 输出。
     run_in "${PRISM_REPO}" git config --get core.hooksPath
@@ -431,13 +324,5 @@ PRISM_STATUS=$?
 expect_status_nonzero "版本不匹配被拦"
 expect_out_has "版本不匹配" "报错说明原因"
 
-drop_fixture
-rm -rf "${PRISM_CASE_ROOT}"
-printf '\n========================================\n'
-printf '通过 %s 项，失败 %s 项\n' "${PRISM_PASS}" "${PRISM_FAIL}"
-if [ "${PRISM_FAIL}" -ne 0 ]; then
-    printf '门禁自测失败。\n' >&2
-    exit 1
-fi
-printf '门禁自测全部通过。\n'
-exit 0
+
+finish "门禁自测"

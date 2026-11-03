@@ -2,7 +2,7 @@
 chcp 65001 > nul
 setlocal enabledelayedexpansion
 
-set "PROJECT_ROOT=%~dp0.."
+for %%i in ("%~dp0..\..") do set "PROJECT_ROOT=%%~fi"
 echo project root: %PROJECT_ROOT%
 
 cd "%PROJECT_ROOT%"

@@ -5,7 +5,7 @@
 # 报告写到 build/Linux/coverage/coverage-report.txt，同时打印到终端。
 #
 # 用法（WSL / Linux 仓库根）：
-#   bash scripts/coverage.sh
+#   bash scripts/build/coverage.sh
 #
 # 口径：统计的是项目自己的 C/C++ 源码；test/、vendor/、vcpkg_installed/、build/
 # 全部排除（正则见下方 IGNORE_REGEX）。默认构建并运行当前注册的全部测试。
@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-PROJECT_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+PROJECT_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 cd "${PROJECT_ROOT}"
 
 PREREQUISITE_DOC="docs/markdown/项目框架.md 7.1（环境与依赖基线）"
@@ -35,10 +35,10 @@ fail() {
 }
 
 if [ "$(uname -s)" != "Linux" ]; then
-    fail "不支持的平台：$(uname -s)（本脚本用于 WSL / Linux；Windows 用 scripts/coverage.ps1）"
+    fail "不支持的平台：$(uname -s)（本脚本用于 WSL / Linux；Windows 用 scripts/build/coverage.ps1）"
 fi
 
-# ---- 前置条件（与 scripts/build.sh 同一口径）----
+# ---- 前置条件（与 scripts/build/build.sh 同一口径）----
 
 if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${PROJECT_ROOT}/scripts/wsl-env.sh" ]; then
     . "${PROJECT_ROOT}/scripts/wsl-env.sh"

@@ -2,7 +2,7 @@
 
 set -uo pipefail
 
-PROJECT_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+PROJECT_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 PREREQUISITE_DOC="docs/markdown/项目框架.md 7.1（环境与依赖基线）"
 
 CHECKS=0

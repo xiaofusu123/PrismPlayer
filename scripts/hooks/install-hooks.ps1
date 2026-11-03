@@ -1,11 +1,11 @@
 #!/usr/bin/env pwsh
 # 门禁安装脚本（#67）：把 core.hooksPath 指向版本控制里的 .githooks/。
 # 用 hooksPath 而不是拷进 .git/hooks/：拷出来的钩子不进版本控制，别人 clone 完是裸奔的。
-# 用法：pwsh -File scripts/install-hooks.ps1
+# 用法：pwsh -File scripts/hooks/install-hooks.ps1
 
 $ErrorActionPreference = "Stop"
 
-$PROJECT_ROOT = Split-Path -Parent $PSScriptRoot
+$PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $PROJECT_ROOT
 
 # 从 Git Bash 里起的 pwsh 可能带着 PATHEXT=.CPL，这时按名字找 git 会扑空，退到 git.exe。

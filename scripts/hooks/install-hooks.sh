@@ -1,11 +1,11 @@
 #!/bin/sh
 # 门禁安装脚本（#67）：把 core.hooksPath 指向版本控制里的 .githooks/。
 # 用 hooksPath 而不是拷进 .git/hooks/：拷出来的钩子不进版本控制，别人 clone 完是裸奔的。
-# 用法：sh scripts/install-hooks.sh（Windows 请用 scripts/install-hooks.ps1）
+# 用法：sh scripts/hooks/install-hooks.sh（Windows 请用 scripts/hooks/install-hooks.ps1）
 
 set -u
 
-PRISM_INSTALL_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+PRISM_INSTALL_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "${PRISM_INSTALL_ROOT}" || exit 1
 
 PRISM_FAIL=0

@@ -1,7 +1,7 @@
 #!/bin/sh
-# 检查入口自测（#97 / #100）：在临时 git 仓库夹具里跑真实入口，断言退出码与 stderr。
+# 检查入口自测：临时仓库里跑真实入口，断言退出码与 stderr（#97 / #100）。
 # 覆盖范围语义（staged / ci / <rev> / <a>...<b>）、vendor 例外、非 C/C++ 忽略、git 失败绝不 fail-open。
-# 也用 tidy.sh 跑真 clang-tidy；不联网、不依赖 CI。用法：sh test/checks/run.sh，有失败项则退出 1。
+# 用法：sh scripts/tests/checks.sh（或 sh scripts/tests/run.sh 一次跑两套）。
 
 set -u
 
@@ -10,66 +10,14 @@ cd "${PRISM_TEST_ROOT}" || exit 1
 
 # shellcheck source=scripts/checks/lib.sh
 . "${PRISM_TEST_ROOT}/scripts/checks/lib.sh"
+# shellcheck source=scripts/tests/lib.sh
+. "${PRISM_TEST_ROOT}/scripts/tests/lib.sh"
 
-PRISM_RUN_SH=$(command -v sh) || PRISM_RUN_SH=/bin/sh
+PRISM_CASE_ROOT="${PRISM_TEST_ROOT}/build/check-tests"
+
 PRISM_CLANG_FORMAT_REAL=$(prism_find_tool clang-format || :)
-# tidy.sh 用例要真 clang-tidy（入口第一步就校验它）与真 clang++（手写编译数据库拿它当编译器）。
 PRISM_CLANG_TIDY_REAL=$(prism_find_tool clang-tidy || :)
 PRISM_CLANGXX_REAL=$(prism_find_tool clang++ || :)
-
-PRISM_PASS=0
-PRISM_FAIL=0
-
-# ---------- 断言 ----------
-ok()  { PRISM_PASS=$((PRISM_PASS + 1)); printf '    [PASS] %s\n' "$1"; }
-bad() {
-    PRISM_FAIL=$((PRISM_FAIL + 1))
-    printf '    [FAIL] %s\n' "$1"
-    printf '          退出码=%s\n' "${PRISM_STATUS}"
-    printf '          输出：\n'
-    printf '%s\n' "${PRISM_OUT}" | sed 's/^/            | /'
-}
-
-expect_status() {
-    if [ "${PRISM_STATUS}" -eq "$1" ]; then ok "$2"; else bad "$2（期望退出码 $1）"; fi
-}
-
-expect_status_nonzero() {
-    if [ "${PRISM_STATUS}" -ne 0 ]; then ok "$1"; else bad "$1（期望非零退出码）"; fi
-}
-
-expect_out_has() {
-    case "${PRISM_OUT}" in
-        *"$1"*) ok "$2" ;;
-        *) bad "$2（输出里没有 '$1'）" ;;
-    esac
-}
-
-expect_out_lacks() {
-    case "${PRISM_OUT}" in
-        *"$1"*) bad "$2（输出里不该出现 '$1'）" ;;
-        *) ok "$2" ;;
-    esac
-}
-
-# 逐字比对，用来断言 pre-commit 与入口是同一份判定。
-expect_out_equals() {
-    if [ "${PRISM_OUT}" = "$1" ]; then
-        ok "$2"
-    else
-        bad "$2（输出与预期不一致）"
-        printf '          预期：\n'
-        printf '%s\n' "$1" | sed 's/^/            | /'
-    fi
-}
-
-# run_in <目录> <命令...>：切 cwd 执行，合并捕获 stdout+stderr，stdin 接 /dev/null 防卡住。
-run_in() {
-    _prism_dir=$1
-    shift
-    PRISM_OUT=$(cd "${_prism_dir}" && "$@" 2>&1 < /dev/null)
-    PRISM_STATUS=$?
-}
 
 # 跑格式入口；cwd 在仓库内即可，入口自己会 cd 到仓库根。
 run_entry() {
@@ -89,78 +37,14 @@ run_entry_ci() {
     PRISM_STATUS=$?
 }
 
-# 跑 tidy 入口（#100）；参数是 <编译数据库目录> <变更范围>。
+# 跑 tidy 入口；参数是 <编译数据库目录> <变更范围>。
 run_entry_tidy() {
     run_in "${PRISM_REPO}" "${PRISM_RUN_SH}" scripts/checks/tidy.sh "$@"
 }
 
-# ---------- 夹具 ----------
-# 夹具放仓库的 build/ 下（已 gitignore）；别用 /tmp —— Git Bash 的 /tmp 与 git.exe 认的不是同一个，-C 会找不到。
-PRISM_CASE_ROOT="${PRISM_TEST_ROOT}/build/check-tests"
-PRISM_CASE_SEQ=0
-
-new_fixture() {
-    PRISM_CASE_SEQ=$((PRISM_CASE_SEQ + 1))
-    PRISM_CASE_DIR="${PRISM_CASE_ROOT}/case-${PRISM_CASE_SEQ}"
-    PRISM_REPO="${PRISM_CASE_DIR}/repo"
-    rm -rf "${PRISM_CASE_DIR}"
-    mkdir -p "${PRISM_REPO}/scripts" || exit 1
-
-    if ! git -C "${PRISM_REPO}" init -q -b main 2>/dev/null; then
-        git -C "${PRISM_REPO}" init -q
-        git -C "${PRISM_REPO}" symbolic-ref HEAD refs/heads/main
-    fi
-    git -C "${PRISM_REPO}" config user.name "gate-test"
-    git -C "${PRISM_REPO}" config user.email "gate-test@example.invalid"
-    git -C "${PRISM_REPO}" config core.autocrlf false
-
-    cp -r "${PRISM_TEST_ROOT}/scripts/checks" "${PRISM_REPO}/scripts/"
-    cp -r "${PRISM_TEST_ROOT}/.githooks" "${PRISM_REPO}/.githooks"
-    cp "${PRISM_TEST_ROOT}/.clang-format" "${PRISM_TEST_ROOT}/.clang-tidy" "${PRISM_REPO}/"
-    cp "${PRISM_TEST_ROOT}/.gitattributes" "${PRISM_REPO}/"
-}
-
-drop_fixture() {
-    [ -n "${PRISM_CASE_DIR:-}" ] && rm -rf "${PRISM_CASE_DIR}"
-    PRISM_CASE_DIR=""
-}
-
-start_case() {
-    printf '\n-- %s\n' "$1"
-    drop_fixture
-    new_fixture
-}
-
-# 用真 clang-format 生成一定合规的内容，免得夹具自己手写格式被判违规。
-good_cpp() {
-    printf 'int PrismSample(int a, int b) {\n    return a + b;\n}\n' \
-        | "${PRISM_CLANG_FORMAT_REAL}" --assume-filename=sample.cpp -
-}
-
-# 两处违规：空格不规整 + 一行超过 ColumnLimit 100。
-bad_cpp() {
-    cat <<'EOF'
-int  PrismSample(int a, int b, int c, int d, int e, int f, int g, int h, int i, int j, int k, int l) {
-      return   a + b;
-}
-EOF
-}
-
-stage() { git -C "${PRISM_REPO}" add "$@"; }
-commit_all() {
-    git -C "${PRISM_REPO}" add -A
-    git -C "${PRISM_REPO}" commit -q -m "$1"
-}
-commit_base() {
-    commit_all "$1"
-    git -C "${PRISM_REPO}" rev-parse HEAD
-}
-
-# ---------- #100：tidy.sh 用的夹具 ----------
-
 # clang-tidy 是原生 exe，编译数据库里的 directory / file 必须是它认得的原生路径（Windows 要 D:/...）：
 # MSYS 的 /d/... 一条也匹配不上，它会报「Compile command not found」却以 0 退出（假绿）。
-# 用 pwd -W 取原生形式、Linux 退回 pwd -P；不用 cygpath —— 它只在 MSYS 系存在，会多出「本机能过、CI 不能过」的路径。
+# 用 pwd -W 取原生形式、Linux 退回 pwd -P；不用 cygpath —— 它只在 MSYS 系存在。
 fixture_native_dir() {
     if _prism_native=$(cd "${PRISM_REPO}" && pwd -W 2>/dev/null) && [ -n "${_prism_native}" ]; then
         _prism_native_out=${_prism_native}
@@ -185,7 +69,6 @@ EOF
 }
 
 # 夹具里没有 CMake，编译数据库手写：command 用真 clang++（路径换成 JSON 安全的正斜杠）。
-# clang-tidy 只解析这条命令的参数、不执行它，所以 argv[0] 用 POSIX 形式也无妨。
 write_tidy_db() {
     mkdir -p "${PRISM_REPO}/build"
     _prism_tidy_native=$(fixture_native_dir)
@@ -585,13 +468,5 @@ run_entry_tidy build "${PRISM_REV_BASE}...${PRISM_REV_BASE}"
 expect_status 0 "两端相同的 a...b 空范围也放行"
 fi
 
-drop_fixture
-rm -rf "${PRISM_CASE_ROOT}"
-printf '\n========================================\n'
-printf '通过 %s 项，失败 %s 项\n' "${PRISM_PASS}" "${PRISM_FAIL}"
-if [ "${PRISM_FAIL}" -ne 0 ]; then
-    printf '检查入口自测失败。\n' >&2
-    exit 1
-fi
-printf '检查入口自测全部通过。\n'
-exit 0
+
+finish "检查入口自测"
