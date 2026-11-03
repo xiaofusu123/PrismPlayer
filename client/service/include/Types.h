@@ -1,12 +1,13 @@
 #pragma once
-#include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 /* ========== 版本信息 ========== */
 
-#define PRISM_VERSION_MAJOR 0  /**< 主版本号 */
-#define PRISM_VERSION_MINOR 0  /**< 次版本号 */
-#define PRISM_VERSION_PATCH 1  /**< 修订版本号 */
+#define PRISM_VERSION_MAJOR 0 /**< 主版本号 */
+#define PRISM_VERSION_MINOR 0 /**< 次版本号 */
+#define PRISM_VERSION_PATCH 1 /**< 修订版本号 */
 
 /* ========== 播放状态 ========== */
 
@@ -15,12 +16,12 @@
  * @brief 播放器播放状态
  */
 typedef enum {
-    PRISM_STATE_IDLE = 0,     /**< 空闲状态，未加载媒体 */
-    PRISM_STATE_LOADING,      /**< 媒体加载中 */
-    PRISM_STATE_PLAYING,      /**< 播放中 */
-    PRISM_STATE_PAUSED,       /**< 已暂停 */
-    PRISM_STATE_STOPPED,      /**< 已停止 */
-    PRISM_STATE_ERROR         /**< 错误状态 */
+    PRISM_STATE_IDLE = 0, /**< 空闲状态，未加载媒体 */
+    PRISM_STATE_LOADING,  /**< 媒体加载中 */
+    PRISM_STATE_PLAYING,  /**< 播放中 */
+    PRISM_STATE_PAUSED,   /**< 已暂停 */
+    PRISM_STATE_STOPPED,  /**< 已停止 */
+    PRISM_STATE_ERROR     /**< 错误状态 */
 } PrismState;
 
 /* ========== 播放器句柄 ========== */
@@ -33,16 +34,16 @@ typedef void* PrismPlayerHandle;
  * @brief 播放器事件类型，通过回调通知上层
  */
 typedef enum {
-    PRISM_EVENT_MEDIA_LOADED = 0,      /**< 媒体加载完成 */
-    PRISM_EVENT_PLAYBACK_COMPLETED,    /**< 播放完成 */
-    PRISM_EVENT_SEEK_COMPLETED,        /**< Seek 操作完成 */
-    PRISM_EVENT_BUFFERING_START,       /**< 缓冲开始 */
-    PRISM_EVENT_BUFFERING_END,         /**< 缓冲结束 */
-    PRISM_EVENT_ERROR,                 /**< 发生错误 */
-    PRISM_EVENT_LOGIN_SUCCESS,         /**< 登录成功 */
-    PRISM_EVENT_LOGIN_FAILED,          /**< 登录失败 */
-    PRISM_EVENT_ROOM_JOINED,           /**< 成功加入房间 */
-    PRISM_EVENT_ROOM_LEFT              /**< 已离开房间 */
+    PRISM_EVENT_MEDIA_LOADED = 0,   /**< 媒体加载完成 */
+    PRISM_EVENT_PLAYBACK_COMPLETED, /**< 播放完成 */
+    PRISM_EVENT_SEEK_COMPLETED,     /**< Seek 操作完成 */
+    PRISM_EVENT_BUFFERING_START,    /**< 缓冲开始 */
+    PRISM_EVENT_BUFFERING_END,      /**< 缓冲结束 */
+    PRISM_EVENT_ERROR,              /**< 发生错误 */
+    PRISM_EVENT_LOGIN_SUCCESS,      /**< 登录成功 */
+    PRISM_EVENT_LOGIN_FAILED,       /**< 登录失败 */
+    PRISM_EVENT_ROOM_JOINED,        /**< 成功加入房间 */
+    PRISM_EVENT_ROOM_LEFT           /**< 已离开房间 */
 } PrismEventType;
 
 /**
@@ -60,14 +61,14 @@ typedef void (*PrismEventCallback)(PrismEventType type, const void* data, void* 
  * @brief 播放器操作错误码
  */
 typedef enum {
-    PRISM_OK                   =  0,  /**< 操作成功 */
-    PRISM_ERROR_UNKNOWN        = -1,  /**< 未知错误 */
-    PRISM_ERROR_INVALID_HANDLE = -2,  /**< 无效的播放器句柄 */
-    PRISM_ERROR_INVALID_PARAM  = -3,  /**< 无效的参数 */
-    PRISM_ERROR_NO_MEDIA       = -4,  /**< 未加载媒体 */
-    PRISM_ERROR_OPEN_FAILED    = -5,  /**< 打开媒体失败 */
-    PRISM_ERROR_SEEK_FAILED    = -6,  /**< Seek 操作失败 */
-    PRISM_ERROR_NOT_SUPPORTED  = -7   /**< 不支持的操作 */
+    PRISM_OK = 0,                    /**< 操作成功 */
+    PRISM_ERROR_UNKNOWN = -1,        /**< 未知错误 */
+    PRISM_ERROR_INVALID_HANDLE = -2, /**< 无效的播放器句柄 */
+    PRISM_ERROR_INVALID_PARAM = -3,  /**< 无效的参数 */
+    PRISM_ERROR_NO_MEDIA = -4,       /**< 未加载媒体 */
+    PRISM_ERROR_OPEN_FAILED = -5,    /**< 打开媒体失败 */
+    PRISM_ERROR_SEEK_FAILED = -6,    /**< Seek 操作失败 */
+    PRISM_ERROR_NOT_SUPPORTED = -7   /**< 不支持的操作 */
 } PrismErrorCode;
 
 /* ========== Seek 模式 ========== */
@@ -77,8 +78,8 @@ typedef enum {
  * @brief Seek 跳转模式
  */
 typedef enum {
-    PRISM_SEEK_ABSOLUTE = 0,  /**< 绝对跳转，position_ms 为目标位置 */
-    PRISM_SEEK_RELATIVE = 1   /**< 相对跳转，position_ms 为偏移量 */
+    PRISM_SEEK_ABSOLUTE = 0, /**< 绝对跳转，position_ms 为目标位置 */
+    PRISM_SEEK_RELATIVE = 1  /**< 相对跳转，position_ms 为偏移量 */
 } PrismSeekMode;
 
 /* ========== 播放配置 ========== */
@@ -88,13 +89,14 @@ typedef enum {
  * @brief 播放器初始化配置
  */
 typedef struct PrismConfig {
-    int video_output_width{0};      /**< 视频输出宽度（像素），0 表示使用原始分辨率 */
-    int video_output_height{0};     /**< 视频输出高度（像素），0 表示使用原始分辨率 */
-    int audio_sample_rate{0};       /**< 音频采样率（Hz），0 表示使用原始采样率 */
-    float default_volume{1.0f};     /**< 默认音量，范围 0.0-1.0 */
-    bool enable_video{true};        /**< 是否启用视频渲染 */
-    bool enable_audio{true};        /**< 是否启用音频输出 */
-    const char* log_level{nullptr}; /**< spdlog 日志等级（"trace"/"debug"/"info"/"warn"/"error"），NULL 默认 "info" */
+    int video_output_width;  /**< 视频输出宽度（像素），0 表示使用原始分辨率 */
+    int video_output_height; /**< 视频输出高度（像素），0 表示使用原始分辨率 */
+    int audio_sample_rate;   /**< 音频采样率（Hz），0 表示使用原始采样率 */
+    float default_volume;    /**< 默认音量，范围 0.0-1.0；config 为 NULL 时由 SDK 填 1.0 */
+    bool enable_video;       /**< 是否启用视频渲染；config 为 NULL 时由 SDK 填 true */
+    bool enable_audio;       /**< 是否启用音频输出；config 为 NULL 时由 SDK 填 true */
+    const char* log_level; /**< spdlog 日志等级（"trace"/"debug"/"info"/"warn"/"error"），NULL 默认
+                              "info" */
 } PrismConfig;
 
 /* ========== 媒体信息 ========== */
@@ -104,11 +106,11 @@ typedef struct PrismConfig {
  * @brief 已加载媒体的详细信息
  */
 typedef struct PrismMediaInfo {
-    int video_width{0};         /**< 视频宽度（像素），无视频流时为 0 */
-    int video_height{0};        /**< 视频高度（像素），无视频流时为 0 */
-    int64_t duration_ms{0};     /**< 媒体总时长（毫秒），直播流为 -1 */
-    int audio_channels{0};      /**< 音频声道数，无音频流时为 0 */
-    int audio_sample_rate{0};   /**< 音频采样率（Hz），无音频流时为 0 */
+    int video_width;       /**< 视频宽度（像素），无视频流时为 0 */
+    int video_height;      /**< 视频高度（像素），无视频流时为 0 */
+    int64_t duration_ms;   /**< 媒体总时长（毫秒），直播流为 -1 */
+    int audio_channels;    /**< 音频声道数，无音频流时为 0 */
+    int audio_sample_rate; /**< 音频采样率（Hz），无音频流时为 0 */
 } PrismMediaInfo;
 
 /* ========== 登录参数 ========== */
@@ -118,9 +120,9 @@ typedef struct PrismMediaInfo {
  * @brief 登录认证参数
  */
 typedef struct PrismLoginParams {
-    const char* username{nullptr};    /**< 用户名 */
-    const char* password{nullptr};    /**< 密码 */
-    const char* server_url{nullptr};  /**< 服务器地址 */
+    const char* username;   /**< 用户名 */
+    const char* password;   /**< 密码 */
+    const char* server_url; /**< 服务器地址 */
 } PrismLoginParams;
 
 /* ========== 房间状态 ========== */
@@ -130,9 +132,9 @@ typedef struct PrismLoginParams {
  * @brief 房间连接状态
  */
 typedef enum {
-    PRISM_ROOM_DISCONNECTED = 0,  /**< 未连接 */
-    PRISM_ROOM_CONNECTING,        /**< 连接中 */
-    PRISM_ROOM_CONNECTED          /**< 已连接 */
+    PRISM_ROOM_DISCONNECTED = 0, /**< 未连接 */
+    PRISM_ROOM_CONNECTING,       /**< 连接中 */
+    PRISM_ROOM_CONNECTED         /**< 已连接 */
 } PrismRoomState;
 
 /* ========== 房间信息 ========== */
@@ -142,7 +144,6 @@ typedef enum {
  * @brief 当前房间的详细信息
  */
 typedef struct PrismRoomInfo {
-    char room_id[256]{};     /**< 房间 ID */
-    int member_count{0};     /**< 房间在线人数 */
+    char room_id[256]; /**< 房间 ID */
+    int member_count;  /**< 房间在线人数 */
 } PrismRoomInfo;
-
