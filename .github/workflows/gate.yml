@@ -1,33 +1,32 @@
-# 服务端门禁（spec #96）：GitHub Actions 上的「不可绕过层」。
-# 契约：六个**必需**检查的 job 名是 main 规则集里的必需状态检查，改名/增删必须同步规则集，否则会静默失效（#96 决策 27 / #103）；非必需的附加 job（如报告型 coverage）不参与合并判定，登记在 AGENTS.md 即可。
-# 本地复现：sh test/hooks/run.sh、sh test/checks/run.sh、sh scripts/checks/format.sh ci。
-# 判定逻辑一律住在 scripts/checks/ 与 test/ 下，本地钩子与 CI 调用同一份（#96 决策 6/8）。
+# 服务端门禁：GitHub Actions 上的「不可绕过层」。
+# 六个必需 job 名是 main 规则集（15828446）的契约，改名/增删必须同步规则集；coverage 是报告型、非必需。
+# 本地复现：sh scripts/tests/run.sh、sh scripts/checks/format.sh ci。判定入口在 scripts/checks/ 与 scripts/tests/。
 
 name: 门禁
 
 on:
-  pull_request: # 含草稿 PR，便于自查（#96 决策 3/28）
+  pull_request: # 含草稿 PR
   push:
-    branches: [main] # 留痕：合进 main 的每一次推送也跑一遍
+    branches: [main]
 
-# 只读权限、不使用任何 secret、不用 pull_request_target（#96 决策 4）：fork 的 PR 会执行本编排。
+# 只读权限、不用 secret、不用 pull_request_target：fork 的 PR 会执行本编排。
 permissions:
   contents: read
 
-# 同一 PR 的新推送取消上一次仍在跑的运行（#96 决策 5）。
+# 同一 PR 的新推送取消旧运行。
 concurrency:
   group: gate-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
-  # 门禁钉死的 23.1.x 必须来自 apt.llvm.org 的 noble-23 仓，CLANG_ROOT 让工具校验直接命中这一份（#96 决策 12）。
+  # 23.1.x 来自 apt.llvm.org noble-23；工具校验直接命中这一份。
   CLANG_ROOT: /usr/lib/llvm-23/bin
-  # CI 上 vcpkg 不在成员本机的位置；取 baseline 那一份，构建与静态检查 job 共用（#99 / #100）。
+  # baseline 那一份 vcpkg；构建与静态检查 job 共用。
   VCPKG_ROOT: /home/runner/vcpkg
 
 jobs:
-  # vcpkg 缓存键只在这一处算（#101）：baseline + manifest + triplet + 镜像 + clang 前缀。
-  # 刻意不用 restore-keys 做部分命中：键不匹配就是干净冷编译，部分命中会让「这次为什么慢」不可解释。
+  # 缓存键只在这里算：baseline + manifest + triplet + 镜像 + clang 前缀。
+  # 不用 restore-keys：键不匹配就干净冷编译，避免「这次为什么慢」不可解释。
   cache-key:
     runs-on: ubuntu-24.04
     outputs:
@@ -45,7 +44,7 @@ jobs:
           printf '缓存键：%s\n' "${key}"
           printf 'key=%s\n' "${key}" >> "$GITHUB_OUTPUT"
 
-  # 门禁机制本身在干净 Linux 机器上成立（#96 决策 20）：无依赖、秒级。
+  # 门禁机制在干净 Linux 机器上成立：无依赖、秒级。
   hooks-self-test:
     runs-on: ubuntu-24.04
     steps:
@@ -53,9 +52,9 @@ jobs:
       - name: 装 23.1.x 的 clang 工具链
         run: bash scripts/ci/setup-linux.sh llvm
       - name: 在临时仓库里跑真钩子，断言退出码与 stderr
-        run: sh test/hooks/run.sh
+        run: sh scripts/tests/hooks.sh
 
-  # 检查入口自己的 CLI 契约自测（#96 决策 21）：同样无依赖、秒级。
+  # 检查入口 CLI 契约自测：无依赖、秒级。
   checks-self-test:
     runs-on: ubuntu-24.04
     steps:
@@ -63,9 +62,9 @@ jobs:
       - name: 装 23.1.x 的 clang 工具链
         run: bash scripts/ci/setup-linux.sh llvm
       - name: 检查入口 CLI 契约自测
-        run: sh test/checks/run.sh
+        run: sh scripts/tests/checks.sh
 
-  # 格式检查只查本次变更范围（#96 决策 7/10）：全仓会让 CI 从第一天起常年飘红。
+  # 只查本次变更范围；全仓会让 CI 常年飘红。
   format:
     runs-on: ubuntu-24.04
     steps:
@@ -77,9 +76,8 @@ jobs:
       - name: 格式检查（只查本次变更范围，判定逻辑在 scripts/checks/format.sh）
         run: sh scripts/checks/format.sh ci
 
-  # 真构建（#99）：Server 的目标平台就是 Ubuntu，跑真实构建并断言产物契约。
-  # 本工作流唯一「重」的 job：未命中缓存时要源码编译 ffmpeg / glfw3 / vulkan 等依赖。
-  # 实测（#101）：未命中 845 秒、命中 77 秒；完整口径见 docs/adr/0006-门禁第二阶段CI.md 决策 5。
+  # 真构建 + 产物契约：Server 的目标平台是 Ubuntu。
+  # 缓存未命中时要从源码编 ffmpeg/glfw3/vulkan；实测 845 秒，命中 77 秒（见 ADR 0006 决策 5）。
   build-linux-debug:
     needs: cache-key
     runs-on: ubuntu-24.04
@@ -98,8 +96,7 @@ jobs:
         run: bash scripts/ci/setup-linux.sh llvm cmake system vcpkg
       - name: 配置（linux-clang-x64-Debug：产出编译数据库与 vcpkg 依赖安装树）
         run: bash scripts/ci/preset-linux-debug.sh configure
-      # 显式保存并 if: always()：actions/cache 自带的「job 结束保存」在 job 失败时不会发生（#101 实测）。
-      # 「依赖刚编完、项目还没编」的中间状态最需要复用；键已命中就没有新东西可存。
+      # 显式保存并 if: always()：job 失败时不会自动保存；「依赖刚编完」的中间状态最值得复用。
       - name: 保存 vcpkg 二进制缓存（键已存在则跳过）
         if: always() && steps.vcpkg-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -113,9 +110,8 @@ jobs:
       - name: 产物契约断言（体积 / 导出数量 / 不含 libc++）
         run: bash scripts/ci/preset-linux-debug.sh verify
 
-  # 静态检查（#100）：与本地 pre-push 同一份判定（scripts/checks/tidy.sh），只是范围不同。
-  # 必须等 build-linux-debug：编译数据库与 vcpkg 头文件树都来自配置阶段，只靠 needs 保证先后。
-  # 不用 artifact 传 compile_commands.json（依赖头文件树 537 MB vs 数据库 1 MB），见 ADR 0006「后果」。
+  # 静态检查：与本地 pre-push 同一份判定（scripts/checks/tidy.sh）。
+  # needs build-linux-debug 保证编译数据库与头文件树就绪；不用 artifact 传（头文件树 537 MB vs 库 1 MB）。
   tidy:
     needs: [cache-key, build-linux-debug]
     runs-on: ubuntu-24.04
@@ -146,8 +142,7 @@ jobs:
       - name: 静态检查（scripts/checks/tidy.sh —— 与本地 pre-push 同一份判定）
         run: sh scripts/checks/tidy.sh build/Linux/debug ci
 
-  # 测试接入点（#102）：这一票只做骨架与语义，`test/` 还没接回根构建。
-  # 所以现在明确说「没有测试可跑」而不是静默绿灯；等 add_test() 出现，同一个 job 自动变成真检查。
+  # 测试接入点：没有注册用例时明确 SKIP，不静默绿灯。
   ctest:
     needs: [cache-key, build-linux-debug]
     runs-on: ubuntu-24.04
@@ -178,9 +173,8 @@ jobs:
       - name: 跑测试（没有注册用例时明确 SKIP，判定在 scripts/checks/ctest.sh）
         run: sh scripts/checks/ctest.sh build/Linux/debug
 
-  # 覆盖率报告（#84）：一条命令（scripts/coverage.sh）构建 → ctest → llvm-cov，产出 coverage-report.txt。
-  # 只出数字、不设阈值、不阻断，所以**不是必需状态检查**（main 规则集只要求上面六个 job）。
-  # 测试一到位，这个 job 自动产出对应模块的数字；验收报告（#93）直接引用 artifact。
+  # 覆盖率报告：构建 → ctest → llvm-cov，产出 coverage-report.txt。
+  # 只出数字、不设阈值、不阻断，因此不是必需检查（规则集只要求上面六个 job）。
   coverage:
     needs: [cache-key, build-linux-debug]
     runs-on: ubuntu-24.04
@@ -196,8 +190,8 @@ jobs:
           key: ${{ needs.cache-key.outputs.key }}
       - name: 装前置（clang 23.1.x / cmake 4.x / Linux 系统开发包 / vcpkg / llvm-cov）
         run: bash scripts/ci/setup-linux.sh llvm coverage cmake system vcpkg
-      - name: 构建、跑测试并生成覆盖率报告（scripts/coverage.sh）
-        run: bash scripts/coverage.sh
+      - name: 构建、跑测试并生成覆盖率报告（scripts/build/coverage.sh）
+        run: bash scripts/build/coverage.sh
       - name: 上传报告
         uses: actions/upload-artifact@v4
         with:

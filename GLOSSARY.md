@@ -28,8 +28,8 @@
 | `client-network` | `client-net`、`network` 目标 | |
 | `client-adapter` | `client-adapters`、`adapter` 目标 | |
 | `CMakeLists.txt` | **`CmakeLists.txt`**（小写 `m`） | 大小写敏感文件系统上 `add_subdirectory()` 找不到小写版本。历史上 `server/` 与 `vendor/` 下共 6 个文件是小写：**`server/` 下 3 个已于 2026-10-11 改为大写**，`vendor/` 下剩余的仍是小写，**已决定暂不处理**（`vendor/` 不在根构建中；门禁的防回归检查必须对它例外） |
-| `windows-clang-x64-Debug` / `windows-clang-x64-Release` / `linux-clang-x64-Debug` / `linux-clang-x64-Release` | `windows-x64-Debug`、`windows-Debug`、`windows-clang-x64-Releasee` | 预设全名带平台前缀与 `clang`；现共 **4 配置 + 4 构建 + 4 test 预设**，各自 `binaryDir`（`build/{Windows,Linux}/{debug,release}`）；`testPresets` 于 2026-11-02 由 #54 新增，`ctest --preset windows-clang-x64-Debug` 可直接运行。后两个是历史名字：`Releasee` 是旧 `build.bat` 非法输入分支里的拼写错误，**已于 2026-10-11 修正，不再是当前仓库的写法** |
-| `windows-base` | — | hidden 预设，上面两个继承它 |
+| `windows-clang-x64-Debug` / `windows-clang-x64-Release` / `linux-clang-x64-Debug` / `linux-clang-x64-Release` | `windows-x64-Debug`、`windows-Debug`、`windows-clang-x64-Releasee` | 预设全名带平台前缀与 `clang`；现共 **6 配置 + 6 构建 + 6 test 预设**（Debug / Release / Coverage × Windows / Linux），`binaryDir`（`build/{Windows,Linux}/{debug,release,coverage}`）；`testPresets` 于 2026-11-02 由 #54 新增，`ctest --preset windows-clang-x64-Debug` 可直接运行。后两个是历史名字：`Releasee` 是旧 `build.bat` 非法输入分支里的拼写错误，**已于 2026-10-11 修正，不再是当前仓库的写法** |
+| `windows-base` | — | hidden 预设，Windows 侧具体预设继承它 |
 | `test/` | **`tests/`** | 目录是单数。`代码规范.docx`（已随 `docs/archive/` 删除）写的是 `tests`，以规范 §7 与实际目录为准 |
 | `include/` + `internal/` + `src/` | `include/`+`src/`（两层）、`Impl/` | 每模块三层；历史上的 `Impl/` 目录已全部改名 `internal/` |
 

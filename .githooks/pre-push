@@ -1,6 +1,6 @@
 #!/bin/sh
-# pre-push 门禁（#69 / #70）：先跑 Debug 预设构建，成功后对本次推送改动的 C/C++ 文件跑 clang-tidy。
-# 顺序不能反：clang-tidy 依赖构建产出的 compile_commands.json。只跑 Debug，不跑 ctest/Release（ADR 决策 3）。
+# pre-push 门禁：先构建 Debug，再对本次推送改动的 C/C++ 跑 clang-tidy（顺序不能反：后者要 compile_commands.json）。
+# 只跑 Debug，不跑 ctest/Release；判定委托 scripts/checks/tidy.sh，与 CI 同源。
 # Git 传入 $1=远端名 $2=远端 URL；stdin 每行 <local ref> <local oid> <remote ref> <remote oid>。
 
 set -u
@@ -40,7 +40,7 @@ if [ ! -t 0 ]; then
     cat > "${PRISM_TMP}/push-info" 2>/dev/null || :
 fi
 
-# 平台 → 预设，与 scripts/build.ps1|build.sh 同一套命名。
+# 平台 → 预设，与 scripts/build/ 下的构建脚本同一套命名。
 case "$(uname -s)" in
     Linux)
         PRISM_PLATFORM=linux
@@ -128,7 +128,7 @@ if [ "${PRISM_BUILD_STATUS}" -ne 0 ]; then
     prism_error "带 error 的行："
     grep -n -i "error" "${PRISM_LOG_DIR}/build.log" | head -n 30 | sed 's/^/       /' >&2
     prism_blank
-    prism_error "本地复现：pwsh -File scripts/build.ps1 1（Windows）或 bash scripts/build.sh 1（WSL/Linux）。"
+    prism_error "本地复现：pwsh -File scripts/build/build.ps1 1（Windows）或 bash scripts/build/build.sh 1（WSL/Linux）。"
     exit 1
 fi
 

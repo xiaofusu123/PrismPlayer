@@ -1,8 +1,6 @@
 #!/bin/sh
-# pre-commit 门禁（#52 / #97）：只查 index，不查工作区。
-# 文件名不得是 CmakeLists.txt（vendor/** 只豁免这一条）；staged 的 C/C++ 必须 clang-format 过。
-# 判定委托 scripts/checks/format.sh，与 CI 同源；不跑 clang-tidy（要编译数据库且慢，ADR 决策 3）。
-# 绕过只允许一次性格式批量整理，且须在 PR 里说明。
+# pre-commit 门禁：只查 index（staged 的 C/C++ 格式 + CmakeLists.txt 命名），判定委托 scripts/checks/format.sh。
+# 与 CI 同源；clang-tidy 放在 pre-push（要编译数据库）。绕过仅限一次性格式整理，且须在 PR 说明。
 
 set -u
 
@@ -20,7 +18,7 @@ cd "${PRISM_ROOT}" || exit 1
 PRISM_ENTRY="${PRISM_HOOK_DIR}/../scripts/checks/format.sh"
 if [ ! -f "${PRISM_ENTRY}" ]; then
     prism_error "找不到检查入口 ${PRISM_ENTRY}（拒绝提交，避免静默放行）。"
-    prism_error "处理：确认 scripts/checks/ 完整（scripts/install-hooks.sh 会一并校验）。"
+    prism_error "处理：确认 scripts/checks/ 完整（scripts/hooks/install-hooks.sh 会一并校验）。"
     exit 1
 fi
 

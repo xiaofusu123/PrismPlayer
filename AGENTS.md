@@ -5,13 +5,13 @@
 干净 clone 到产物只需要两条命令（在仓库根目录执行）：
 
 ```powershell
-pwsh -File scripts/build.ps1 1           # 1 = Debug，2 = Release
-pwsh -File scripts/verify-build.ps1      # 断言产物存在且体积合理
+pwsh -File scripts/build/build.ps1 1           # 1 = Debug，2 = Release
+pwsh -File scripts/build/verify-build.ps1      # 断言产物存在且体积合理
 ```
 
 ```bash
-bash scripts/build.sh 1
-bash scripts/verify-build.sh
+bash scripts/build/build.sh 1
+bash scripts/build/verify-build.sh
 ```
 
 依赖安装树残缺、需要**显式清空后重装**时加 `--clean`：脚本先删掉该预设的整棵构建目录（含 `vcpkg_installed/` 的 manifest 与 ABI 戳，不删它们 vcpkg 会认为已装好而短路），再配置 + 构建。仓库内 `.vcpkg-cache`（已 gitignore）作为本机加速缓存保留。
@@ -40,7 +40,7 @@ vcpkg baseline（`vcpkg-configuration.json` 的 `default-registry`）固定为 `
 
 ### 本阶段「可复现」的边界
 
-到此为止：**同一工具链 + 同一 vcpkg baseline + 同一预设名 ⇒ 同一组产物**（2026-11-02 实测 Debug 下共 9 个链接目标：`client-engine`、`client-service`、`client-adapter`、`client-av_sync`、`server-adapter`、`server-business`、`server-network`、`Prism-server`，以及仅 Debug 的 `test-engine`）；其中 4 个业务产物 `client-engine`、`client-av_sync`、`client-service`、`Prism-server` 由 `scripts/verify-build.*` 断言存在与体积。
+到此为止：**同一工具链 + 同一 vcpkg baseline + 同一预设名 ⇒ 同一组产物**（2026-11-02 实测 Debug 下共 9 个链接目标：`client-engine`、`client-service`、`client-adapter`、`client-av_sync`、`server-adapter`、`server-business`、`server-network`、`Prism-server`，以及仅 Debug 的 `test-engine`）；其中 4 个业务产物 `client-engine`、`client-av_sync`、`client-service`、`Prism-server` 由 `scripts/build/verify-build.*` 断言存在与体积。
 
 明确**不**保证：跨机器逐字节一致（路径、时间戳、缓存命中都会改变二进制）；容器化 / 隔离环境；`.vcpkg-cache`（仓库内、已 gitignore）在别的机器上可复用。
 
@@ -51,11 +51,11 @@ vcpkg baseline（`vcpkg-configuration.json` 的 `default-registry`）固定为 `
 提交与推送由仓库自带的钩子把关（**快反馈层**：几秒到几十秒），服务端还有一层**不可绕过层**（GitHub Actions，见下「服务端检查」）。钩子每个 clone / 每台机器装一次：
 
 ```powershell
-pwsh -File scripts/install-hooks.ps1
+pwsh -File scripts/hooks/install-hooks.ps1
 ```
 
 ```bash
-bash scripts/install-hooks.sh
+bash scripts/hooks/install-hooks.sh
 ```
 
 脚本给 `.githooks/*` 加执行位、把 `core.hooksPath` 指向 `.githooks`，再读回校验；`git config --local --get core.hooksPath` 应输出 `.githooks`。钩子统一 `#!/bin/sh`，由 Git for Windows 自带的 sh 执行，不依赖 PowerShell / cmd / Python。
@@ -92,21 +92,21 @@ bash scripts/install-hooks.sh
 
 仓库里多数 C/C++ 文件还没跑过 `.clang-format`（#68 明确不做全仓一次性重排）。**碰到哪个文件就整理哪个**：staged 的文件必须合规，报错里直接给可复制的修复命令。确需一次性批量整理时，`git commit --no-verify` / `git push --no-verify` 是唯一允许的绕过，且必须在 PR 描述里说明。
 
-自测：`sh test/hooks/run.sh`（临时仓库里跑真实钩子，断言退出码与 stderr）与 `sh test/checks/run.sh`（检查入口的 CLI 契约、范围语义、以及「不 fail-open」）。
+自测（一键跑两套：`sh scripts/tests/run.sh`）：`sh scripts/tests/hooks.sh`（临时仓库里跑真实钩子，断言退出码与 stderr）与 `sh scripts/tests/checks.sh`（检查入口的 CLI 契约、范围语义、以及「不 fail-open」）。
 
 ### 服务端检查（GitHub Actions，#96）
 
-本地钩子会被 `--no-verify` 绕过，也可能因为「这台机器根本没装钩子」而压根不生效，所以 `main` 上另有一层跑在 GitHub 上的检查：`.github/workflows/gate.yml`。**判定逻辑不写在 YAML 里** —— workflow 只负责装工具链、还原缓存、按预设配置与构建，判定一律调用 `scripts/checks/` 与 `test/` 下的**同一份入口**（本地钩子调的也是它），所以「CI 说绿、本机说红」在结构上不可能出现。
+本地钩子会被 `--no-verify` 绕过，也可能因为「这台机器根本没装钩子」而压根不生效，所以 `main` 上另有一层跑在 GitHub 上的检查：`.github/workflows/gate.yml`。**判定逻辑不写在 YAML 里** —— workflow 只负责装工具链、还原缓存、按预设配置与构建，判定一律调用 `scripts/checks/` 与 `scripts/tests/` 下的**同一份入口**（本地钩子调的也是它），所以「CI 说绿、本机说红」在结构上不可能出现。
 
 | job | 查什么 | 判定入口 |
 |-----|--------|---------|
-| `hooks-self-test` | 钩子自身在干净机器上成立 | `sh test/hooks/run.sh` |
-| `checks-self-test` | 检查入口的 CLI 契约与范围语义 | `sh test/checks/run.sh` |
+| `hooks-self-test` | 钩子自身在干净机器上成立 | `sh scripts/tests/hooks.sh` |
+| `checks-self-test` | 检查入口的 CLI 契约与范围语义 | `sh scripts/tests/checks.sh` |
 | `format` | **本次变更范围**内 C/C++ 文件的格式（判定对象等价于 staged 内容） | `sh scripts/checks/format.sh ci` |
 | `build-linux-debug` | Ubuntu 24.04 + `linux-clang-x64-Debug` 从零配置 + 构建 + 产物契约（体积阈值、≥32 个 `prism_player_*` 导出、不含 libc++） | `scripts/ci/preset-linux-debug.sh configure` / `build` / `verify` |
 | `tidy` | 本次变更范围内的 clang-tidy（与 `pre-push` 同一份判定） | `sh scripts/checks/tidy.sh build/Linux/debug ci` |
 | `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿（当前 `test/engine` 6 个用例） | `sh scripts/checks/ctest.sh build/Linux/debug` |
-| `coverage` | LLVM source-based 覆盖率报告（只出数字，不设阈值、不阻断；#84） | `bash scripts/coverage.sh` |
+| `coverage` | LLVM source-based 覆盖率报告（只出数字，不设阈值、不阻断；#84） | `bash scripts/build/coverage.sh` |
 
 上表六个 job（`hooks-self-test`、`checks-self-test`、`format`、`build-linux-debug`、`tidy`、`ctest`）**全部**是 `main` 规则集里的**必需状态检查**；`coverage` 是表中的第七行，**只上传报告、不是必需检查**（原因：batch ① 的 AV Sync 还没有测试、数字没有代表性，见 `docs/adr/0002-代码门禁.md` 决策 7）；`cache-key` 只是内部步骤，不是契约的一部分。**必需检查的改名 / 增删必须同步规则集**；非必需的附加 job 不参与合并判定，不受这条约束，但新增时要登记进本表。
 
@@ -119,7 +119,7 @@ bash scripts/ci/preset-linux-debug.sh verify
 sh scripts/checks/format.sh ci
 sh scripts/checks/tidy.sh build/Linux/debug ci
 sh scripts/checks/ctest.sh build/Linux/debug
-bash scripts/coverage.sh   # 覆盖率报告（报告型，不阻断；需要 llvm-23）
+bash scripts/build/coverage.sh   # 覆盖率报告（报告型，不阻断；需要 llvm-23）
 ```
 
 **CI 只跑 Linux Debug**：Windows 与 Release 由本机钩子覆盖（Server 的目标平台就是 Ubuntu，CI 对它最有说服力）。workflow 把 `CLANG_ROOT` 设成 `/usr/lib/llvm-23/bin`、`VCPKG_ROOT` 设成 `/home/runner/vcpkg`；工具版本前缀仍然必须是 `23.1`，不符即失败退出（判定复用 `scripts/checks/lib.sh`，与本机同一份）。

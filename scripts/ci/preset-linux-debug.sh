@@ -31,7 +31,7 @@ on_error() {
     printf '  ③ 日志里是 clang++ / 链接器的错误 —— 那才是代码本身编译不过。\n' >&2
     printf '本地复现（WSL / Linux，仓库根）：\n' >&2
     printf '  bash scripts/ci/setup-linux.sh llvm cmake system vcpkg\n' >&2
-    printf '  bash scripts/build.sh 1 && bash scripts/verify-build.sh 1\n' >&2
+    printf '  bash scripts/build/build.sh 1 && bash scripts/build/verify-build.sh 1\n' >&2
     printf '前置条件与依赖基线：docs/markdown/项目框架.md 7.1\n' >&2
 }
 trap 'on_error' ERR
@@ -74,8 +74,8 @@ case "${STEP}" in
         cmake --build --preset "${PRESET}"
         ;;
     verify)
-        say "产物契约断言：bash scripts/verify-build.sh 1"
-        bash scripts/verify-build.sh 1
+        say "产物契约断言：bash scripts/build/verify-build.sh 1"
+        bash scripts/build/verify-build.sh 1
         ;;
     *)
         usage
