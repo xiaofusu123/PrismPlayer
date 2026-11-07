@@ -100,16 +100,18 @@ echo "体积阈值刻意高于空归档/占位文件，并低于实测产物体�
 for config in "${selected[@]}"; do
     case "${config}" in
         debug)
-            test_config "linux:debug" "${PROJECT_ROOT}/build/Linux/debug" x64-linux 25 \
+            test_config "linux:debug" "${PROJECT_ROOT}/build/Linux/debug" x64-linux 26 \
                 client/engine/libclient-engine.so:36000 \
                 client/service/libclient-service.so:2000000 \
+                client/adapter/libclient-adapter.a:5000000 \
                 client/business/av_sync/libclient-av_sync.a:6000000 \
                 server/Prism-server:4000
             ;;
         release)
-            test_config "linux:release" "${PROJECT_ROOT}/build/Linux/release" x64-linux 25 \
+            test_config "linux:release" "${PROJECT_ROOT}/build/Linux/release" x64-linux 26 \
                 client/engine/libclient-engine.so:6000 \
                 client/service/libclient-service.so:120000 \
+                client/adapter/libclient-adapter.a:700000 \
                 client/business/av_sync/libclient-av_sync.a:490000 \
                 server/Prism-server:4000
             ;;

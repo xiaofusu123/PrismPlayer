@@ -70,7 +70,7 @@
 | `ConfigAdapter`（接口） / `JSONConfigAdapter`（实现） | `SettingsAdapter`、`ConfigManager` | 同上 |
 | `NetworkAdapter`（接口） / `ASIONetworkAdapter`（实现） | `SocketAdapter`、`NetAdapter` | 同上 |
 
-> ⚠️ 说「适配器」时**指明是接口还是实现**：文档里列组件清单时用左边的接口名（这也是 `项目框架.md` 的做法，它没错），说具体实现时才用右边的名字。`FileAdapter` → `WinFileAdapter` 与 `ConfigAdapter` → `JSONConfigAdapter` **已有实现**（分别在 `src/WinFileAdapter.cpp`、`src/JSONConfigAdapter.cpp`），`SQLiteDBAdapter` / `ASIONetworkAdapter` / `OpenSSLCryptoAdapter` **仍只有声明骨架**（后两者的 `// TODO` 保留在 `internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`）。`client-adapter` 目标现在会产出非空静态库。
+> ⚠️ 说「适配器」时**指明是接口还是实现**：文档里列组件清单时用左边的接口名（这也是 `项目框架.md` 的做法，它没错），说具体实现时才用右边的名字。**五个实现全部落地**：`src/WinFileAdapter.cpp`、`src/JSONConfigAdapter.cpp`（#57）、`src/SQLiteDBAdapter.cpp`、`src/OpenSSLCryptoAdapter.cpp`、`src/ASIONetworkAdapter.cpp`（#59）；`internal/` 下原先那两处 `// TODO`（OpenSSL 私有成员、`sqlite3*` 句柄）已随实现移除。`client-adapter` 目标产出非空静态库，归档内含 5 个目标文件。
 
 ## 版本、数值与标识
 

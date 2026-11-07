@@ -18,10 +18,11 @@ $SPECS = @{
     "windows:debug" = @{
         BuildDir    = "build/Windows/debug"
         Triplet     = "x64-mingw-dynamic"
-        MinPackages = 25
+        MinPackages = 26
         Artifacts   = @(
             @{ Path = "client/engine/libclient-engine.dll"; MinSize = 50000 },
             @{ Path = "client/service/libclient-service.dll"; MinSize = 5000000 },
+            @{ Path = "client/adapter/libclient-adapter.a"; MinSize = 8000000 },
             @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 7500000 },
             @{ Path = "server/Prism-server.exe"; MinSize = 8000 }
         )
@@ -29,10 +30,11 @@ $SPECS = @{
     "windows:release" = @{
         BuildDir    = "build/Windows/release"
         Triplet     = "x64-mingw-dynamic"
-        MinPackages = 25
+        MinPackages = 26
         Artifacts   = @(
             @{ Path = "client/engine/libclient-engine.dll"; MinSize = 9000 },
             @{ Path = "client/service/libclient-service.dll"; MinSize = 120000 },
+            @{ Path = "client/adapter/libclient-adapter.a"; MinSize = 800000 },
             @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 400000 },
             @{ Path = "server/Prism-server.exe"; MinSize = 8000 }
         )
@@ -40,10 +42,11 @@ $SPECS = @{
     "linux:debug" = @{
         BuildDir    = "build/Linux/debug"
         Triplet     = "x64-linux"
-        MinPackages = 25
+        MinPackages = 26
         Artifacts   = @(
             @{ Path = "client/engine/libclient-engine.so"; MinSize = 36000 },
             @{ Path = "client/service/libclient-service.so"; MinSize = 2000000 },
+            @{ Path = "client/adapter/libclient-adapter.a"; MinSize = 5000000 },
             @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 6000000 },
             @{ Path = "server/Prism-server"; MinSize = 4000 }
         )
@@ -51,10 +54,11 @@ $SPECS = @{
     "linux:release" = @{
         BuildDir    = "build/Linux/release"
         Triplet     = "x64-linux"
-        MinPackages = 25
+        MinPackages = 26
         Artifacts   = @(
             @{ Path = "client/engine/libclient-engine.so"; MinSize = 6000 },
             @{ Path = "client/service/libclient-service.so"; MinSize = 120000 },
+            @{ Path = "client/adapter/libclient-adapter.a"; MinSize = 700000 },
             @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 490000 },
             @{ Path = "server/Prism-server"; MinSize = 4000 }
         )

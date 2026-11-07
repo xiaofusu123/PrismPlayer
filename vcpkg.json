@@ -17,6 +17,7 @@
         "openssl",
         "soundtouch",
         "spdlog",
+        "sqlite3",
         "vulkan"
       ]
     },
