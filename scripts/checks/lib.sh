@@ -197,6 +197,15 @@ prism_range_files() {
             ;;
         ci)
             _prism_rf_ci=$(prism_ci_range_from_env) || return 1
+            # push 事件的 before 可能是被强推掉的旧 tip（历史重写后与 after 无共同祖先），
+            # 此时三点 `a...b` 会让 git 直接报 "no merge base"。退回两点比较两棵树的实际差异，
+            # 仍然只查内容变化、仍然 fail-closed（git 失败即 return 1）。
+            _prism_rf_ci_base=${_prism_rf_ci%%...*}
+            _prism_rf_ci_head=${_prism_rf_ci#*...}
+            if ! git merge-base "${_prism_rf_ci_base}" "${_prism_rf_ci_head}" >/dev/null 2>&1; then
+                prism_info "CI 范围的 base 与 head 没有共同祖先（force-push），改用两点比较实际树差异。"
+                _prism_rf_ci="${_prism_rf_ci_base}..${_prism_rf_ci_head}"
+            fi
             git diff --name-only --diff-filter=ACMR -z "${_prism_rf_ci}" > "${_prism_rf_out}.z" || return 1
             ;;
         -*)
