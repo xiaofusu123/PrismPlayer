@@ -24,19 +24,17 @@ constexpr int HTTP_TRANSFER_TIMEOUT_SECS = 60;
 constexpr int WS_HANDSHAKE_TIMEOUT_SECS = 10;
 
 /**
- * @brief 把请求头表拼成 ixwebsocket 需要的 `Key: Value\r\n` 文本
+ * @brief 把公共接口的请求头表转成 ixwebsocket 的大小写不敏感表
  * @param headers 自定义请求头
- * @return 逐行拼接的请求头文本，空表返回空串
+ * @return ixwebsocket 的请求头表
  */
-std::string to_header_lines(const std::unordered_map<std::string, std::string>& headers) {
-    std::string lines;
+[[nodiscard]] ix::WebSocketHttpHeaders
+to_ix_headers(const std::unordered_map<std::string, std::string>& headers) {
+    ix::WebSocketHttpHeaders result;
     for (const auto& item : headers) {
-        lines += item.first;
-        lines += ": ";
-        lines += item.second;
-        lines += "\r\n";
+        result.emplace(item.first, item.second);
     }
-    return lines;
+    return result;
 }
 
 /**
@@ -47,7 +45,7 @@ std::string to_header_lines(const std::unordered_map<std::string, std::string>& 
 [[nodiscard]] ix::HttpRequestArgsPtr
 make_request_args(const std::unordered_map<std::string, std::string>& headers) {
     auto args = std::make_shared<ix::HttpRequestArgs>();
-    args->extraHeaders = to_header_lines(headers);
+    args->extraHeaders = to_ix_headers(headers);
     args->connectTimeout = HTTP_CONNECT_TIMEOUT_SECS;
     args->transferTimeout = HTTP_TRANSFER_TIMEOUT_SECS;
     return args;
@@ -71,8 +69,10 @@ HttpResponse to_response(const ix::HttpResponsePtr& raw) {
         response.headers.emplace(item.first, item.second);
     }
 
-    if (!raw->error.empty()) {
-        spdlog::warn("[NetworkAdapter] HTTP request failed: {}", raw->error);
+    // ixwebsocket 的 HttpResponse 没有独立的错误字段：请求没能走通时 statusCode 保持初值
+    // （-1），所以用「状态码 <= 0」作为失败判据，交给调用方按 0 处理。
+    if (response.status_code <= 0) {
+        spdlog::warn("[NetworkAdapter] HTTP request returned no status code");
     }
     return response;
 }
@@ -96,7 +96,6 @@ struct NetworkImpl {
     std::condition_variable settled;   /**< 握手有结果（Open/Close/Error）时唤醒 ws_connect */
     bool connecting{false};            /**< 正在等握手结果 */
     bool opened{false};                /**< 连接已建立 */
-    bool failed{false};                /**< 握手失败 */
     std::string error;                 /**< 最近一次错误描述 */
     bool net_ready{false};             /**< ix::initNetSystem() 已调用 */
 
@@ -139,7 +138,8 @@ void NetworkImpl::on_message(const ix::WebSocketMessagePtr& message) {
             settled.notify_all();
             break;
         case ix::WebSocketMessageType::Error:
-            failed = true;
+            // 握手失败与「连上后被断开」共用这一支：两种情况下 connecting 都要落回 false，
+            // 让等握手的 ws_connect() 立刻返回 false 而不是干等到超时。
             connecting = false;
             error = message->errorInfo.reason;
             error_text = error;
@@ -270,7 +270,6 @@ bool ASIONetworkAdapter::ws_connect(const std::string& url, WsCallback* callback
         impl_->callback = callback;
         impl_->connecting = true;
         impl_->opened = false;
-        impl_->failed = false;
         impl_->error.clear();
         impl_->ws = socket;
     }
