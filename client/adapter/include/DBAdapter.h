@@ -12,10 +12,10 @@ namespace Prism::Adapter {
  * @brief 用户账户信息
  */
 struct AccountInfo {
-    int64_t id{0};                       /**< 账户 ID */
-    std::string username;                /**< 账户名 / 昵称 */
-    std::string email;                   /**< 邮箱 */
-    std::string password_hash;           /**< 密码哈希 */
+    int64_t id{0};             /**< 账户 ID */
+    std::string username;      /**< 账户名 / 昵称 */
+    std::string email;         /**< 邮箱 */
+    std::string password_hash; /**< 密码哈希 */
 };
 
 /**
@@ -23,20 +23,20 @@ struct AccountInfo {
  * @brief 音频文件信息
  */
 struct AudioFileInfo {
-    int64_t id{0};                       /**< 文件 ID */
-    std::string title;                   /**< 歌曲名 */
-    std::string file_path;               /**< 文件路径 */
-    uint64_t file_size{0};               /**< 文件大小（字节） */
-    std::string cover_path;              /**< 封面路径 */
-    std::string artist;                  /**< 作曲者 */
-    std::string encoding_format;         /**< 编码格式（AAC/MP3/FLAC/Opus/PCM） */
-    uint64_t duration{0};                /**< 时长（ms） */
-    uint32_t bit_depth{0};               /**< 位深（16/24/32） */
-    uint32_t sample_rate{0};             /**< 采样率（Hz） */
-    uint64_t bit_rate{0};                /**< 比特率（bps） */
-    uint32_t channels{0};                /**< 声道数（1/2/6/8） */
-    std::string channel_layout;          /**< 声道布局（mono/stereo/5.1/7.1） */
-    std::string lyrics_path;             /**< 歌词文件路径 */
+    int64_t id{0};               /**< 文件 ID */
+    std::string title;           /**< 歌曲名 */
+    std::string file_path;       /**< 文件路径 */
+    uint64_t file_size{0};       /**< 文件大小（字节） */
+    std::string cover_path;      /**< 封面路径 */
+    std::string artist;          /**< 作曲者 */
+    std::string encoding_format; /**< 编码格式（AAC/MP3/FLAC/Opus/PCM） */
+    uint64_t duration{0};        /**< 时长（ms） */
+    uint32_t bit_depth{0};       /**< 位深（16/24/32） */
+    uint32_t sample_rate{0};     /**< 采样率（Hz） */
+    uint64_t bit_rate{0};        /**< 比特率（bps） */
+    uint32_t channels{0};        /**< 声道数（1/2/6/8） */
+    std::string channel_layout;  /**< 声道布局（mono/stereo/5.1/7.1） */
+    std::string lyrics_path;     /**< 歌词文件路径 */
 };
 
 /**
@@ -44,18 +44,18 @@ struct AudioFileInfo {
  * @brief 视频文件信息
  */
 struct VideoFileInfo {
-    int64_t id{0};                       /**< 文件 ID */
-    std::string filename;                /**< 文件名 */
-    std::string file_path;               /**< 文件路径 */
-    uint64_t file_size{0};               /**< 文件大小（字节） */
-    std::string author;                  /**< 作者 */
-    uint32_t resolution_width{0};        /**< 分辨率宽度 */
-    uint32_t resolution_height{0};       /**< 分辨率高度 */
-    uint32_t color_depth{0};             /**< 色深（8/10 bit） */
-    uint64_t duration{0};                /**< 时长（ms） */
-    std::string encoding_format;         /**< 编码格式（H.264/H.265/AV1/VP9） */
-    double frame_rate{0.0};              /**< 帧率（fps） */
-    uint64_t bit_rate{0};                /**< 比特率（bps） */
+    int64_t id{0};                 /**< 文件 ID */
+    std::string filename;          /**< 文件名 */
+    std::string file_path;         /**< 文件路径 */
+    uint64_t file_size{0};         /**< 文件大小（字节） */
+    std::string author;            /**< 作者 */
+    uint32_t resolution_width{0};  /**< 分辨率宽度 */
+    uint32_t resolution_height{0}; /**< 分辨率高度 */
+    uint32_t color_depth{0};       /**< 色深（8/10 bit） */
+    uint64_t duration{0};          /**< 时长（ms） */
+    std::string encoding_format;   /**< 编码格式（H.264/H.265/AV1/VP9） */
+    double frame_rate{0.0};        /**< 帧率（fps） */
+    uint64_t bit_rate{0};          /**< 比特率（bps） */
 };
 
 /**
@@ -63,7 +63,7 @@ struct VideoFileInfo {
  * @brief SQLite 数据库操作抽象接口，提供表级 CRUD
  */
 class DBAdapter {
-public:
+  public:
     virtual ~DBAdapter() = default;
 
     /**

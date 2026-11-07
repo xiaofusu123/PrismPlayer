@@ -12,9 +12,9 @@ namespace Prism::Adapter {
  * @brief HTTP 响应
  */
 struct HttpResponse {
-    int status_code{0};                                           /**< HTTP 状态码 */
-    std::string body;                                             /**< 响应体 */
-    std::unordered_map<std::string, std::string> headers;         /**< 响应头 */
+    int status_code{0};                                   /**< HTTP 状态码 */
+    std::string body;                                     /**< 响应体 */
+    std::unordered_map<std::string, std::string> headers; /**< 响应头 */
 };
 
 /**
@@ -22,8 +22,8 @@ struct HttpResponse {
  * @brief WebSocket 消息类型
  */
 enum class WsMessageType {
-    TEXT,    /**< 文本消息 */
-    BINARY   /**< 二进制消息 */
+    TEXT,  /**< 文本消息 */
+    BINARY /**< 二进制消息 */
 };
 
 /**
@@ -31,8 +31,8 @@ enum class WsMessageType {
  * @brief WebSocket 消息
  */
 struct WsMessage {
-    WsMessageType type;          /**< 消息类型 */
-    std::string data;            /**< 消息数据 */
+    WsMessageType type; /**< 消息类型 */
+    std::string data;   /**< 消息数据 */
 };
 
 /**
@@ -40,7 +40,7 @@ struct WsMessage {
  * @brief WebSocket 事件回调接口，由上层实现
  */
 class WsCallback {
-public:
+  public:
     virtual ~WsCallback() = default;
 
     /**
@@ -71,7 +71,7 @@ public:
  * @brief 网络通信抽象接口，封装 HTTP 请求与 WebSocket 通信
  */
 class NetworkAdapter {
-public:
+  public:
     virtual ~NetworkAdapter() = default;
 
     /**
@@ -93,8 +93,9 @@ public:
      * @param headers 自定义请求头
      * @return HttpResponse 响应
      */
-    virtual HttpResponse http_get(const std::string& url,
-                                  const std::unordered_map<std::string, std::string>& headers = {}) = 0;
+    virtual HttpResponse
+    http_get(const std::string& url,
+             const std::unordered_map<std::string, std::string>& headers = {}) = 0;
 
     /**
      * @brief 发送 HTTP POST 请求
@@ -103,9 +104,9 @@ public:
      * @param headers 自定义请求头
      * @return HttpResponse 响应
      */
-    virtual HttpResponse http_post(const std::string& url,
-                                   const std::string& body,
-                                   const std::unordered_map<std::string, std::string>& headers = {}) = 0;
+    virtual HttpResponse
+    http_post(const std::string& url, const std::string& body,
+              const std::unordered_map<std::string, std::string>& headers = {}) = 0;
 
     // ==================== WebSocket ====================
 
