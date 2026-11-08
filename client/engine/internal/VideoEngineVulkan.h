@@ -17,7 +17,10 @@ public:
     bool seek(uint64_t pts, int seek_mode) override;
     VideoSyncInfo get_sync_info() override;
     RenderMetadata get_render_result() override;
+    void set_observer(IEngineObserver* observer) override;
+
 private:
+    IEngineObserver* observer_{nullptr};
 };
 
 } // namespace Prism::Engine

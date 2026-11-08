@@ -57,6 +57,12 @@ public:
     virtual void set_video_engine(Prism::Engine::VideoEngine* engine) = 0;
 
     /**
+     * @brief 绑定帧回调观察者，并在引擎创建时注册到引擎
+     * @param observer 观察者指针（不持有所有权）
+     */
+    virtual void set_observer(Prism::Engine::IEngineObserver* observer) = 0;
+
+    /**
      * @brief 从工厂创建并初始化引擎，接管引擎所有权
      * @param audio_factory 音频引擎工厂指针（void* 解耦），nullptr 则不创建音频引擎
      * @param video_factory 视频引擎工厂指针（void* 解耦），nullptr 则不创建视频引擎

@@ -38,4 +38,8 @@ RenderMetadata VideoEngineVulkan::get_render_result() {
     return RenderMetadata{};
 }
 
+void VideoEngineVulkan::set_observer(IEngineObserver* observer) {
+    observer_ = observer;
+}
+
 } // namespace Prism::Engine

@@ -25,6 +25,7 @@
       "dependencies": [
         "asio",
         "ixwebsocket",
+        "libmysql",
         "nlohmann-json",
         "openssl",
         "spdlog"

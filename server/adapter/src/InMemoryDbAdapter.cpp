@@ -10,6 +10,7 @@ bool InMemoryDbAdapter::connect() {
     rooms_.clear();
     room_members_.clear();
     next_user_id_ = 1;
+    next_join_seq_ = 1;
     spdlog::info("InMemoryDbAdapter: connected (in-memory store initialized)");
     return true;
 }
@@ -20,6 +21,7 @@ void InMemoryDbAdapter::close() {
     rooms_.clear();
     room_members_.clear();
     next_user_id_ = 1;
+    next_join_seq_ = 1;
     spdlog::info("InMemoryDbAdapter: closed (in-memory store cleared)");
 }
 
@@ -97,7 +99,9 @@ bool InMemoryDbAdapter::insert_room_member(const RoomMemberRecord& member) {
             return false;
         }
     }
-    members.push_back(member);
+    RoomMemberRecord record = member;
+    record.joined_at = next_join_seq_++;
+    members.push_back(record);
     return true;
 }
 
@@ -124,6 +128,36 @@ std::vector<RoomMemberRecord> InMemoryDbAdapter::query_room_members(const std::s
         return {};
     }
     return it->second;
+}
+
+bool InMemoryDbAdapter::update_room_state(const std::string& room_id, RoomState state,
+                                          const std::string& current_media, int64_t position_ms) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = rooms_.find(room_id);
+    if (it == rooms_.end()) {
+        return false;
+    }
+    it->second.state = state;
+    it->second.current_media = current_media;
+    it->second.position_ms = position_ms;
+    return true;
+}
+
+bool InMemoryDbAdapter::update_room_owner(const std::string& room_id, int64_t owner_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = rooms_.find(room_id);
+    if (it == rooms_.end()) {
+        return false;
+    }
+    it->second.owner_id = owner_id;
+    return true;
+}
+
+bool InMemoryDbAdapter::delete_room(const std::string& room_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    rooms_.erase(room_id);
+    room_members_.erase(room_id);
+    return true;
 }
 
 } // namespace Prism::Server::Adapter

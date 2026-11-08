@@ -12,6 +12,7 @@ namespace Prism::Server::Adapter {
 namespace {
 
 constexpr int SALT_SIZE = 16;
+constexpr int TOKEN_SIZE = 32;
 
 std::string to_hex(const unsigned char* data, size_t size) {
     static const char HEX[] = "0123456789abcdef";
@@ -79,6 +80,14 @@ bool OpenSSLCryptoAdapter::verify_password(const std::string& password, const st
         return false;
     }
     return CRYPTO_memcmp(computed.data(), hash.data(), computed.size()) == 0;
+}
+
+std::string OpenSSLCryptoAdapter::generate_token() {
+    unsigned char raw[TOKEN_SIZE] = {};
+    if (RAND_bytes(raw, TOKEN_SIZE) != 1) {
+        return {};
+    }
+    return to_hex(raw, TOKEN_SIZE);
 }
 
 } // namespace Prism::Server::Adapter

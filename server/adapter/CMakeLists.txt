@@ -4,6 +4,7 @@ message(STATUS "${PROJECT_NAME} is building")
 
 find_package(spdlog REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(unofficial-libmysql REQUIRED)
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SRC)
 
@@ -25,6 +26,7 @@ if(SRC)
     PRIVATE
         spdlog::spdlog_header_only
         OpenSSL::Crypto
+        unofficial::libmysql::libmysql
     )
 else()
     message(WARNING "No source files found for ${PROJECT_NAME}")

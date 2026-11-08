@@ -34,4 +34,8 @@ AudioSyncInfo AudioEngineWasapiShared::get_sync_info() {
     return AudioSyncInfo{};
 }
 
+void AudioEngineWasapiShared::set_observer(IEngineObserver* observer) {
+    observer_ = observer;
+}
+
 } // namespace Prism::Engine

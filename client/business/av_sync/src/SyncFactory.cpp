@@ -22,7 +22,7 @@ std::unique_ptr<ICommandDispatcher> create_command_dispatcher()
     return std::make_unique<CommandDispatcher>();
 }
 
-std::unique_ptr<IEngineObserver> create_engine_observer()
+std::unique_ptr<ISyncObserver> create_engine_observer()
 {
     return std::make_unique<EngineObserver>();
 }

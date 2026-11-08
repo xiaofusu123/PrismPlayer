@@ -5,7 +5,7 @@
 #include "IPlaybackStateMachine.h"
 #include "ISyncAlgorithm.h"
 #include "ICommandDispatcher.h"
-#include "IEngineObserver.h"
+#include "ISyncObserver.h"
 #include "IServiceNetwork.h"
 
 #include <memory>
@@ -35,7 +35,7 @@ public:
     std::unique_ptr<Prism::Business::IPlaybackStateMachine> sync_sm_;
     std::unique_ptr<Prism::Business::ISyncAlgorithm>      sync_algo_;
     std::unique_ptr<Prism::Business::ICommandDispatcher>  cmd_dispatcher_;
-    std::unique_ptr<Prism::Business::IEngineObserver>     engine_observer_;
+    std::unique_ptr<Prism::Business::ISyncObserver>       engine_observer_;
 
     /* ---- 网络抽象（外部注入或默认桩实现） ---- */
     std::unique_ptr<IServiceNetwork> network_;

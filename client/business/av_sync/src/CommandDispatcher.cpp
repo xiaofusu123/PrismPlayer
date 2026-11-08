@@ -95,6 +95,11 @@ void CommandDispatcher::set_video_engine(Prism::Engine::VideoEngine* engine)
     video_engine_ = engine;
 }
 
+void CommandDispatcher::set_observer(Prism::Engine::IEngineObserver* observer)
+{
+    observer_ = observer;
+}
+
 bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_factory, bool enable_video)
 {
     auto* audio_fac = static_cast<Prism::Engine::AudioEngineFactory*>(audio_factory);
@@ -106,6 +111,9 @@ bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_fact
             audio_owned_.reset();
             audio_engine_ = nullptr;
             return false;
+        }
+        if (observer_) {
+            audio_engine_->set_observer(observer_);
         }
         spdlog::info("[CommandDispatcher] audio engine initialized");
     }
@@ -120,6 +128,9 @@ bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_fact
             video_engine_ = nullptr;
             return false;
         }
+        if (observer_) {
+            video_engine_->set_observer(observer_);
+        }
         spdlog::info("[CommandDispatcher] video engine initialized");
     }
 
@@ -129,6 +140,7 @@ bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_fact
 void CommandDispatcher::shutdown_engines()
 {
     if (audio_engine_) {
+        audio_engine_->set_observer(nullptr);
         audio_engine_->close();
         audio_owned_.reset();
         audio_engine_ = nullptr;
@@ -136,6 +148,7 @@ void CommandDispatcher::shutdown_engines()
     }
 
     if (video_engine_) {
+        video_engine_->set_observer(nullptr);
         video_engine_->close();
         video_owned_.reset();
         video_engine_ = nullptr;

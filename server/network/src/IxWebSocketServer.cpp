@@ -77,10 +77,21 @@ void IxWebSocketServer::handle_message(const std::shared_ptr<ix::ConnectionState
         session_manager_->register_connection(conn_id, &socket);
         spdlog::info("connection {} opened", conn_id);
         break;
-    case ix::WebSocketMessageType::Close:
+    case ix::WebSocketMessageType::Close: {
+        auto user_id = session_manager_->user_of(conn_id);
+        std::vector<std::string> room_ids;
+        if (user_id.has_value()) {
+            room_ids = session_manager_->rooms_of_user(*user_id);
+        }
         session_manager_->unregister_connection(conn_id);
+        if (user_id.has_value() && rooms_ != nullptr) {
+            for (const auto& room_id : room_ids) {
+                rooms_->leave_room(room_id, *user_id);
+            }
+        }
         spdlog::info("connection {} closed", conn_id);
         break;
+    }
     case ix::WebSocketMessageType::Message:
         handle_json_message(conn_id, socket, message->str);
         break;
@@ -111,6 +122,8 @@ void IxWebSocketServer::handle_json_message(const std::string& conn_id, ix::WebS
         handle_register(conn_id, socket, message);
     } else if (type == Business::MSG_LOGIN) {
         handle_login(conn_id, socket, message);
+    } else if (type == Business::MSG_LOGOUT) {
+        handle_logout(conn_id, socket, message);
     } else if (type == Business::MSG_CREATE_ROOM) {
         handle_create_room(conn_id, socket, message);
     } else if (type == Business::MSG_JOIN_ROOM) {
@@ -118,7 +131,7 @@ void IxWebSocketServer::handle_json_message(const std::string& conn_id, ix::WebS
     } else if (type == Business::MSG_LEAVE_ROOM) {
         handle_leave_room(conn_id, socket, message);
     } else {
-        auto sender = session_manager_->user_of(conn_id);
+        auto sender = require_auth(socket, message);
         if (router_ != nullptr && sender.has_value()) {
             router_->route(*sender, payload);
         }
@@ -156,20 +169,50 @@ void IxWebSocketServer::handle_login(const std::string& conn_id, ix::WebSocket& 
     }
     std::string username = message["username"].get<std::string>();
     std::string password = message["password"].get<std::string>();
-    auto user_id = auth_->login(username, password);
-    if (user_id.has_value()) {
-        session_manager_->bind_user(*user_id, conn_id);
-        send_ack(socket, Business::MSG_LOGIN);
-    } else {
-        send_error(socket, 401, "invalid credentials");
+    auto result = auth_->login(username, password);
+    if (result.error != Business::AuthError::NONE) {
+        send_error(socket, Business::ERR_INVALID_CREDENTIALS, "invalid credentials");
+        return;
     }
+    session_manager_->bind_user(result.user_id, conn_id);
+
+    nlohmann::json ack;
+    ack["type"] = Business::MSG_ACK;
+    ack["ok"] = true;
+    ack["for"] = Business::MSG_LOGIN;
+    ack["token"] = result.token;
+    socket.send(ack.dump());
 }
 
-void IxWebSocketServer::handle_create_room(const std::string& conn_id, ix::WebSocket& socket,
+void IxWebSocketServer::handle_logout(const std::string& /*conn_id*/, ix::WebSocket& socket,
+                                      const nlohmann::json& message) {
+    if (auth_ == nullptr) {
+        send_error(socket, 500, "auth not ready");
+        return;
+    }
+    if (!message.contains("token") || !message["token"].is_string()) {
+        send_error(socket, Business::ERR_NOT_AUTHENTICATED, "not authenticated");
+        return;
+    }
+    std::string token = message["token"].get<std::string>();
+    auto result = auth_->verify_token(token);
+    if (result.error == Business::AuthError::TOKEN_EXPIRED) {
+        send_error(socket, Business::ERR_TOKEN_EXPIRED, "token expired");
+        return;
+    }
+    if (result.error != Business::AuthError::NONE) {
+        send_error(socket, Business::ERR_NOT_AUTHENTICATED, "not authenticated");
+        return;
+    }
+    auth_->logout(token);
+    session_manager_->unbind_user(result.user_id);
+    send_ack(socket, Business::MSG_LOGOUT);
+}
+
+void IxWebSocketServer::handle_create_room(const std::string& /*conn_id*/, ix::WebSocket& socket,
                                            const nlohmann::json& message) {
-    auto user_id = session_manager_->user_of(conn_id);
+    auto user_id = require_auth(socket, message);
     if (!user_id.has_value()) {
-        send_error(socket, 401, "not logged in");
         return;
     }
     if (!message.contains("room_id")) {
@@ -179,17 +222,17 @@ void IxWebSocketServer::handle_create_room(const std::string& conn_id, ix::WebSo
     std::string room_id = message["room_id"].get<std::string>();
     std::string name = message.value("name", room_id);
     if (rooms_ != nullptr && rooms_->create_room(room_id, name, *user_id)) {
+        session_manager_->add_room_member(room_id, *user_id);
         send_ack(socket, Business::MSG_CREATE_ROOM);
     } else {
         send_error(socket, 409, "room already exists");
     }
 }
 
-void IxWebSocketServer::handle_join_room(const std::string& conn_id, ix::WebSocket& socket,
+void IxWebSocketServer::handle_join_room(const std::string& /*conn_id*/, ix::WebSocket& socket,
                                          const nlohmann::json& message) {
-    auto user_id = session_manager_->user_of(conn_id);
+    auto user_id = require_auth(socket, message);
     if (!user_id.has_value()) {
-        send_error(socket, 401, "not logged in");
         return;
     }
     if (!message.contains("room_id")) {
@@ -205,11 +248,10 @@ void IxWebSocketServer::handle_join_room(const std::string& conn_id, ix::WebSock
     }
 }
 
-void IxWebSocketServer::handle_leave_room(const std::string& conn_id, ix::WebSocket& socket,
+void IxWebSocketServer::handle_leave_room(const std::string& /*conn_id*/, ix::WebSocket& socket,
                                           const nlohmann::json& message) {
-    auto user_id = session_manager_->user_of(conn_id);
+    auto user_id = require_auth(socket, message);
     if (!user_id.has_value()) {
-        send_error(socket, 401, "not logged in");
         return;
     }
     if (!message.contains("room_id")) {
@@ -223,6 +265,29 @@ void IxWebSocketServer::handle_leave_room(const std::string& conn_id, ix::WebSoc
     } else {
         send_error(socket, 404, "not in room");
     }
+}
+
+std::optional<int64_t> IxWebSocketServer::require_auth(ix::WebSocket& socket,
+                                                       const nlohmann::json& message) {
+    if (auth_ == nullptr) {
+        send_error(socket, 500, "auth not ready");
+        return std::nullopt;
+    }
+    if (!message.contains("token") || !message["token"].is_string()) {
+        send_error(socket, Business::ERR_NOT_AUTHENTICATED, "not authenticated");
+        return std::nullopt;
+    }
+    std::string token = message["token"].get<std::string>();
+    auto result = auth_->verify_token(token);
+    if (result.error == Business::AuthError::TOKEN_EXPIRED) {
+        send_error(socket, Business::ERR_TOKEN_EXPIRED, "token expired");
+        return std::nullopt;
+    }
+    if (result.error != Business::AuthError::NONE) {
+        send_error(socket, Business::ERR_NOT_AUTHENTICATED, "not authenticated");
+        return std::nullopt;
+    }
+    return result.user_id;
 }
 
 void IxWebSocketServer::send_ack(ix::WebSocket& socket, const std::string& for_type) {

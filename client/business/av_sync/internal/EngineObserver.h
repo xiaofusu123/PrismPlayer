@@ -1,6 +1,6 @@
 #pragma once
 
-#include "IEngineObserver.h"
+#include "ISyncObserver.h"
 #include "ISyncAlgorithm.h"
 #include "IPlaybackStateMachine.h"
 
@@ -10,7 +10,7 @@ namespace Prism::Business {
  * @class EngineObserver
  * @brief 引擎观察者实现，接收帧回调并驱动同步校准
  */
-class EngineObserver : public IEngineObserver {
+class EngineObserver : public ISyncObserver {
 public:
     EngineObserver();
     ~EngineObserver() override = default;

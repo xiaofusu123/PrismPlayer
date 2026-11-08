@@ -10,6 +10,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <vector>
 
 namespace Prism::Server::Network {
 
@@ -46,11 +47,24 @@ class SessionManager : public Business::IClientNotifier {
     void bind_user(int64_t user_id, const std::string& conn_id);
 
     /**
+     * @brief 解绑用户（登出时清理其连接绑定与房间在线状态）
+     * @param user_id 用户 ID
+     */
+    void unbind_user(int64_t user_id);
+
+    /**
      * @brief 查询连接对应的用户 ID
      * @param conn_id 连接 ID
      * @return 已绑定返回用户 ID，否则 nullopt
      */
     std::optional<int64_t> user_of(const std::string& conn_id);
+
+    /**
+     * @brief 查询用户当前在线的房间
+     * @param user_id 用户 ID
+     * @return 房间 ID 列表
+     */
+    std::vector<std::string> rooms_of_user(int64_t user_id);
 
     /**
      * @brief 记录用户加入房间（在线状态）

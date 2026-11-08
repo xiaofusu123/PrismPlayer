@@ -33,12 +33,18 @@ class InMemoryDbAdapter : public DBAdapter {
     bool delete_room_member(const std::string& room_id, int64_t user_id) override;
     std::vector<RoomMemberRecord> query_room_members(const std::string& room_id) override;
 
+    bool update_room_state(const std::string& room_id, RoomState state,
+                           const std::string& current_media, int64_t position_ms) override;
+    bool update_room_owner(const std::string& room_id, int64_t owner_id) override;
+    bool delete_room(const std::string& room_id) override;
+
   private:
     std::mutex mutex_;
     std::map<int64_t, UserRecord> users_;
     int64_t next_user_id_{1};
     std::map<std::string, RoomRecord> rooms_;
     std::map<std::string, std::vector<RoomMemberRecord>> room_members_;
+    int64_t next_join_seq_{1};
 };
 
 } // namespace Prism::Server::Adapter
