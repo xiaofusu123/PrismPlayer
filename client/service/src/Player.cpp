@@ -68,6 +68,7 @@ PrismPlayerInternal::PrismPlayerInternal(const PrismConfig& cfg, PrismEventCallb
 
     engine_observer_->set_sync_algorithm(sync_algo_.get());
     engine_observer_->set_state_machine(sync_sm_.get());
+    cmd_dispatcher_->set_observer(engine_observer_.get());
 
     network_ = std::make_unique<DefaultNetworkClient>();
 

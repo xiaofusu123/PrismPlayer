@@ -3,7 +3,7 @@
 #include "PlaybackStateMachine.h"
 #include "SyncAlgorithm.h"
 #include "CommandDispatcher.h"
-#include "EngineObserver.h"
+#include "SyncEngineObserver.h"
 
 namespace Prism::Business {
 
@@ -24,7 +24,7 @@ std::unique_ptr<ICommandDispatcher> create_command_dispatcher()
 
 std::unique_ptr<IEngineObserver> create_engine_observer()
 {
-    return std::make_unique<EngineObserver>();
+    return std::make_unique<SyncEngineObserver>();
 }
 
 } // namespace Prism::Business

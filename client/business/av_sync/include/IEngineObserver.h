@@ -1,7 +1,6 @@
 #pragma once
 
-#include "AudioEngine.h"
-#include "VideoEngine.h"
+#include "EngineObserver.h"
 
 namespace Prism::Business {
 
@@ -10,32 +9,15 @@ class IPlaybackStateMachine;
 
 /**
  * @class IEngineObserver
- * @brief 引擎帧回调观察者抽象接口
+ * @brief AV Sync 侧引擎帧回调观察者抽象接口
  *
- * 接收 Engine 层的帧回调，驱动同步算法校准。
- * 在帧到达时触发 calibrate，根据结果调整渲染行为。
+ * 继承引擎层声明的 Prism::Engine::EngineObserver（三个帧回调），
+ * 并额外提供同步算法/状态机的装配方法。引擎只依赖 Engine::EngineObserver，
+ * 不依赖本类，从而避免引擎层对 Business 层的反向依赖。
  */
-class IEngineObserver {
+class IEngineObserver : public Prism::Engine::EngineObserver {
 public:
-    virtual ~IEngineObserver() = default;
-
-    /**
-     * @brief 音频帧到达回调
-     * @param info 音频同步信息
-     */
-    virtual void on_audio_frame(const Prism::Engine::AudioSyncInfo& info) = 0;
-
-    /**
-     * @brief 视频帧到达回调
-     * @param info 视频同步信息
-     */
-    virtual void on_video_frame(const Prism::Engine::VideoSyncInfo& info) = 0;
-
-    /**
-     * @brief 渲染就绪回调
-     * @param metadata 渲染元数据
-     */
-    virtual void on_render_ready(const Prism::Engine::RenderMetadata& metadata) = 0;
+    ~IEngineObserver() override = default;
 
     /**
      * @brief 绑定同步算法

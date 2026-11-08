@@ -24,6 +24,15 @@ class ISyncAlgorithm {
     virtual SyncAction calibrate(uint64_t audio_pts, uint64_t video_pts) = 0;
 
     /**
+     * @brief 更新当前音频 PTS（不触发校准）
+     *
+     * 音频帧到达时调用，使 get_drift_info().audio_pts 随音频时钟单调推进，
+     * 服务层据此返回播放位置，无需等待视频帧触发 calibrate。
+     * @param audio_pts 当前音频帧 PTS（ms）
+     */
+    virtual void update_audio_pts(uint64_t audio_pts) = 0;
+
+    /**
      * @brief 配置同步参数
      * @param config 同步配置
      */

@@ -23,10 +23,12 @@ public:
     void set_video_engine(Prism::Engine::VideoEngine* engine) override;
     bool initialize_engines(void* audio_factory, void* video_factory, bool enable_video) override;
     void shutdown_engines() override;
+    void set_observer(Prism::Engine::EngineObserver* observer) override;
 
 private:
     Prism::Engine::AudioEngine* audio_engine_{nullptr};
     Prism::Engine::VideoEngine* video_engine_{nullptr};
+    Prism::Engine::EngineObserver* observer_{nullptr};
     std::unique_ptr<Prism::Engine::AudioEngine> audio_owned_;
     std::unique_ptr<Prism::Engine::VideoEngine> video_owned_;
 };

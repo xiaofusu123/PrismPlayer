@@ -36,6 +36,11 @@ SyncAction SyncAlgorithm::calibrate(uint64_t audio_pts, uint64_t video_pts)
     return SyncAction::RENDER;
 }
 
+void SyncAlgorithm::update_audio_pts(uint64_t audio_pts)
+{
+    drift_info_.audio_pts = audio_pts;
+}
+
 void SyncAlgorithm::configure(const SyncConfig& config)
 {
     config_ = config;

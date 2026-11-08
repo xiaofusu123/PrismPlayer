@@ -11,6 +11,8 @@ typedef int32_t RenderResultHandle;
 
 namespace Prism::Engine {
 
+class EngineObserver;
+
 /**
  * @struct VideoSyncInfo
  * @brief 视频同步信息
@@ -85,6 +87,12 @@ class VideoEngine {
      * @return RenderMetadata 渲染元数据
      */
     virtual RenderMetadata get_render_result() = 0;
+
+    /**
+     * @brief 注册帧回调观察者
+     * @param observer 观察者指针，传 nullptr 表示注销
+     */
+    virtual void set_observer(EngineObserver* observer) = 0;
 };
 
 } // namespace Prism::Engine

@@ -7,13 +7,13 @@
 namespace Prism::Business {
 
 /**
- * @class EngineObserver
+ * @class SyncEngineObserver
  * @brief 引擎观察者实现，接收帧回调并驱动同步校准
  */
-class EngineObserver : public IEngineObserver {
+class SyncEngineObserver : public IEngineObserver {
 public:
-    EngineObserver();
-    ~EngineObserver() override = default;
+    SyncEngineObserver();
+    ~SyncEngineObserver() override = default;
 
     void on_audio_frame(const Prism::Engine::AudioSyncInfo& info) override;
     void on_video_frame(const Prism::Engine::VideoSyncInfo& info) override;

@@ -25,6 +25,7 @@
       "dependencies": [
         "asio",
         "ixwebsocket",
+        "libmariadb",
         "nlohmann-json",
         "openssl",
         "spdlog"

@@ -18,6 +18,7 @@ if(SRC)
         PUBLIC
             GTest::gtest_main
             $<$<TARGET_EXISTS:client-service>:client-service>
+            $<$<TARGET_EXISTS:client-engine>:client-engine>
     )
 
     if(WIN32 AND TARGET client-service)

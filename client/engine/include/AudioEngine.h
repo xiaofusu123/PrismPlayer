@@ -4,6 +4,8 @@
 
 namespace Prism::Engine {
 
+class EngineObserver;
+
 /**
  * @struct AudioSyncInfo
  * @brief 音频同步信息
@@ -58,6 +60,12 @@ public:
      * @return AudioSyncInfo 音频同步信息
      */
     virtual AudioSyncInfo get_sync_info() = 0;
+
+    /**
+     * @brief 注册帧回调观察者
+     * @param observer 观察者指针，传 nullptr 表示注销
+     */
+    virtual void set_observer(EngineObserver* observer) = 0;
 };
 
 } // namespace Prism::Engine

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include "AudioEngine.h"
+#include "EngineObserver.h"
 #include "VideoEngine.h"
 
 namespace Prism::Business {
@@ -69,6 +70,15 @@ public:
      * @brief 关闭并销毁所有引擎实例
      */
     virtual void shutdown_engines() = 0;
+
+    /**
+     * @brief 注册帧回调观察者
+     *
+     * 在 initialize_engines / set_audio_engine / set_video_engine 之后，
+     * 分发器会把该观察者注册到已创建/注入的引擎上。
+     * @param observer 观察者指针（不持有所有权），nullptr 表示注销
+     */
+    virtual void set_observer(Prism::Engine::EngineObserver* observer) = 0;
 };
 
 } // namespace Prism::Business

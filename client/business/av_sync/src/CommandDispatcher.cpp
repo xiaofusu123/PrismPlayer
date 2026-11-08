@@ -88,11 +88,28 @@ bool CommandDispatcher::dispatch_speed(float speed)
 void CommandDispatcher::set_audio_engine(Prism::Engine::AudioEngine* engine)
 {
     audio_engine_ = engine;
+    if (audio_engine_) {
+        audio_engine_->set_observer(observer_);
+    }
 }
 
 void CommandDispatcher::set_video_engine(Prism::Engine::VideoEngine* engine)
 {
     video_engine_ = engine;
+    if (video_engine_) {
+        video_engine_->set_observer(observer_);
+    }
+}
+
+void CommandDispatcher::set_observer(Prism::Engine::EngineObserver* observer)
+{
+    observer_ = observer;
+    if (audio_engine_) {
+        audio_engine_->set_observer(observer_);
+    }
+    if (video_engine_) {
+        video_engine_->set_observer(observer_);
+    }
 }
 
 bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_factory, bool enable_video)
@@ -107,6 +124,7 @@ bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_fact
             audio_engine_ = nullptr;
             return false;
         }
+        audio_engine_->set_observer(observer_);
         spdlog::info("[CommandDispatcher] audio engine initialized");
     }
 
@@ -120,6 +138,7 @@ bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_fact
             video_engine_ = nullptr;
             return false;
         }
+        video_engine_->set_observer(observer_);
         spdlog::info("[CommandDispatcher] video engine initialized");
     }
 
