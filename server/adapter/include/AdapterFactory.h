@@ -16,20 +16,17 @@ class CryptoAdapter;
  * - MEMORY: 内存实现（缺省）
  * - MYSQL: MySQL 实现
  */
-enum class DbBackend {
-    MEMORY,
-    MYSQL
-};
+enum class DbBackend { MEMORY, MYSQL };
 
 /**
  * @struct MySqlConfig
  * @brief MySQL 连接配置
  */
 struct MySqlConfig {
-    std::string host{"127.0.0.1"};      /**< 主机地址 */
-    uint16_t port{3306};                /**< 端口 */
-    std::string user{"prism"};          /**< 用户名 */
-    std::string password;               /**< 密码 */
+    std::string host{"127.0.0.1"};        /**< 主机地址 */
+    uint16_t port{3306};                  /**< 端口 */
+    std::string user{"prism"};            /**< 用户名 */
+    std::string password;                 /**< 密码 */
     std::string database{"prism_player"}; /**< 数据库名 */
 };
 
@@ -49,8 +46,7 @@ std::unique_ptr<DBAdapter> create_db_adapter();
  * @param config MySQL 连接配置（仅 MYSQL 后端使用）
  * @return DBAdapter 实例
  */
-std::unique_ptr<DBAdapter> create_db_adapter(DbBackend backend,
-                                             const MySqlConfig& config = {});
+std::unique_ptr<DBAdapter> create_db_adapter(DbBackend backend, const MySqlConfig& config = {});
 
 /**
  * @brief 创建密码学适配器实例（OpenSSL 实现）

@@ -25,24 +25,20 @@ struct UserRecord {
  * - PLAYING: 播放中
  * - PAUSED: 暂停
  */
-enum class RoomState {
-    IDLE,
-    PLAYING,
-    PAUSED
-};
+enum class RoomState { IDLE, PLAYING, PAUSED };
 
 /**
  * @struct RoomRecord
  * @brief 房间记录
  */
 struct RoomRecord {
-    std::string room_id;                         /**< 房间 ID */
-    std::string name;                            /**< 房间名 */
-    int64_t owner_id{0};                         /**< 房主用户 ID */
-    int32_t max_members{0};                      /**< 最大成员数 */
-    RoomState state{RoomState::IDLE};            /**< 房间播放状态 */
-    std::string current_media;                   /**< 当前媒体 URI */
-    int64_t position_ms{0};                      /**< 当前播放位置（ms） */
+    std::string room_id;              /**< 房间 ID */
+    std::string name;                 /**< 房间名 */
+    int64_t owner_id{0};              /**< 房主用户 ID */
+    int32_t max_members{0};           /**< 最大成员数 */
+    RoomState state{RoomState::IDLE}; /**< 房间播放状态 */
+    std::string current_media;        /**< 当前媒体 URI */
+    int64_t position_ms{0};           /**< 当前播放位置（ms） */
 };
 
 /**
@@ -50,9 +46,9 @@ struct RoomRecord {
  * @brief 房间成员记录
  */
 struct RoomMemberRecord {
-    std::string room_id;   /**< 房间 ID */
-    int64_t user_id{0};    /**< 用户 ID */
-    int64_t joined_at{0};  /**< 加入时间（ms，越小越早加入） */
+    std::string room_id;  /**< 房间 ID */
+    int64_t user_id{0};   /**< 用户 ID */
+    int64_t joined_at{0}; /**< 加入时间（ms，越小越早加入） */
 };
 
 /**

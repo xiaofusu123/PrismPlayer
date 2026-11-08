@@ -19,7 +19,7 @@ constexpr int64_t k_seek_tolerance_ms = 5;
  * 经 IEngineObserver::on_audio_frame 送进同步侧。
  */
 class FakeAudioEngine : public Prism::Engine::AudioEngine {
-public:
+  public:
     bool init() override { return true; }
     bool play() override { return true; }
     bool pause() override { return true; }
@@ -30,12 +30,8 @@ public:
         sync_info_.current_pts.store(seek_mode == 0 ? pts : cur + pts);
         return true;
     }
-    Prism::Engine::AudioSyncInfo get_sync_info() override {
-        return Prism::Engine::AudioSyncInfo{};
-    }
-    void set_observer(Prism::Engine::IEngineObserver* observer) override {
-        observer_ = observer;
-    }
+    Prism::Engine::AudioSyncInfo get_sync_info() override { return Prism::Engine::AudioSyncInfo{}; }
+    void set_observer(Prism::Engine::IEngineObserver* observer) override { observer_ = observer; }
 
     void advance_to(uint64_t pts) {
         sync_info_.current_pts.store(pts);
@@ -44,7 +40,7 @@ public:
         }
     }
 
-private:
+  private:
     Prism::Engine::AudioSyncInfo sync_info_;
     Prism::Engine::IEngineObserver* observer_{nullptr};
 };
@@ -53,7 +49,7 @@ private:
  * 假视频引擎：推进 VideoSyncInfo.current_pts 并回调 on_video_frame。
  */
 class FakeVideoEngine : public Prism::Engine::VideoEngine {
-public:
+  public:
     bool init() override { return true; }
     bool play() override { return true; }
     bool pause() override { return true; }
@@ -64,15 +60,11 @@ public:
         sync_info_.current_pts.store(seek_mode == 0 ? pts : cur + pts);
         return true;
     }
-    Prism::Engine::VideoSyncInfo get_sync_info() override {
-        return Prism::Engine::VideoSyncInfo{};
-    }
+    Prism::Engine::VideoSyncInfo get_sync_info() override { return Prism::Engine::VideoSyncInfo{}; }
     Prism::Engine::RenderMetadata get_render_result() override {
         return Prism::Engine::RenderMetadata{};
     }
-    void set_observer(Prism::Engine::IEngineObserver* observer) override {
-        observer_ = observer;
-    }
+    void set_observer(Prism::Engine::IEngineObserver* observer) override { observer_ = observer; }
 
     void advance_to(uint64_t pts) {
         sync_info_.current_pts.store(pts);
@@ -81,7 +73,7 @@ public:
         }
     }
 
-private:
+  private:
     Prism::Engine::VideoSyncInfo sync_info_;
     Prism::Engine::IEngineObserver* observer_{nullptr};
 };
@@ -90,7 +82,7 @@ private:
  * 假音频工厂：保留创建出的引擎裸指针，供测试驱动帧推进。
  */
 class FakeAudioFactory : public Prism::Engine::AudioEngineFactory {
-public:
+  public:
     std::unique_ptr<Prism::Engine::AudioEngine> create_audio_engine() override {
         auto engine = std::make_unique<FakeAudioEngine>();
         engine_ = engine.get();
@@ -98,7 +90,7 @@ public:
     }
     FakeAudioEngine* engine() { return engine_; }
 
-private:
+  private:
     FakeAudioEngine* engine_{nullptr};
 };
 
@@ -106,7 +98,7 @@ private:
  * 假视频工厂：保留创建出的引擎裸指针，供测试驱动帧推进。
  */
 class FakeVideoFactory : public Prism::Engine::VideoEngineFactory {
-public:
+  public:
     std::unique_ptr<Prism::Engine::VideoEngine> create_video_engine() override {
         auto engine = std::make_unique<FakeVideoEngine>();
         engine_ = engine.get();
@@ -114,12 +106,12 @@ public:
     }
     FakeVideoEngine* engine() { return engine_; }
 
-private:
+  private:
     FakeVideoEngine* engine_{nullptr};
 };
 
 class PlayerPositionTest : public ::testing::Test {
-protected:
+  protected:
     void SetUp() override {
         player_ = prism_player_create(nullptr, nullptr, nullptr);
         ASSERT_NE(player_, nullptr);

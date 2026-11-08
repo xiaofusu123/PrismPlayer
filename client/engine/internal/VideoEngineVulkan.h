@@ -5,7 +5,7 @@
 namespace Prism::Engine {
 
 class VideoEngineVulkan : public VideoEngine {
-public:
+  public:
     VideoEngineVulkan();
     ~VideoEngineVulkan() override;
 
@@ -19,7 +19,7 @@ public:
     RenderMetadata get_render_result() override;
     void set_observer(IEngineObserver* observer) override;
 
-private:
+  private:
     IEngineObserver* observer_{nullptr};
 };
 

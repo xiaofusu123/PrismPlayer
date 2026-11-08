@@ -2,14 +2,14 @@
 
 #include "Player.h"
 
-#include "IPlaybackStateMachine.h"
-#include "ISyncAlgorithm.h"
 #include "ICommandDispatcher.h"
-#include "ISyncObserver.h"
+#include "IPlaybackStateMachine.h"
 #include "IServiceNetwork.h"
+#include "ISyncAlgorithm.h"
+#include "ISyncObserver.h"
 
-#include <memory>
 #include <atomic>
+#include <memory>
 #include <string>
 
 namespace Prism::Service {
@@ -19,10 +19,8 @@ namespace Prism::Service {
  * @brief 播放器内部状态，封装 C API 句柄背后的全部数据
  */
 class PrismPlayerInternal {
-public:
-    explicit PrismPlayerInternal(const PrismConfig& cfg,
-                                 PrismEventCallback cb,
-                                 void* ud);
+  public:
+    explicit PrismPlayerInternal(const PrismConfig& cfg, PrismEventCallback cb, void* ud);
     ~PrismPlayerInternal();
 
     void fire_event(PrismEventType type, const void* data = nullptr) const;
@@ -33,9 +31,9 @@ public:
 
     /* ---- AV Sync 组件 ---- */
     std::unique_ptr<Prism::Business::IPlaybackStateMachine> sync_sm_;
-    std::unique_ptr<Prism::Business::ISyncAlgorithm>      sync_algo_;
-    std::unique_ptr<Prism::Business::ICommandDispatcher>  cmd_dispatcher_;
-    std::unique_ptr<Prism::Business::ISyncObserver>       engine_observer_;
+    std::unique_ptr<Prism::Business::ISyncAlgorithm> sync_algo_;
+    std::unique_ptr<Prism::Business::ICommandDispatcher> cmd_dispatcher_;
+    std::unique_ptr<Prism::Business::ISyncObserver> engine_observer_;
 
     /* ---- 网络抽象（外部注入或默认桩实现） ---- */
     std::unique_ptr<IServiceNetwork> network_;
@@ -44,22 +42,22 @@ public:
     PrismMediaInfo media_info_{};
 
     /* ---- 配置与回调 ---- */
-    PrismConfig        config_{};
-    std::string        log_level_{"info"};
+    PrismConfig config_{};
+    std::string log_level_{"info"};
     PrismEventCallback callback_{nullptr};
-    void*              user_data_{nullptr};
+    void* user_data_{nullptr};
 
     /* ---- 播放状态 ---- */
     std::atomic<PrismState> state_{PRISM_STATE_IDLE};
 
     /* ---- 音频属性 ---- */
     std::atomic<float> volume_{1.0f};
-    std::atomic<bool>  mute_{false};
+    std::atomic<bool> mute_{false};
     std::atomic<float> volume_before_mute_{1.0f};
 
     /* ---- 播放属性 ---- */
     std::atomic<float> speed_{1.0f};
-    std::atomic<bool>  loop_{false};
+    std::atomic<bool> loop_{false};
 
     /* ---- 视频窗口 ---- */
     std::atomic<void*> video_window_{nullptr};

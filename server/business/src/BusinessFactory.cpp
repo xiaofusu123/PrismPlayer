@@ -16,8 +16,7 @@ std::unique_ptr<IRoomManager> create_room_manager(Adapter::DBAdapter* db,
     return std::make_unique<RoomManager>(db, notifier);
 }
 
-std::unique_ptr<IMessageRouter> create_message_router(Adapter::DBAdapter* db,
-                                                      IRoomManager* rooms,
+std::unique_ptr<IMessageRouter> create_message_router(Adapter::DBAdapter* db, IRoomManager* rooms,
                                                       IClientNotifier* notifier) {
     return std::make_unique<MessageRouter>(db, rooms, notifier);
 }

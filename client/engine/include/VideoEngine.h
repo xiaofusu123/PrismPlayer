@@ -3,7 +3,7 @@
 #include <atomic>
 
 #ifdef _WIN32
-#include <windows.h>
+    #include <windows.h>
 typedef HANDLE RenderResultHandle;
 #else
 typedef int32_t RenderResultHandle;

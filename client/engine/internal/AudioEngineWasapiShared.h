@@ -5,7 +5,7 @@
 namespace Prism::Engine {
 
 class AudioEngineWasapiShared : public AudioEngine {
-public:
+  public:
     AudioEngineWasapiShared();
     ~AudioEngineWasapiShared() override;
 
@@ -18,7 +18,7 @@ public:
     AudioSyncInfo get_sync_info() override;
     void set_observer(IEngineObserver* observer) override;
 
-private:
+  private:
     IEngineObserver* observer_{nullptr};
 };
 

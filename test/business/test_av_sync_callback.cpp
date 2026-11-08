@@ -20,7 +20,7 @@ using Prism::Business::SyncState;
  * 经 IEngineObserver::on_audio_frame 送进同步侧（对应 #55 的「引擎 → AV Sync 回调通道」）。
  */
 class FakeAudioEngine : public Prism::Engine::AudioEngine {
-public:
+  public:
     bool init() override { return true; }
     bool play() override { return true; }
     bool pause() override { return true; }
@@ -31,12 +31,8 @@ public:
         sync_info_.current_pts.store(seek_mode == 0 ? pts : cur + pts);
         return true;
     }
-    Prism::Engine::AudioSyncInfo get_sync_info() override {
-        return Prism::Engine::AudioSyncInfo{};
-    }
-    void set_observer(Prism::Engine::IEngineObserver* observer) override {
-        observer_ = observer;
-    }
+    Prism::Engine::AudioSyncInfo get_sync_info() override { return Prism::Engine::AudioSyncInfo{}; }
+    void set_observer(Prism::Engine::IEngineObserver* observer) override { observer_ = observer; }
 
     void advance_to(uint64_t pts) {
         sync_info_.current_pts.store(pts);
@@ -45,7 +41,7 @@ public:
         }
     }
 
-private:
+  private:
     Prism::Engine::AudioSyncInfo sync_info_;
     Prism::Engine::IEngineObserver* observer_{nullptr};
 };
@@ -55,7 +51,7 @@ private:
  * 同时按同步算法给出的 SyncAction 记录 presented / waited / dropped 计数。
  */
 class FakeVideoEngine : public Prism::Engine::VideoEngine {
-public:
+  public:
     bool init() override { return true; }
     bool play() override { return true; }
     bool pause() override { return true; }
@@ -66,15 +62,11 @@ public:
         sync_info_.current_pts.store(seek_mode == 0 ? pts : cur + pts);
         return true;
     }
-    Prism::Engine::VideoSyncInfo get_sync_info() override {
-        return Prism::Engine::VideoSyncInfo{};
-    }
+    Prism::Engine::VideoSyncInfo get_sync_info() override { return Prism::Engine::VideoSyncInfo{}; }
     Prism::Engine::RenderMetadata get_render_result() override {
         return Prism::Engine::RenderMetadata{};
     }
-    void set_observer(Prism::Engine::IEngineObserver* observer) override {
-        observer_ = observer;
-    }
+    void set_observer(Prism::Engine::IEngineObserver* observer) override { observer_ = observer; }
 
     void advance_to(uint64_t pts) {
         sync_info_.current_pts.store(pts);
@@ -100,7 +92,7 @@ public:
     int waited() const { return waited_; }
     int dropped() const { return dropped_; }
 
-private:
+  private:
     Prism::Engine::VideoSyncInfo sync_info_;
     Prism::Engine::IEngineObserver* observer_{nullptr};
     int presented_{0};
@@ -133,8 +125,8 @@ struct SyncHarness {
  * 推一帧（音频先到、视频后到），校验同步算法给出的 SyncAction 与状态机落点一致，
  * 并把该决策记录进假视频引擎的计数。
  */
-void drive_frame(SyncHarness& h, uint64_t audio_pts, uint64_t video_pts,
-                 SyncAction expected_action, SyncState expected_state) {
+void drive_frame(SyncHarness& h, uint64_t audio_pts, uint64_t video_pts, SyncAction expected_action,
+                 SyncState expected_state) {
     h.audio.advance_to(audio_pts);
     h.video.advance_to(video_pts);
 

@@ -10,8 +10,7 @@
 
 namespace Prism::Server::Business {
 
-MessageRouter::MessageRouter(Adapter::DBAdapter* db, IRoomManager* rooms,
-                             IClientNotifier* notifier)
+MessageRouter::MessageRouter(Adapter::DBAdapter* db, IRoomManager* rooms, IClientNotifier* notifier)
     : db_(db), rooms_(rooms), notifier_(notifier) {}
 
 void MessageRouter::route(int64_t sender_user_id, const std::string& json) {

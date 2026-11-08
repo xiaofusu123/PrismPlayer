@@ -14,12 +14,7 @@ namespace Prism::Server::Business {
  * - NOT_AUTHENTICATED: 未认证（缺 token 或 token 无效）
  * - TOKEN_EXPIRED: token 已过期
  */
-enum class AuthError {
-    NONE,
-    INVALID_CREDENTIALS,
-    NOT_AUTHENTICATED,
-    TOKEN_EXPIRED
-};
+enum class AuthError { NONE, INVALID_CREDENTIALS, NOT_AUTHENTICATED, TOKEN_EXPIRED };
 
 /**
  * @struct AuthResult

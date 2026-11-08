@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ISyncObserver.h"
-#include "ISyncAlgorithm.h"
 #include "IPlaybackStateMachine.h"
+#include "ISyncAlgorithm.h"
+#include "ISyncObserver.h"
 
 namespace Prism::Business {
 
@@ -11,7 +11,7 @@ namespace Prism::Business {
  * @brief 引擎观察者实现，接收帧回调并驱动同步校准
  */
 class EngineObserver : public ISyncObserver {
-public:
+  public:
     EngineObserver();
     ~EngineObserver() override = default;
 
@@ -21,7 +21,7 @@ public:
     void set_sync_algorithm(ISyncAlgorithm* algo) override;
     void set_state_machine(IPlaybackStateMachine* sm) override;
 
-private:
+  private:
     ISyncAlgorithm* sync_algo_{nullptr};
     IPlaybackStateMachine* state_machine_{nullptr};
     uint64_t last_audio_pts_{0};

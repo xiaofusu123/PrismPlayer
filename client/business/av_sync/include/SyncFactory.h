@@ -1,8 +1,8 @@
 #pragma once
 
+#include "ICommandDispatcher.h"
 #include "IPlaybackStateMachine.h"
 #include "ISyncAlgorithm.h"
-#include "ICommandDispatcher.h"
 #include "ISyncObserver.h"
 
 #include <memory>

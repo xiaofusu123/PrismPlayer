@@ -33,8 +33,7 @@ std::unique_ptr<IRoomManager> create_room_manager(Adapter::DBAdapter* db,
  * @param rooms 房间管理器（不持有所有权）
  * @param notifier 客户端推送器（不持有所有权）
  */
-std::unique_ptr<IMessageRouter> create_message_router(Adapter::DBAdapter* db,
-                                                      IRoomManager* rooms,
+std::unique_ptr<IMessageRouter> create_message_router(Adapter::DBAdapter* db, IRoomManager* rooms,
                                                       IClientNotifier* notifier);
 
 } // namespace Prism::Server::Business

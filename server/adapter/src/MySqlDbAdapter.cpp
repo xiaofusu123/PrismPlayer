@@ -94,7 +94,8 @@ bool MySqlDbAdapter::insert_user(const UserRecord& user) {
     }
     const char* sql = "INSERT INTO users (username, password_hash, salt) VALUES (?, ?, ?)";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         spdlog::error("MySqlDbAdapter: insert_user prepare failed: {}",
                       stmt ? mysql_stmt_error(stmt) : mysql_error(mysql_));
         if (stmt != nullptr) {
@@ -122,7 +123,8 @@ std::optional<UserRecord> MySqlDbAdapter::query_user_by_username(const std::stri
     }
     const char* sql = "SELECT id, username, password_hash, salt FROM users WHERE username = ?";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -192,7 +194,8 @@ std::optional<UserRecord> MySqlDbAdapter::query_user_by_id(int64_t id) {
     }
     const char* sql = "SELECT id, username, password_hash, salt FROM users WHERE id = ?";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -264,7 +267,8 @@ bool MySqlDbAdapter::insert_room(const RoomRecord& room) {
     const char* sql = "INSERT INTO rooms (room_id, name, owner_id, max_members, state, "
                       "current_media, position_ms) VALUES (?, ?, ?, ?, ?, ?, ?)";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -302,7 +306,8 @@ std::optional<RoomRecord> MySqlDbAdapter::query_room_by_id(const std::string& ro
     const char* sql = "SELECT room_id, name, owner_id, max_members, state, current_media, "
                       "position_ms FROM rooms WHERE room_id = ?";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -421,7 +426,8 @@ bool MySqlDbAdapter::insert_room_member(const RoomMemberRecord& member) {
     }
     const char* sql = "INSERT INTO room_members (room_id, user_id) VALUES (?, ?)";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -448,7 +454,8 @@ bool MySqlDbAdapter::delete_room_member(const std::string& room_id, int64_t user
     }
     const char* sql = "DELETE FROM room_members WHERE room_id = ? AND user_id = ?";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -477,7 +484,8 @@ std::vector<RoomMemberRecord> MySqlDbAdapter::query_room_members(const std::stri
     const char* sql = "SELECT room_id, user_id, UNIX_TIMESTAMP(joined_at) * 1000 FROM room_members "
                       "WHERE room_id = ? ORDER BY joined_at ASC";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -531,7 +539,8 @@ bool MySqlDbAdapter::update_room_state(const std::string& room_id, RoomState sta
     const char* sql = "UPDATE rooms SET state = ?, current_media = ?, position_ms = ? "
                       "WHERE room_id = ?";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -561,7 +570,8 @@ bool MySqlDbAdapter::update_room_owner(const std::string& room_id, int64_t owner
     }
     const char* sql = "UPDATE rooms SET owner_id = ? WHERE room_id = ?";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
@@ -588,7 +598,8 @@ bool MySqlDbAdapter::delete_room(const std::string& room_id) {
     }
     const char* sql = "DELETE FROM rooms WHERE room_id = ?";
     MYSQL_STMT* stmt = mysql_stmt_init(mysql_);
-    if (stmt == nullptr || mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
+    if (stmt == nullptr ||
+        mysql_stmt_prepare(stmt, sql, static_cast<unsigned long>(std::strlen(sql))) != 0) {
         if (stmt != nullptr) {
             mysql_stmt_close(stmt);
         }
