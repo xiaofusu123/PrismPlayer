@@ -88,9 +88,9 @@ class FakeVideoEngine : public Prism::Engine::VideoEngine {
             break;
         }
     }
-    int presented() const { return presented_; }
-    int waited() const { return waited_; }
-    int dropped() const { return dropped_; }
+    [[nodiscard]] int presented() const { return presented_; }
+    [[nodiscard]] int waited() const { return waited_; }
+    [[nodiscard]] int dropped() const { return dropped_; }
 
   private:
     Prism::Engine::VideoSyncInfo sync_info_;

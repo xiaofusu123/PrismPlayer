@@ -11,8 +11,8 @@
 
 namespace {
 
-constexpr int64_t k_seek_target_ms = 5000;
-constexpr int64_t k_seek_tolerance_ms = 5;
+constexpr int64_t K_SEEK_TARGET_MS = 5000;
+constexpr int64_t K_SEEK_TOLERANCE_MS = 5;
 
 /**
  * 假音频引擎：由测试驱动 advance_to()，把 AudioSyncInfo.current_pts
@@ -163,14 +163,14 @@ TEST_F(PlayerPositionTest, SeekLandsWithinTolerance) {
     video_factory_.engine()->advance_to(1000);
     EXPECT_EQ(prism_player_get_position(player_), 1000);
 
-    ASSERT_EQ(prism_player_seek(player_, k_seek_target_ms, PRISM_SEEK_ABSOLUTE), PRISM_OK);
+    ASSERT_EQ(prism_player_seek(player_, K_SEEK_TARGET_MS, PRISM_SEEK_ABSOLUTE), PRISM_OK);
 
-    audio_factory_.engine()->advance_to(k_seek_target_ms);
-    video_factory_.engine()->advance_to(k_seek_target_ms);
+    audio_factory_.engine()->advance_to(K_SEEK_TARGET_MS);
+    video_factory_.engine()->advance_to(K_SEEK_TARGET_MS);
 
     int64_t pos = prism_player_get_position(player_);
-    int64_t error = pos > k_seek_target_ms ? pos - k_seek_target_ms : k_seek_target_ms - pos;
-    EXPECT_LE(error, k_seek_tolerance_ms);
+    int64_t error = pos > K_SEEK_TARGET_MS ? pos - K_SEEK_TARGET_MS : K_SEEK_TARGET_MS - pos;
+    EXPECT_LE(error, K_SEEK_TOLERANCE_MS);
 }
 
 } // namespace
