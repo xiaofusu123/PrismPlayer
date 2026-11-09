@@ -111,9 +111,11 @@ install_cmake() {
 }
 
 # glfw3 / vulkan / ffmpeg 在 Linux 侧的 vcpkg port 需要这些系统开发包（#96 决策 15）。
+# libmysql 的 CMake 在 Linux 上强制要 rpc/rpc.h（glibc ≥ 2.26 把 SunRPC 移出，改由 libtirpc 提供），
+# 并同时检查 numa.h / ldap.h；缺 rpc/rpc.h 时 MySQL 配置直接 fatal 退出（不是警告）。
 # 干净 runner 缺 autoreconf 一族会 BUILD_FAILED：`apt-get install -s` 只证明包名可解析，证明不了清单够用。
 install_system_deps() {
-    say "system：安装 glfw3 / vulkan / ffmpeg 在 Linux 侧的系统开发包 ..."
+    say "system：安装 glfw3 / vulkan / ffmpeg / libmysql 在 Linux 侧的系统开发包 ..."
     sudo apt-get update
     sudo apt-get install -y --no-install-recommends \
         pkg-config \
@@ -129,6 +131,7 @@ install_system_deps() {
         libwayland-dev wayland-protocols libxkbcommon-dev \
         libdrm-dev \
         libasound2-dev \
+        libtirpc-dev libnuma-dev libldap2-dev \
         python3
 }
 
