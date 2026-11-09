@@ -3,7 +3,7 @@
 #include "AdapterFactory.h"
 #include "DBAdapter.h"
 
-#include <mysql.h>
+#include <mysql/mysql.h>
 
 #include <mutex>
 
