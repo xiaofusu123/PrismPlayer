@@ -767,23 +767,22 @@ AV Sync 与 Network 两个模块的接口。
 
 ### 4.5 CryptoAdapter — 密码学操作
 
-基于 OpenSSL 实现 SHA-256 哈希和 AES-256-GCM 加解密。
+基于 OpenSSL 实现 SHA-256 口令哈希与 AEAD 内存加解密。文件级加密（分块 AEAD）不在本接口，见 ADR 0007 与 `FileCipher`。
 
 | 分组 | 方法 | 返回 | 说明 |
 |---|---|---|---|
-| 密码 | `hash_password(const std::string& password)` | `HashResult` | SHA-256 + 随机 Salt 哈希 |
-| | `verify_password(const std::string& password, const std::string& hash, const std::string& salt)` | `bool` | 验证密码是否匹配 |
-| 文件 | `encrypt_file(const std::string& input, const std::string& output, const std::string& key)` | `bool` | AES-256-GCM 加密文件 |
-| | `decrypt_file(const std::string& input, const std::string& output, const std::string& key)` | `bool` | AES-256-GCM 解密文件 |
-| 内存 | `encrypt_buffer(const uint8_t* data, size_t size, const std::string& key)` | `EncryptResult` | AES-256-GCM 加密内存数据 |
-| | `decrypt_buffer(const uint8_t* data, size_t size, const std::string& key, const std::vector<uint8_t>& iv, const std::vector<uint8_t>& tag)` | `std::vector<uint8_t>` | AES-256-GCM 解密内存数据 |
+| 口令 | `hash_password(const std::string& password)` | `HashResult` | SHA-256 + 随机盐，产出摘要、盐与自描述凭据串 |
+| | `verify_password(const std::string& password, const std::string& credential)` | `bool` | 按自描述串校验口令；串格式非法一律返回 false |
+| 内存 | `encrypt_buffer(const uint8_t* data, size_t size, const std::string& key, CipherSuite suite)` | `EncryptResult` | AEAD 加密内存数据，套件必须显式给出 |
+| | `decrypt_buffer(const uint8_t* data, size_t size, const std::string& key, const std::vector<uint8_t>& iv, const std::vector<uint8_t>& tag, CipherSuite suite)` | `std::vector<uint8_t>` | AEAD 解密内存数据，套件须与加密一致 |
 
 **辅助类型**
 
 | 类型 | 字段 | 说明 |
 |---|---|---|
-| `HashResult` | `.hash` `.salt` | 密码哈希结果（哈希值 + 随机盐） |
-| `EncryptResult` | `.cipher_data` `.iv` `.tag` | AES 加密结果（密文 + IV + GCM 认证标签） |
+| `CipherSuite` | `AES_256_GCM` `CHACHA20_POLY1305` | AEAD 套件；均为 32 字节密钥、12 字节 nonce、16 字节标签 |
+| `HashResult` | `.hash` `.salt` `.credential` | 摘要、盐（均为小写十六进制）与自描述凭据串 `sha256$<盐 hex>$<摘要 hex>` |
+| `EncryptResult` | `.cipher_data` `.iv` `.tag` | 密文 + 12 字节 nonce + 16 字节认证标签 |
 
 ---
 
