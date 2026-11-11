@@ -3,13 +3,15 @@
 #include <atomic>
 
 #ifdef _WIN32
-#include <windows.h>
+    #include <windows.h>
 typedef HANDLE RenderResultHandle;
 #else
 typedef int32_t RenderResultHandle;
 #endif
 
 namespace Prism::Engine {
+
+class IEngineObserver;
 
 /**
  * @struct VideoSyncInfo
@@ -85,6 +87,12 @@ class VideoEngine {
      * @return RenderMetadata 渲染元数据
      */
     virtual RenderMetadata get_render_result() = 0;
+
+    /**
+     * @brief 注册帧回调观察者
+     * @param observer 观察者指针（不持有所有权，可为 nullptr 取消注册）
+     */
+    virtual void set_observer(IEngineObserver* observer) = 0;
 };
 
 } // namespace Prism::Engine

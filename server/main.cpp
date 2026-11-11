@@ -20,7 +20,7 @@ int main() {
 
     auto auth = Prism::Server::Business::create_auth_service(db.get(), crypto.get());
     auto rooms = Prism::Server::Business::create_room_manager(db.get(), notifier);
-    auto router = Prism::Server::Business::create_message_router(db.get(), notifier);
+    auto router = Prism::Server::Business::create_message_router(db.get(), rooms.get(), notifier);
 
     server->set_handlers(auth.get(), rooms.get(), router.get());
     server->start("0.0.0.0", 8080);

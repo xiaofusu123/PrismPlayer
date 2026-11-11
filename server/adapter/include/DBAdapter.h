@@ -18,14 +18,27 @@ struct UserRecord {
 };
 
 /**
+ * @enum RoomState
+ * @brief 房间播放状态
+ *
+ * - IDLE: 空闲
+ * - PLAYING: 播放中
+ * - PAUSED: 暂停
+ */
+enum class RoomState { IDLE, PLAYING, PAUSED };
+
+/**
  * @struct RoomRecord
  * @brief 房间记录
  */
 struct RoomRecord {
-    std::string room_id;    /**< 房间 ID */
-    std::string name;       /**< 房间名 */
-    int64_t owner_id{0};    /**< 房主用户 ID */
-    int32_t max_members{0}; /**< 最大成员数 */
+    std::string room_id;              /**< 房间 ID */
+    std::string name;                 /**< 房间名 */
+    int64_t owner_id{0};              /**< 房主用户 ID */
+    int32_t max_members{0};           /**< 最大成员数 */
+    RoomState state{RoomState::IDLE}; /**< 房间播放状态 */
+    std::string current_media;        /**< 当前媒体 URI */
+    int64_t position_ms{0};           /**< 当前播放位置（ms） */
 };
 
 /**
@@ -33,13 +46,14 @@ struct RoomRecord {
  * @brief 房间成员记录
  */
 struct RoomMemberRecord {
-    std::string room_id; /**< 房间 ID */
-    int64_t user_id{0};  /**< 用户 ID */
+    std::string room_id;  /**< 房间 ID */
+    int64_t user_id{0};   /**< 用户 ID */
+    int64_t joined_at{0}; /**< 加入时间（ms，越小越早加入） */
 };
 
 /**
  * @class DBAdapter
- * @brief 数据库操作抽象接口（当前内存实现，MySQL 实现延后到 #83）
+ * @brief 数据库操作抽象接口（内存实现 + MySQL 实现，由 AdapterFactory 显式选择）
  */
 class DBAdapter {
   public:
@@ -121,9 +135,35 @@ class DBAdapter {
     /**
      * @brief 查询房间全部成员
      * @param room_id 房间 ID
-     * @return 成员列表
+     * @return 成员列表（按加入时间升序）
      */
     virtual std::vector<RoomMemberRecord> query_room_members(const std::string& room_id) = 0;
+
+    /**
+     * @brief 更新房间播放状态（含当前媒体与位置）
+     * @param room_id 房间 ID
+     * @param state 目标播放状态
+     * @param current_media 当前媒体 URI
+     * @param position_ms 当前播放位置（ms）
+     * @return 成功返回 true，房间不存在返回 false
+     */
+    virtual bool update_room_state(const std::string& room_id, RoomState state,
+                                   const std::string& current_media, int64_t position_ms) = 0;
+
+    /**
+     * @brief 移交房主
+     * @param room_id 房间 ID
+     * @param owner_id 新房主用户 ID
+     * @return 成功返回 true，房间不存在返回 false
+     */
+    virtual bool update_room_owner(const std::string& room_id, int64_t owner_id) = 0;
+
+    /**
+     * @brief 删除房间
+     * @param room_id 房间 ID
+     * @return 成功返回 true
+     */
+    virtual bool delete_room(const std::string& room_id) = 0;
 };
 
 } // namespace Prism::Server::Adapter

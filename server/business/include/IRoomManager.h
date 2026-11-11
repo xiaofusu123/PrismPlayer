@@ -47,6 +47,16 @@ class IRoomManager {
      * @return 房间列表
      */
     virtual std::vector<Adapter::RoomRecord> list_rooms() = 0;
+
+    /**
+     * @brief 更新房间播放状态（当前媒体与位置）并广播房间状态
+     * @param room_id 房间 ID
+     * @param state 目标播放状态
+     * @param position_ms 当前播放位置（ms）
+     * @return 成功返回 true，房间不存在返回 false
+     */
+    virtual bool update_room_state(const std::string& room_id, Adapter::RoomState state,
+                                   int64_t position_ms) = 0;
 };
 
 } // namespace Prism::Server::Business

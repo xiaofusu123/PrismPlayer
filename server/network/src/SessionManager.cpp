@@ -64,6 +64,21 @@ void SessionManager::bind_user(int64_t user_id, const std::string& conn_id) {
     conn_id_to_user_id_[conn_id] = user_id;
 }
 
+void SessionManager::unbind_user(int64_t user_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = user_id_to_conn_id_.find(user_id);
+    if (it == user_id_to_conn_id_.end()) {
+        return;
+    }
+    std::string conn_id = it->second;
+    user_id_to_conn_id_.erase(it);
+    conn_id_to_user_id_.erase(conn_id);
+
+    for (auto& entry : room_id_to_members_) {
+        entry.second.erase(user_id);
+    }
+}
+
 std::optional<int64_t> SessionManager::user_of(const std::string& conn_id) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = conn_id_to_user_id_.find(conn_id);
@@ -71,6 +86,17 @@ std::optional<int64_t> SessionManager::user_of(const std::string& conn_id) {
         return std::nullopt;
     }
     return it->second;
+}
+
+std::vector<std::string> SessionManager::rooms_of_user(int64_t user_id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::string> rooms;
+    for (const auto& entry : room_id_to_members_) {
+        if (entry.second.count(user_id) > 0) {
+            rooms.push_back(entry.first);
+        }
+    }
+    return rooms;
 }
 
 void SessionManager::add_room_member(const std::string& room_id, int64_t user_id) {

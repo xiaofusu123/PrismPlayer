@@ -26,6 +26,8 @@ channels:
         $ref: '#/components/messages/register'
       login:
         $ref: '#/components/messages/login'
+      logout:
+        $ref: '#/components/messages/logout'
       createRoom:
         $ref: '#/components/messages/createRoom'
       joinRoom:
@@ -70,37 +72,43 @@ components:
     login:
       name: login
       title: Login
-      summary: 登录并绑定连接与用户；成功回 ack，凭据错误回 error(401)。
+      summary: 登录并绑定连接与用户；成功回 ack（携带 `token`），凭据错误回 error(401)。
       payload:
         $ref: '#/components/schemas/Login'
+    logout:
+      name: logout
+      title: Logout
+      summary: 登出并失效 token；成功回 ack，token 无效回 error(403)，token 过期回 error(419)。
+      payload:
+        $ref: '#/components/schemas/Logout'
     createRoom:
       name: createRoom
       title: Create room
-      summary: 创建房间；`name` 可省略，默认等于 `room_id`。
+      summary: 创建房间；`name` 可省略，默认等于 `room_id`。未认证回 error(403)，token 过期回 error(419)，房间已存在回 error(409)。
       payload:
         $ref: '#/components/schemas/CreateRoom'
     joinRoom:
       name: joinRoom
       title: Join room
-      summary: 加入房间；未登录回 error(401)，房间不存在或已加入回 error(404)。
+      summary: 加入房间；未认证回 error(403)，token 过期回 error(419)，房间不存在或已加入回 error(404)。
       payload:
         $ref: '#/components/schemas/JoinRoom'
     leaveRoom:
       name: leaveRoom
       title: Leave room
-      summary: 离开房间；不在房间内回 error(404)。
+      summary: 离开房间；未认证回 error(403)，token 过期回 error(419)，不在房间内回 error(404)。
       payload:
         $ref: '#/components/schemas/LeaveRoom'
     playback:
       name: playback
       title: Playback control
-      summary: 房间内播放控制；由 MessageRouter 补充 `sender` 后广播给房间成员。
+      summary: 房间内播放控制；未认证回 error(403)，token 过期回 error(419)。由 MessageRouter 补充 `sender` 后广播给房间成员。
       payload:
         $ref: '#/components/schemas/Playback'
     chat:
       name: chat
       title: Chat message
-      summary: 房间内聊天；由 MessageRouter 补充 `sender` 后广播给房间成员。
+      summary: 房间内聊天；未认证回 error(403)，token 过期回 error(419)。由 MessageRouter 补充 `sender` 后广播给房间成员。
       payload:
         $ref: '#/components/schemas/Chat'
     ack:
@@ -124,7 +132,7 @@ components:
     roomUpdate:
       name: roomUpdate
       title: Room update
-      summary: 房间成员/状态变更；当前实现仅在 `ServerTypes.h` 中保留类型，尚未发送。
+      summary: 房间状态/成员变更广播；由 RoomManager 在播放状态变化、成员进出（含房主转移/空房销毁）时发送。
       payload:
         $ref: '#/components/schemas/RoomUpdate'
   schemas:
@@ -156,13 +164,26 @@ components:
           type: string
           format: password
           minLength: 1
+    Logout:
+      type: object
+      additionalProperties: false
+      required: [type, token]
+      properties:
+        type:
+          const: logout
+        token:
+          type: string
+          minLength: 1
     CreateRoom:
       type: object
       additionalProperties: false
-      required: [type, room_id]
+      required: [type, token, room_id]
       properties:
         type:
           const: create_room
+        token:
+          type: string
+          minLength: 1
         room_id:
           type: string
           minLength: 1
@@ -171,30 +192,39 @@ components:
     JoinRoom:
       type: object
       additionalProperties: false
-      required: [type, room_id]
+      required: [type, token, room_id]
       properties:
         type:
           const: join_room
+        token:
+          type: string
+          minLength: 1
         room_id:
           type: string
           minLength: 1
     LeaveRoom:
       type: object
       additionalProperties: false
-      required: [type, room_id]
+      required: [type, token, room_id]
       properties:
         type:
           const: leave_room
+        token:
+          type: string
+          minLength: 1
         room_id:
           type: string
           minLength: 1
     Playback:
       type: object
       additionalProperties: true
-      required: [type, room_id]
+      required: [type, token, room_id]
       properties:
         type:
           const: playback
+        token:
+          type: string
+          minLength: 1
         room_id:
           type: string
           minLength: 1
@@ -207,10 +237,13 @@ components:
     Chat:
       type: object
       additionalProperties: true
-      required: [type, room_id]
+      required: [type, token, room_id]
       properties:
         type:
           const: chat
+        token:
+          type: string
+          minLength: 1
         room_id:
           type: string
           minLength: 1
@@ -227,7 +260,10 @@ components:
           const: true
         for:
           type: string
-          enum: [register, login, create_room, join_room, leave_room]
+          enum: [register, login, logout, create_room, join_room, leave_room]
+        token:
+          type: string
+          description: 登录成功时返回的会话令牌，后续受保护消息必须携带。
     Error:
       type: object
       additionalProperties: false
@@ -239,6 +275,9 @@ components:
           type: integer
           minimum: 400
           maximum: 599
+          description: |
+            认证类错误码互不相同：401 口令错、403 未认证、419 token 过期；
+            400 参数缺失/非法 JSON，404 资源不存在，409 冲突，500 服务未就绪。
         message:
           type: string
     RoomBroadcast:
@@ -264,3 +303,18 @@ components:
         room_id:
           type: string
           minLength: 1
+        owner_id:
+          type: integer
+          description: 当前房主 user_id；房主转移后指向最早加入的成员。
+        state:
+          type: string
+          enum: [idle, playing, paused]
+        current_media:
+          type: string
+          description: 当前播放媒体标识。
+        position_ms:
+          type: integer
+          minimum: 0
+        member_count:
+          type: integer
+          minimum: 0

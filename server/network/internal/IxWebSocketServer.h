@@ -8,6 +8,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace Prism::Server::Network {
@@ -40,12 +41,22 @@ class IxWebSocketServer : public ISignalingServer {
                          const nlohmann::json& message);
     void handle_login(const std::string& conn_id, ix::WebSocket& socket,
                       const nlohmann::json& message);
+    void handle_logout(const std::string& conn_id, ix::WebSocket& socket,
+                       const nlohmann::json& message);
     void handle_create_room(const std::string& conn_id, ix::WebSocket& socket,
                             const nlohmann::json& message);
     void handle_join_room(const std::string& conn_id, ix::WebSocket& socket,
                           const nlohmann::json& message);
     void handle_leave_room(const std::string& conn_id, ix::WebSocket& socket,
                            const nlohmann::json& message);
+
+    /**
+     * @brief 校验请求携带的会话令牌，失败时直接回错误
+     * @param socket 目标连接
+     * @param message 入站消息
+     * @return 校验通过返回用户 ID，否则 nullopt
+     */
+    std::optional<int64_t> require_auth(ix::WebSocket& socket, const nlohmann::json& message);
 
     void send_ack(ix::WebSocket& socket, const std::string& for_type);
     void send_error(ix::WebSocket& socket, int code, const std::string& message);

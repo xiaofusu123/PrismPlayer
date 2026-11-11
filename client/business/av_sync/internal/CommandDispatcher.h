@@ -11,7 +11,7 @@ namespace Prism::Business {
  * @brief 指令分发实现，持有 Engine 指针并转发播放指令
  */
 class CommandDispatcher : public ICommandDispatcher {
-public:
+  public:
     CommandDispatcher();
     ~CommandDispatcher() override = default;
 
@@ -21,12 +21,14 @@ public:
     bool dispatch_speed(float speed) override;
     void set_audio_engine(Prism::Engine::AudioEngine* engine) override;
     void set_video_engine(Prism::Engine::VideoEngine* engine) override;
+    void set_observer(Prism::Engine::IEngineObserver* observer) override;
     bool initialize_engines(void* audio_factory, void* video_factory, bool enable_video) override;
     void shutdown_engines() override;
 
-private:
+  private:
     Prism::Engine::AudioEngine* audio_engine_{nullptr};
     Prism::Engine::VideoEngine* video_engine_{nullptr};
+    Prism::Engine::IEngineObserver* observer_{nullptr};
     std::unique_ptr<Prism::Engine::AudioEngine> audio_owned_;
     std::unique_ptr<Prism::Engine::VideoEngine> video_owned_;
 };

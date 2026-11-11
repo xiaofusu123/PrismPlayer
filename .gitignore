@@ -11,3 +11,4 @@ vendor/*/bin
 vendor/*/lib
 .vcpkg-cache
 task-current
+vcpkg_installed

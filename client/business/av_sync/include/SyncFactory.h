@@ -1,9 +1,9 @@
 #pragma once
 
+#include "ICommandDispatcher.h"
 #include "IPlaybackStateMachine.h"
 #include "ISyncAlgorithm.h"
-#include "ICommandDispatcher.h"
-#include "IEngineObserver.h"
+#include "ISyncObserver.h"
 
 #include <memory>
 
@@ -25,8 +25,8 @@ std::unique_ptr<ISyncAlgorithm> create_sync_algorithm();
 std::unique_ptr<ICommandDispatcher> create_command_dispatcher();
 
 /**
- * @brief 创建引擎观察者实例
+ * @brief 创建同步观察者实例
  */
-std::unique_ptr<IEngineObserver> create_engine_observer();
+std::unique_ptr<ISyncObserver> create_engine_observer();
 
 } // namespace Prism::Business

@@ -73,7 +73,7 @@
       "inherits": "linux-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "VCPKG_MANIFEST_FEATURES": "client;server;test"
+        "VCPKG_MANIFEST_FEATURES": "client;server;mysql;test"
       }
     },
     {
@@ -82,7 +82,7 @@
       "inherits": "linux-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "VCPKG_MANIFEST_FEATURES": "client;server"
+        "VCPKG_MANIFEST_FEATURES": "client;server;mysql"
       }
     },
     {
@@ -91,7 +91,7 @@
       "inherits": "linux-base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "VCPKG_MANIFEST_FEATURES": "client;server;test",
+        "VCPKG_MANIFEST_FEATURES": "client;server;mysql;test",
         "PRISM_COVERAGE": "ON"
       }
     }

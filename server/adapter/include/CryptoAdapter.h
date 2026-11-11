@@ -37,6 +37,12 @@ class CryptoAdapter {
      */
     virtual bool verify_password(const std::string& password, const std::string& hash,
                                  const std::string& salt) = 0;
+
+    /**
+     * @brief 生成随机会话令牌（十六进制，用于登录后的会话凭证）
+     * @return 令牌字符串；随机源失败返回空串
+     */
+    virtual std::string generate_token() = 0;
 };
 
 } // namespace Prism::Server::Adapter
