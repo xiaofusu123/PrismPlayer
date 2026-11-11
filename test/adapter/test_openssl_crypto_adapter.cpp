@@ -1,18 +1,15 @@
 ﻿#include <gtest/gtest.h>
 
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
-#include <iterator>
 #include <random>
 #include <string>
-#include <system_error>
 #include <vector>
 
 #include "OpenSSLCryptoAdapter.h"
 
 namespace {
 
+using Prism::Adapter::CipherSuite;
 using Prism::Adapter::EncryptResult;
 using Prism::Adapter::OpenSSLCryptoAdapter;
 
@@ -36,18 +33,6 @@ constexpr const char* REFERENCE_HASH =
     "fedbe6aa64a3e55cd70c8ce053afa048b99c5b547ea4a0913216475f0297b020";
 
 /**
- * @brief 造一个唯一的临时目录
- * @return 已创建好的目录路径
- */
-std::filesystem::path make_temp_dir() {
-    static std::mt19937_64 engine{std::random_device{}()};
-    std::filesystem::path dir =
-        std::filesystem::temp_directory_path() / ("prism-crypto-" + std::to_string(engine()));
-    std::filesystem::create_directories(dir);
-    return dir;
-}
-
-/**
  * @brief 生成一段可复现的伪随机数据
  * @param size 字节数
  * @return 数据
@@ -59,28 +44,6 @@ std::vector<uint8_t> make_payload(size_t size) {
         byte = static_cast<uint8_t>(engine() & 0xff);
     }
     return data;
-}
-
-/**
- * @brief 把字节写进文件
- * @param path 目标路径
- * @param data 数据
- */
-void write_file(const std::filesystem::path& path, const std::vector<uint8_t>& data) {
-    std::ofstream out(path, std::ios::binary | std::ios::trunc);
-    out.write(reinterpret_cast<const char*>(data.data()),
-              static_cast<std::streamsize>(data.size()));
-}
-
-/**
- * @brief 读回整个文件
- * @param path 源路径
- * @return 文件内容
- */
-std::vector<uint8_t> read_file(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    return std::vector<uint8_t>(std::istreambuf_iterator<char>(in),
-                                std::istreambuf_iterator<char>());
 }
 
 /**
@@ -109,6 +72,7 @@ TEST(OpenSSLCryptoAdapter, HashPasswordProducesSaltAndDigest) {
 
     EXPECT_TRUE(is_hex_of_length(result.salt, 32));
     EXPECT_TRUE(is_hex_of_length(result.hash, 64));
+    EXPECT_EQ(result.credential, "sha256$" + result.salt + "$" + result.hash);
 }
 
 TEST(OpenSSLCryptoAdapter, HashPasswordUsesRandomSalt) {
@@ -124,30 +88,40 @@ TEST(OpenSSLCryptoAdapter, VerifyPasswordAcceptsMatchingPassword) {
     OpenSSLCryptoAdapter adapter;
     auto result = adapter.hash_password(TEST_PASSWORD);
 
-    EXPECT_TRUE(adapter.verify_password(TEST_PASSWORD, result.hash, result.salt));
-    EXPECT_FALSE(adapter.verify_password(OTHER_PASSWORD, result.hash, result.salt));
+    EXPECT_TRUE(adapter.verify_password(TEST_PASSWORD, result.credential));
+    EXPECT_FALSE(adapter.verify_password(OTHER_PASSWORD, result.credential));
 }
 
-TEST(OpenSSLCryptoAdapter, VerifyPasswordRejectsMalformedStoredValue) {
+TEST(OpenSSLCryptoAdapter, VerifyPasswordRejectsMalformedCredential) {
     OpenSSLCryptoAdapter adapter;
 
-    EXPECT_FALSE(adapter.verify_password(TEST_PASSWORD, "", ""));
-    EXPECT_FALSE(adapter.verify_password(TEST_PASSWORD, "zz", REFERENCE_SALT));
-    // 盐长度不对（16 个字符 = 8 字节）同样拒绝，不做「尽力而为」的解析。
-    EXPECT_FALSE(adapter.verify_password(TEST_PASSWORD, REFERENCE_HASH, "0001020304050607"));
+    EXPECT_FALSE(adapter.verify_password(TEST_PASSWORD, ""));
+    EXPECT_FALSE(adapter.verify_password(TEST_PASSWORD, "zz"));
+    // 缺分隔符、前缀不对、段数不对，一律拒绝，不做「尽力而为」的解析。
+    EXPECT_FALSE(
+        adapter.verify_password(TEST_PASSWORD, std::string(REFERENCE_SALT) + REFERENCE_HASH));
+    EXPECT_FALSE(adapter.verify_password(TEST_PASSWORD, std::string("sha512$") + REFERENCE_SALT +
+                                                            "$" + REFERENCE_HASH));
+    EXPECT_FALSE(adapter.verify_password(TEST_PASSWORD, std::string("sha256$") + REFERENCE_SALT));
+    // 盐长度不对（16 个字符 = 8 字节）同样拒绝。
+    EXPECT_FALSE(adapter.verify_password(TEST_PASSWORD,
+                                         std::string("sha256$0001020304050607$") + REFERENCE_HASH));
 }
 
 TEST(OpenSSLCryptoAdapter, VerifyPasswordMatchesReferenceVector) {
     OpenSSLCryptoAdapter adapter;
-    EXPECT_TRUE(adapter.verify_password(TEST_PASSWORD, REFERENCE_HASH, REFERENCE_SALT));
-    EXPECT_FALSE(adapter.verify_password(OTHER_PASSWORD, REFERENCE_HASH, REFERENCE_SALT));
+    std::string credential = std::string("sha256$") + REFERENCE_SALT + "$" + REFERENCE_HASH;
+
+    EXPECT_TRUE(adapter.verify_password(TEST_PASSWORD, credential));
+    EXPECT_FALSE(adapter.verify_password(OTHER_PASSWORD, credential));
 }
 
 TEST(OpenSSLCryptoAdapter, BufferRoundTrip) {
     OpenSSLCryptoAdapter adapter;
     std::vector<uint8_t> plain = make_payload(4096);
 
-    EncryptResult encrypted = adapter.encrypt_buffer(plain.data(), plain.size(), TEST_KEY);
+    EncryptResult encrypted =
+        adapter.encrypt_buffer(plain.data(), plain.size(), TEST_KEY, CipherSuite::AES_256_GCM);
     ASSERT_EQ(encrypted.cipher_data.size(), plain.size());
     EXPECT_EQ(encrypted.iv.size(), 12U);
     EXPECT_EQ(encrypted.tag.size(), 16U);
@@ -155,18 +129,20 @@ TEST(OpenSSLCryptoAdapter, BufferRoundTrip) {
 
     auto decrypted =
         adapter.decrypt_buffer(encrypted.cipher_data.data(), encrypted.cipher_data.size(), TEST_KEY,
-                               encrypted.iv, encrypted.tag);
+                               encrypted.iv, encrypted.tag, CipherSuite::AES_256_GCM);
     EXPECT_EQ(decrypted, plain);
 }
 
 TEST(OpenSSLCryptoAdapter, BufferRoundTripOfEmptyPayload) {
     OpenSSLCryptoAdapter adapter;
 
-    EncryptResult encrypted = adapter.encrypt_buffer(nullptr, 0, TEST_KEY);
+    EncryptResult encrypted =
+        adapter.encrypt_buffer(nullptr, 0, TEST_KEY, CipherSuite::AES_256_GCM);
     EXPECT_TRUE(encrypted.cipher_data.empty());
     ASSERT_EQ(encrypted.tag.size(), 16U);
 
-    auto decrypted = adapter.decrypt_buffer(nullptr, 0, TEST_KEY, encrypted.iv, encrypted.tag);
+    auto decrypted = adapter.decrypt_buffer(nullptr, 0, TEST_KEY, encrypted.iv, encrypted.tag,
+                                            CipherSuite::AES_256_GCM);
     EXPECT_TRUE(decrypted.empty());
 }
 
@@ -174,21 +150,22 @@ TEST(OpenSSLCryptoAdapter, BufferDecryptRejectsTamperedData) {
     OpenSSLCryptoAdapter adapter;
     std::vector<uint8_t> plain = make_payload(1024);
 
-    EncryptResult encrypted = adapter.encrypt_buffer(plain.data(), plain.size(), TEST_KEY);
+    EncryptResult encrypted =
+        adapter.encrypt_buffer(plain.data(), plain.size(), TEST_KEY, CipherSuite::AES_256_GCM);
     ASSERT_FALSE(encrypted.cipher_data.empty());
 
     auto tampered = encrypted.cipher_data;
     tampered[0] = static_cast<uint8_t>(tampered[0] ^ 0x01);
-    EXPECT_TRUE(
-        adapter
-            .decrypt_buffer(tampered.data(), tampered.size(), TEST_KEY, encrypted.iv, encrypted.tag)
-            .empty());
+    EXPECT_TRUE(adapter
+                    .decrypt_buffer(tampered.data(), tampered.size(), TEST_KEY, encrypted.iv,
+                                    encrypted.tag, CipherSuite::AES_256_GCM)
+                    .empty());
 
     auto bad_tag = encrypted.tag;
     bad_tag[0] = static_cast<uint8_t>(bad_tag[0] ^ 0x01);
     EXPECT_TRUE(adapter
                     .decrypt_buffer(encrypted.cipher_data.data(), encrypted.cipher_data.size(),
-                                    TEST_KEY, encrypted.iv, bad_tag)
+                                    TEST_KEY, encrypted.iv, bad_tag, CipherSuite::AES_256_GCM)
                     .empty());
 }
 
@@ -197,63 +174,62 @@ TEST(OpenSSLCryptoAdapter, RejectsKeyThatIsNot32Bytes) {
     std::vector<uint8_t> plain = make_payload(16);
 
     EXPECT_TRUE(
-        adapter.encrypt_buffer(plain.data(), plain.size(), "too-short-key").cipher_data.empty());
-    EXPECT_TRUE(
-        adapter.decrypt_buffer(plain.data(), plain.size(), "too-short-key", {}, {}).empty());
+        adapter
+            .encrypt_buffer(plain.data(), plain.size(), "too-short-key", CipherSuite::AES_256_GCM)
+            .cipher_data.empty());
+    EXPECT_TRUE(adapter
+                    .decrypt_buffer(plain.data(), plain.size(), "too-short-key", {}, {},
+                                    CipherSuite::AES_256_GCM)
+                    .empty());
 }
 
-TEST(OpenSSLCryptoAdapter, FileRoundTripAcrossChunkBoundary) {
+TEST(OpenSSLCryptoAdapter, BufferRoundTripWithChaCha20Poly1305) {
     OpenSSLCryptoAdapter adapter;
-    std::filesystem::path dir = make_temp_dir();
-    std::filesystem::path plain_path = dir / "plain.bin";
-    std::filesystem::path cipher_path = dir / "cipher.bin";
-    std::filesystem::path output_path = dir / "output.bin";
+    std::vector<uint8_t> plain = make_payload(4096);
 
-    // 比 64 KiB 的流式块大出几块，覆盖「最后一块不满」的分支。
-    std::vector<uint8_t> plain = make_payload(200 * 1024 + 123);
-    write_file(plain_path, plain);
+    EncryptResult encrypted = adapter.encrypt_buffer(plain.data(), plain.size(), TEST_KEY,
+                                                     CipherSuite::CHACHA20_POLY1305);
+    ASSERT_EQ(encrypted.cipher_data.size(), plain.size());
+    EXPECT_EQ(encrypted.iv.size(), 12U);
+    EXPECT_EQ(encrypted.tag.size(), 16U);
+    EXPECT_NE(encrypted.cipher_data, plain);
 
-    ASSERT_TRUE(adapter.encrypt_file(plain_path.string(), cipher_path.string(), TEST_KEY));
-    std::vector<uint8_t> cipher = read_file(cipher_path);
-    EXPECT_EQ(cipher.size(), plain.size() + 12 + 16);
-    EXPECT_NE(cipher, plain);
-
-    ASSERT_TRUE(adapter.decrypt_file(cipher_path.string(), output_path.string(), TEST_KEY));
-    EXPECT_EQ(read_file(output_path), plain);
-
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
+    auto decrypted =
+        adapter.decrypt_buffer(encrypted.cipher_data.data(), encrypted.cipher_data.size(), TEST_KEY,
+                               encrypted.iv, encrypted.tag, CipherSuite::CHACHA20_POLY1305);
+    EXPECT_EQ(decrypted, plain);
 }
 
-TEST(OpenSSLCryptoAdapter, EncryptFileRejectsMissingInput) {
+TEST(OpenSSLCryptoAdapter, ChaCha20Poly1305RejectsTamperedData) {
     OpenSSLCryptoAdapter adapter;
-    std::filesystem::path dir = make_temp_dir();
+    std::vector<uint8_t> plain = make_payload(1024);
 
-    EXPECT_FALSE(
-        adapter.encrypt_file((dir / "missing.bin").string(), (dir / "out.bin").string(), TEST_KEY));
-    EXPECT_FALSE(std::filesystem::exists(dir / "out.bin"));
+    EncryptResult encrypted = adapter.encrypt_buffer(plain.data(), plain.size(), TEST_KEY,
+                                                     CipherSuite::CHACHA20_POLY1305);
+    ASSERT_FALSE(encrypted.cipher_data.empty());
 
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
+    auto tampered = encrypted.cipher_data;
+    tampered[0] = static_cast<uint8_t>(tampered[0] ^ 0x01);
+    EXPECT_TRUE(adapter
+                    .decrypt_buffer(tampered.data(), tampered.size(), TEST_KEY, encrypted.iv,
+                                    encrypted.tag, CipherSuite::CHACHA20_POLY1305)
+                    .empty());
 }
 
-TEST(OpenSSLCryptoAdapter, DecryptFileWithWrongKeyLeavesNoPlaintext) {
+TEST(OpenSSLCryptoAdapter, CrossSuiteDecryptFails) {
     OpenSSLCryptoAdapter adapter;
-    std::filesystem::path dir = make_temp_dir();
-    std::filesystem::path plain_path = dir / "plain.bin";
-    std::filesystem::path cipher_path = dir / "cipher.bin";
-    std::filesystem::path output_path = dir / "output.bin";
+    std::vector<uint8_t> plain = make_payload(512);
 
-    write_file(plain_path, make_payload(1024));
-    ASSERT_TRUE(adapter.encrypt_file(plain_path.string(), cipher_path.string(), TEST_KEY));
+    EncryptResult encrypted =
+        adapter.encrypt_buffer(plain.data(), plain.size(), TEST_KEY, CipherSuite::AES_256_GCM);
+    ASSERT_FALSE(encrypted.cipher_data.empty());
 
-    EXPECT_FALSE(adapter.decrypt_file(cipher_path.string(), output_path.string(),
-                                      "fedcba9876543210fedcba9876543210"));
-    // 认证失败的半成品必须删掉，不能留下一个看似可用的明文文件。
-    EXPECT_FALSE(std::filesystem::exists(output_path));
-
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
+    // 同一把密钥、同一个 nonce、同一个 tag，只把套件换掉：认证必须失败，不能解出乱码。
+    EXPECT_TRUE(adapter
+                    .decrypt_buffer(encrypted.cipher_data.data(), encrypted.cipher_data.size(),
+                                    TEST_KEY, encrypted.iv, encrypted.tag,
+                                    CipherSuite::CHACHA20_POLY1305)
+                    .empty());
 }
 
 } // namespace

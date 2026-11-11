@@ -7,12 +7,9 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <filesystem>
-#include <fstream>
 #include <limits>
 #include <memory>
 #include <string>
-#include <system_error>
 #include <vector>
 
 #include <spdlog/spdlog.h>
@@ -25,11 +22,8 @@ constexpr size_t KEY_SIZE = 32;
 constexpr size_t IV_SIZE = 12;
 constexpr size_t TAG_SIZE = 16;
 
-/** @brief 密文文件的最小长度：IV + tag；再短的必然是坏文件 */
-constexpr uintmax_t FILE_MIN_SIZE = IV_SIZE + TAG_SIZE;
-
-/** @brief 流式加解密的块大小，避免把整个文件读进内存 */
-constexpr size_t FILE_CHUNK_SIZE = 64 * 1024;
+/** @brief 自描述凭据串的算法前缀，格式为 `<前缀>$<盐 hex>$<摘要 hex>` */
+constexpr const char* CREDENTIAL_ALGORITHM = "sha256";
 
 /** @brief `EVP_CIPHER_CTX` 的 RAII 包装 */
 using CipherCtxPtr = std::unique_ptr<EVP_CIPHER_CTX, decltype(&EVP_CIPHER_CTX_free)>;
@@ -93,15 +87,14 @@ std::string to_hex(const uint8_t* data, size_t size) {
 }
 
 /**
- * @brief 校验并取出 32 字节 AES 密钥
+ * @brief 校验并取出 32 字节 AEAD 密钥
  * @param key 接口传入的密钥字符串
  * @param out 32 字节密钥
  * @return 长度正好 32 字节返回 true
  */
-[[nodiscard]] bool aes_key_from(const std::string& key, std::array<uint8_t, KEY_SIZE>& out) {
+[[nodiscard]] bool aead_key_from(const std::string& key, std::array<uint8_t, KEY_SIZE>& out) {
     if (key.size() != KEY_SIZE) {
-        spdlog::error("[CryptoAdapter] AES-256-GCM key must be {} bytes, got {}", KEY_SIZE,
-                      key.size());
+        spdlog::error("[CryptoAdapter] AEAD key must be {} bytes, got {}", KEY_SIZE, key.size());
         return false;
     }
 
@@ -132,29 +125,117 @@ std::string to_hex(const uint8_t* data, size_t size) {
 }
 
 /**
- * @brief 以 AES-256-GCM 初始化一个 EVP 上下文
+ * @brief 按套件取出 OpenSSL 的 `EVP_CIPHER` 描述
+ * @param suite AEAD 套件
+ * @return 该套件在当前 OpenSSL 构建里可用则返回描述符，否则返回 nullptr
+ *
+ * `EVP_chacha20_poly1305()` 在构建时未启用该算法会返回 nullptr —— 这就是「运行时探测」：
+ * 不假定库里一定有两个套件，缺了就明确失败，不做静默降级。
+ */
+[[nodiscard]] const EVP_CIPHER* cipher_for(CipherSuite suite) {
+    switch (suite) {
+    case CipherSuite::AES_256_GCM:
+        return EVP_aes_256_gcm();
+    case CipherSuite::CHACHA20_POLY1305:
+        return EVP_chacha20_poly1305();
+    }
+    return nullptr;
+}
+
+/**
+ * @brief 套件的可读名字，仅用于日志
+ * @param suite AEAD 套件
+ * @return 名字字面量
+ */
+[[nodiscard]] const char* suite_name(CipherSuite suite) {
+    switch (suite) {
+    case CipherSuite::AES_256_GCM:
+        return "AES-256-GCM";
+    case CipherSuite::CHACHA20_POLY1305:
+        return "ChaCha20-Poly1305";
+    }
+    return "unknown";
+}
+
+/**
+ * @brief 以指定 AEAD 套件初始化一个 EVP 上下文
  * @param ctx 上下文
  * @param encrypt true 走加密，false 走解密
  * @param key 32 字节密钥
- * @param iv 12 字节 IV
+ * @param nonce 12 字节 nonce（GCM 文档里叫 IV）
+ * @param suite AEAD 套件
  * @return 成功返回 true
  */
-[[nodiscard]] bool init_gcm_cipher(EVP_CIPHER_CTX* ctx, bool encrypt,
-                                   const std::array<uint8_t, KEY_SIZE>& key, const uint8_t* iv) {
-    int ok = encrypt ? EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, nullptr, nullptr)
-                     : EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, nullptr, nullptr);
+[[nodiscard]] bool init_aead_cipher(EVP_CIPHER_CTX* ctx, bool encrypt,
+                                    const std::array<uint8_t, KEY_SIZE>& key, const uint8_t* nonce,
+                                    CipherSuite suite) {
+    const EVP_CIPHER* cipher = cipher_for(suite);
+    if (cipher == nullptr) {
+        spdlog::error("[CryptoAdapter] {} is not available in this OpenSSL build",
+                      suite_name(suite));
+        return false;
+    }
+
+    int ok = encrypt ? EVP_EncryptInit_ex(ctx, cipher, nullptr, nullptr, nullptr)
+                     : EVP_DecryptInit_ex(ctx, cipher, nullptr, nullptr, nullptr);
     if (ok != 1) {
         return false;
     }
 
-    // 默认 IV 长度是 12，这里显式设置一次，改算法参数时不会默默沿用默认值。
-    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, static_cast<int>(IV_SIZE), nullptr) != 1) {
+    // 默认 nonce 长度是 12，这里显式设置一次，换套件或改参数时不会默默沿用默认值。
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_SET_IVLEN, static_cast<int>(IV_SIZE), nullptr) !=
+        1) {
         return false;
     }
 
-    ok = encrypt ? EVP_EncryptInit_ex(ctx, nullptr, nullptr, key.data(), iv)
-                 : EVP_DecryptInit_ex(ctx, nullptr, nullptr, key.data(), iv);
+    ok = encrypt ? EVP_EncryptInit_ex(ctx, nullptr, nullptr, key.data(), nonce)
+                 : EVP_DecryptInit_ex(ctx, nullptr, nullptr, key.data(), nonce);
     return ok == 1;
+}
+
+/**
+ * @brief 把盐与摘要拼成自描述凭据串 `sha256$<盐 hex>$<摘要 hex>`
+ * @param salt_hex 盐，小写十六进制
+ * @param hash_hex 摘要，小写十六进制
+ * @return 自描述串
+ */
+[[nodiscard]] std::string make_credential(const std::string& salt_hex,
+                                          const std::string& hash_hex) {
+    std::string credential(CREDENTIAL_ALGORITHM);
+    credential.push_back('$');
+    credential += salt_hex;
+    credential.push_back('$');
+    credential += hash_hex;
+    return credential;
+}
+
+/**
+ * @brief 把自描述凭据串拆回盐与摘要两段
+ * @param credential 自描述串
+ * @param salt_hex 输出：盐，小写十六进制
+ * @param hash_hex 输出：摘要，小写十六进制
+ * @return 前缀与分隔符都合法返回 true
+ *
+ * 严格按「三段、两个 `$`、前缀等于 `sha256`」解析；不做「尽力解析」——凭据串来自
+ * 数据库，格式不对说明数据已经坏了，按 0 处理只会把错误藏起来。
+ */
+[[nodiscard]] bool parse_credential(const std::string& credential, std::string& salt_hex,
+                                    std::string& hash_hex) {
+    size_t first = credential.find('$');
+    if (first == std::string::npos) {
+        return false;
+    }
+    size_t second = credential.find('$', first + 1);
+    if (second == std::string::npos || credential.find('$', second + 1) != std::string::npos) {
+        return false;
+    }
+    if (credential.compare(0, first, CREDENTIAL_ALGORITHM) != 0) {
+        return false;
+    }
+
+    salt_hex = credential.substr(first + 1, second - first - 1);
+    hash_hex = credential.substr(second + 1);
+    return true;
 }
 
 /**
@@ -164,141 +245,6 @@ std::string to_hex(const uint8_t* data, size_t size) {
  */
 [[nodiscard]] bool fits_in_int(size_t size) {
     return size <= static_cast<size_t>(std::numeric_limits<int>::max());
-}
-
-/**
- * @brief 往输出流写一段字节
- * @param out 输出流
- * @param data 字节
- * @param size 字节数
- * @return 写入成功返回 true
- */
-[[nodiscard]] bool write_bytes(std::ofstream& out, const uint8_t* data, size_t size) {
-    out.write(reinterpret_cast<const char*>(data), static_cast<std::streamsize>(size));
-    return static_cast<bool>(out);
-}
-
-/**
- * @brief 把输入流的剩余内容加密后写入输出流
- * @param in 明文输入流（已定位到起点）
- * @param out 密文输出流（IV 由调用方先写）
- * @param key 32 字节密钥
- * @param iv 12 字节 IV
- * @param input_path 输入路径，仅用于日志
- * @return 成功返回 true（不含 IV / tag，两者由调用方与本文末尾各自写）
- */
-[[nodiscard]] bool encrypt_stream(std::ifstream& in, std::ofstream& out,
-                                  const std::array<uint8_t, KEY_SIZE>& key, const uint8_t* iv,
-                                  const std::string& input_path) {
-    CipherCtxPtr ctx = make_cipher_ctx();
-    if (!ctx || !init_gcm_cipher(ctx.get(), true, key, iv)) {
-        spdlog::error("[CryptoAdapter] cannot initialise AES-256-GCM");
-        return false;
-    }
-
-    std::vector<uint8_t> plain(FILE_CHUNK_SIZE);
-    std::vector<uint8_t> cipher(FILE_CHUNK_SIZE + TAG_SIZE);
-    while (in) {
-        in.read(reinterpret_cast<char*>(plain.data()), static_cast<std::streamsize>(plain.size()));
-        std::streamsize read_bytes = in.gcount();
-        if (read_bytes <= 0) {
-            break;
-        }
-
-        int written = 0;
-        if (EVP_EncryptUpdate(ctx.get(), cipher.data(), &written, plain.data(),
-                              static_cast<int>(read_bytes)) != 1) {
-            spdlog::error("[CryptoAdapter] AES-256-GCM encrypt failed on '{}'", input_path);
-            return false;
-        }
-        if (!write_bytes(out, cipher.data(), static_cast<size_t>(written))) {
-            spdlog::error("[CryptoAdapter] cannot write ciphertext for '{}'", input_path);
-            return false;
-        }
-    }
-
-    int final_len = 0;
-    if (EVP_EncryptFinal_ex(ctx.get(), cipher.data(), &final_len) != 1) {
-        spdlog::error("[CryptoAdapter] AES-256-GCM encrypt finalisation failed on '{}'",
-                      input_path);
-        return false;
-    }
-    if (!write_bytes(out, cipher.data(), static_cast<size_t>(final_len))) {
-        spdlog::error("[CryptoAdapter] cannot write the final block for '{}'", input_path);
-        return false;
-    }
-
-    std::array<uint8_t, TAG_SIZE> tag{};
-    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_GET_TAG, static_cast<int>(tag.size()),
-                            tag.data()) != 1) {
-        spdlog::error("[CryptoAdapter] cannot read the GCM tag for '{}'", input_path);
-        return false;
-    }
-    return write_bytes(out, tag.data(), tag.size());
-}
-
-/**
- * @brief 解密输入流中从当前位置起的若干字节，写入输出流
- * @param in 密文输入流（已定位到密文起点）
- * @param out 明文输出流
- * @param cipher_length 要读取的密文字节数
- * @param key 32 字节密钥
- * @param iv 12 字节 IV
- * @param tag 16 字节认证标签
- * @param input_path 输入路径，仅用于日志
- * @return 认证通过且写入成功返回 true
- */
-[[nodiscard]] bool decrypt_stream(std::ifstream& in, std::ofstream& out, uintmax_t cipher_length,
-                                  const std::array<uint8_t, KEY_SIZE>& key,
-                                  const std::array<uint8_t, IV_SIZE>& iv,
-                                  const std::array<uint8_t, TAG_SIZE>& tag,
-                                  const std::string& input_path) {
-    CipherCtxPtr ctx = make_cipher_ctx();
-    if (!ctx || !init_gcm_cipher(ctx.get(), false, key, iv.data())) {
-        spdlog::error("[CryptoAdapter] cannot initialise AES-256-GCM");
-        return false;
-    }
-
-    std::vector<uint8_t> cipher(FILE_CHUNK_SIZE);
-    std::vector<uint8_t> plain(FILE_CHUNK_SIZE + TAG_SIZE);
-    uintmax_t remaining = cipher_length;
-    while (remaining > 0) {
-        auto want = static_cast<size_t>(
-            std::min<uintmax_t>(remaining, static_cast<uintmax_t>(cipher.size())));
-        in.read(reinterpret_cast<char*>(cipher.data()), static_cast<std::streamsize>(want));
-        if (in.gcount() != static_cast<std::streamsize>(want)) {
-            spdlog::error("[CryptoAdapter] unexpected end of '{}'", input_path);
-            return false;
-        }
-        remaining -= want;
-
-        int written = 0;
-        if (EVP_DecryptUpdate(ctx.get(), plain.data(), &written, cipher.data(),
-                              static_cast<int>(want)) != 1) {
-            spdlog::error("[CryptoAdapter] AES-256-GCM decrypt failed on '{}'", input_path);
-            return false;
-        }
-        if (!write_bytes(out, plain.data(), static_cast<size_t>(written))) {
-            spdlog::error("[CryptoAdapter] cannot write plaintext for '{}'", input_path);
-            return false;
-        }
-    }
-
-    // tag 必须在 final 之前设置：final 既解密最后一个分组，也校验整段密文的认证标签。
-    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, static_cast<int>(tag.size()),
-                            const_cast<uint8_t*>(tag.data())) != 1) {
-        spdlog::error("[CryptoAdapter] cannot set the GCM tag for '{}'", input_path);
-        return false;
-    }
-
-    int final_len = 0;
-    if (EVP_DecryptFinal_ex(ctx.get(), plain.data(), &final_len) != 1) {
-        spdlog::error("[CryptoAdapter] AES-256-GCM authentication failed on '{}' "
-                      "(wrong key or corrupt data)",
-                      input_path);
-        return false;
-    }
-    return write_bytes(out, plain.data(), static_cast<size_t>(final_len));
 }
 
 } // namespace
@@ -318,19 +264,28 @@ HashResult OpenSSLCryptoAdapter::hash_password(const std::string& password) {
     HashResult result;
     result.salt = to_hex(salt.data(), salt.size());
     result.hash = to_hex(digest.data(), digest.size());
+    result.credential = make_credential(result.salt, result.hash);
     return result;
 }
 
-bool OpenSSLCryptoAdapter::verify_password(const std::string& password, const std::string& hash,
-                                           const std::string& salt) {
+bool OpenSSLCryptoAdapter::verify_password(const std::string& password,
+                                           const std::string& credential) {
+    std::string salt_hex;
+    std::string hash_hex;
+    if (!parse_credential(credential, salt_hex, hash_hex)) {
+        spdlog::warn("[CryptoAdapter] stored credential is not a {} string",
+                     "sha256$<salt>$<hash>");
+        return false;
+    }
+
     std::vector<uint8_t> salt_bytes;
-    if (!from_hex(salt, salt_bytes) || salt_bytes.size() != SALT_SIZE) {
+    if (!from_hex(salt_hex, salt_bytes) || salt_bytes.size() != SALT_SIZE) {
         spdlog::warn("[CryptoAdapter] stored salt is not a {} byte hex string", SALT_SIZE);
         return false;
     }
 
     std::vector<uint8_t> expected;
-    if (!from_hex(hash, expected) || expected.size() != 32) {
+    if (!from_hex(hash_hex, expected) || expected.size() != 32) {
         spdlog::warn("[CryptoAdapter] stored hash is not a 32 byte hex string");
         return false;
     }
@@ -345,9 +300,9 @@ bool OpenSSLCryptoAdapter::verify_password(const std::string& password, const st
 }
 
 EncryptResult OpenSSLCryptoAdapter::encrypt_buffer(const uint8_t* data, size_t size,
-                                                   const std::string& key) {
-    std::array<uint8_t, KEY_SIZE> aes_key{};
-    if (!aes_key_from(key, aes_key)) {
+                                                   const std::string& key, CipherSuite suite) {
+    std::array<uint8_t, KEY_SIZE> aead_key{};
+    if (!aead_key_from(key, aead_key)) {
         return {};
     }
     if (data == nullptr && size > 0) {
@@ -362,24 +317,25 @@ EncryptResult OpenSSLCryptoAdapter::encrypt_buffer(const uint8_t* data, size_t s
     EncryptResult result;
     result.iv.resize(IV_SIZE);
     if (RAND_bytes(result.iv.data(), static_cast<int>(result.iv.size())) != 1) {
-        spdlog::error("[CryptoAdapter] cannot generate a random IV");
+        spdlog::error("[CryptoAdapter] cannot generate a random nonce");
         return {};
     }
 
     CipherCtxPtr ctx = make_cipher_ctx();
-    if (!ctx || !init_gcm_cipher(ctx.get(), true, aes_key, result.iv.data())) {
-        spdlog::error("[CryptoAdapter] cannot initialise AES-256-GCM");
+    if (!ctx || !init_aead_cipher(ctx.get(), true, aead_key, result.iv.data(), suite)) {
+        spdlog::error("[CryptoAdapter] cannot initialise {}", suite_name(suite));
         return {};
     }
 
-    // +TAG_SIZE：GCM 的 final 块最多再吐一个分组，先留出位置，事后按实际长度收缩。
+    // +TAG_SIZE：final 块最多再吐一个分组，先留出位置，事后按实际长度收缩。
+    // 两个套件的密文长度都等于明文长度，这块余量对它们都是够的。
     result.cipher_data.resize(size + TAG_SIZE);
     int update_len = 0;
     size_t total = 0;
     if (size > 0) {
         if (EVP_EncryptUpdate(ctx.get(), result.cipher_data.data(), &update_len, data,
                               static_cast<int>(size)) != 1) {
-            spdlog::error("[CryptoAdapter] AES-256-GCM encrypt failed");
+            spdlog::error("[CryptoAdapter] {} encrypt failed", suite_name(suite));
             return {};
         }
         total = static_cast<size_t>(update_len);
@@ -387,16 +343,16 @@ EncryptResult OpenSSLCryptoAdapter::encrypt_buffer(const uint8_t* data, size_t s
 
     int final_len = 0;
     if (EVP_EncryptFinal_ex(ctx.get(), result.cipher_data.data() + total, &final_len) != 1) {
-        spdlog::error("[CryptoAdapter] AES-256-GCM encrypt finalisation failed");
+        spdlog::error("[CryptoAdapter] {} encrypt finalisation failed", suite_name(suite));
         return {};
     }
     total += static_cast<size_t>(final_len);
     result.cipher_data.resize(total);
 
     result.tag.resize(TAG_SIZE);
-    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_GET_TAG, static_cast<int>(TAG_SIZE),
+    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_GET_TAG, static_cast<int>(TAG_SIZE),
                             result.tag.data()) != 1) {
-        spdlog::error("[CryptoAdapter] cannot read the GCM tag");
+        spdlog::error("[CryptoAdapter] cannot read the {} tag", suite_name(suite));
         return {};
     }
     return result;
@@ -405,9 +361,10 @@ EncryptResult OpenSSLCryptoAdapter::encrypt_buffer(const uint8_t* data, size_t s
 std::vector<uint8_t> OpenSSLCryptoAdapter::decrypt_buffer(const uint8_t* data, size_t size,
                                                           const std::string& key,
                                                           const std::vector<uint8_t>& iv,
-                                                          const std::vector<uint8_t>& tag) {
-    std::array<uint8_t, KEY_SIZE> aes_key{};
-    if (!aes_key_from(key, aes_key)) {
+                                                          const std::vector<uint8_t>& tag,
+                                                          CipherSuite suite) {
+    std::array<uint8_t, KEY_SIZE> aead_key{};
+    if (!aead_key_from(key, aead_key)) {
         return {};
     }
     if (data == nullptr && size > 0) {
@@ -415,7 +372,7 @@ std::vector<uint8_t> OpenSSLCryptoAdapter::decrypt_buffer(const uint8_t* data, s
         return {};
     }
     if (iv.size() != IV_SIZE || tag.size() != TAG_SIZE) {
-        spdlog::error("[CryptoAdapter] unexpected IV ({} B) or tag ({} B) length", iv.size(),
+        spdlog::error("[CryptoAdapter] unexpected nonce ({} B) or tag ({} B) length", iv.size(),
                       tag.size());
         return {};
     }
@@ -425,8 +382,8 @@ std::vector<uint8_t> OpenSSLCryptoAdapter::decrypt_buffer(const uint8_t* data, s
     }
 
     CipherCtxPtr ctx = make_cipher_ctx();
-    if (!ctx || !init_gcm_cipher(ctx.get(), false, aes_key, iv.data())) {
-        spdlog::error("[CryptoAdapter] cannot initialise AES-256-GCM");
+    if (!ctx || !init_aead_cipher(ctx.get(), false, aead_key, iv.data(), suite)) {
+        spdlog::error("[CryptoAdapter] cannot initialise {}", suite_name(suite));
         return {};
     }
 
@@ -436,150 +393,29 @@ std::vector<uint8_t> OpenSSLCryptoAdapter::decrypt_buffer(const uint8_t* data, s
     if (size > 0) {
         if (EVP_DecryptUpdate(ctx.get(), plain.data(), &update_len, data, static_cast<int>(size)) !=
             1) {
-            spdlog::error("[CryptoAdapter] AES-256-GCM decrypt failed");
+            spdlog::error("[CryptoAdapter] {} decrypt failed", suite_name(suite));
             return {};
         }
         total = static_cast<size_t>(update_len);
     }
 
     // tag 必须在 final 之前设置：final 既解密最后一个分组，也校验整段密文的认证标签。
-    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, static_cast<int>(TAG_SIZE),
+    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_AEAD_SET_TAG, static_cast<int>(TAG_SIZE),
                             const_cast<uint8_t*>(tag.data())) != 1) {
-        spdlog::error("[CryptoAdapter] cannot set the GCM tag");
+        spdlog::error("[CryptoAdapter] cannot set the {} tag", suite_name(suite));
         return {};
     }
 
     int final_len = 0;
     if (EVP_DecryptFinal_ex(ctx.get(), plain.data() + total, &final_len) != 1) {
-        spdlog::error(
-            "[CryptoAdapter] AES-256-GCM authentication failed (wrong key or corrupt data)");
+        spdlog::error("[CryptoAdapter] {} authentication failed (wrong key, wrong suite or "
+                      "corrupt data)",
+                      suite_name(suite));
         return {};
     }
     total += static_cast<size_t>(final_len);
     plain.resize(total);
     return plain;
-}
-
-bool OpenSSLCryptoAdapter::encrypt_file(const std::string& input_path,
-                                        const std::string& output_path, const std::string& key) {
-    std::array<uint8_t, KEY_SIZE> aes_key{};
-    if (!aes_key_from(key, aes_key)) {
-        return false;
-    }
-
-    std::error_code ec;
-    if (!std::filesystem::is_regular_file(input_path, ec)) {
-        spdlog::error("[CryptoAdapter] '{}' is not a regular file", input_path);
-        return false;
-    }
-
-    std::ifstream in(input_path, std::ios::binary);
-    if (!in) {
-        spdlog::error("[CryptoAdapter] cannot open '{}' for reading", input_path);
-        return false;
-    }
-
-    std::filesystem::path out_path = std::filesystem::path(output_path);
-    std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
-    if (!out) {
-        spdlog::error("[CryptoAdapter] cannot open '{}' for writing", output_path);
-        return false;
-    }
-
-    // 失败路径统一「关流 + 删半成品」：留下一个解不开的密文文件比什么都不留更糟。
-    auto fail = [&out, &out_path]() {
-        out.close();
-        std::error_code remove_ec;
-        std::filesystem::remove(out_path, remove_ec);
-        return false;
-    };
-
-    std::array<uint8_t, IV_SIZE> iv{};
-    if (RAND_bytes(iv.data(), static_cast<int>(iv.size())) != 1) {
-        spdlog::error("[CryptoAdapter] cannot generate a random IV");
-        return fail();
-    }
-    if (!write_bytes(out, iv.data(), iv.size()) ||
-        !encrypt_stream(in, out, aes_key, iv.data(), input_path)) {
-        return fail();
-    }
-
-    out.flush();
-    if (!out) {
-        spdlog::error("[CryptoAdapter] failed to write '{}'", output_path);
-        return fail();
-    }
-
-    spdlog::debug("[CryptoAdapter] encrypted '{}' -> '{}'", input_path, output_path);
-    return true;
-}
-
-bool OpenSSLCryptoAdapter::decrypt_file(const std::string& input_path,
-                                        const std::string& output_path, const std::string& key) {
-    std::array<uint8_t, KEY_SIZE> aes_key{};
-    if (!aes_key_from(key, aes_key)) {
-        return false;
-    }
-
-    std::error_code ec;
-    uintmax_t file_size = std::filesystem::file_size(input_path, ec);
-    if (ec) {
-        spdlog::error("[CryptoAdapter] cannot stat '{}': {}", input_path, ec.message());
-        return false;
-    }
-    if (file_size < FILE_MIN_SIZE) {
-        spdlog::error("[CryptoAdapter] '{}' is too short ({} bytes) to be a cipher file",
-                      input_path, file_size);
-        return false;
-    }
-
-    std::ifstream in(input_path, std::ios::binary);
-    if (!in) {
-        spdlog::error("[CryptoAdapter] cannot open '{}' for reading", input_path);
-        return false;
-    }
-
-    std::filesystem::path out_path = std::filesystem::path(output_path);
-    std::ofstream out(out_path, std::ios::binary | std::ios::trunc);
-    if (!out) {
-        spdlog::error("[CryptoAdapter] cannot open '{}' for writing", output_path);
-        return false;
-    }
-
-    auto fail = [&out, &out_path]() {
-        out.close();
-        std::error_code remove_ec;
-        std::filesystem::remove(out_path, remove_ec);
-        return false;
-    };
-
-    // 容器布局：[12B IV][密文][16B tag]，tag 在尾部，所以先读头、再跳到尾部读 tag。
-    std::array<uint8_t, IV_SIZE> iv{};
-    if (!in.read(reinterpret_cast<char*>(iv.data()), static_cast<std::streamsize>(iv.size()))) {
-        spdlog::error("[CryptoAdapter] cannot read the IV from '{}'", input_path);
-        return fail();
-    }
-
-    std::array<uint8_t, TAG_SIZE> tag{};
-    in.seekg(static_cast<std::streamoff>(file_size - TAG_SIZE), std::ios::beg);
-    if (!in.read(reinterpret_cast<char*>(tag.data()), static_cast<std::streamsize>(tag.size()))) {
-        spdlog::error("[CryptoAdapter] cannot read the tag from '{}'", input_path);
-        return fail();
-    }
-
-    in.seekg(static_cast<std::streamoff>(IV_SIZE), std::ios::beg);
-    if (!decrypt_stream(in, out, file_size - FILE_MIN_SIZE, aes_key, iv, tag, input_path)) {
-        return fail();
-    }
-
-    out.flush();
-    if (!out) {
-        spdlog::error("[CryptoAdapter] failed to write '{}'", output_path);
-        return fail();
-    }
-
-    spdlog::debug("[CryptoAdapter] decrypted '{}' -> '{}'", input_path, output_path);
-    return true;
 }
 
 } // namespace Prism::Adapter
