@@ -7,7 +7,7 @@ echo "project root: ${PROJECT_ROOT}"
 
 cd "${PROJECT_ROOT}"
 
-PREREQUISITE_DOC="docs/markdown/项目框架.md 7.1（环境与依赖基线）"
+PREREQUISITE_DOC="AGENTS.md「构建（前置条件与可复现边界）」"
 
 if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${PROJECT_ROOT}/scripts/wsl-env.sh" ]; then
     . "${PROJECT_ROOT}/scripts/wsl-env.sh"

@@ -91,7 +91,7 @@ printf 'clang-format: %s\n' "${PRISM_CLANG_FORMAT_REAL:-未找到}"
 printf 'clang-tidy:   %s\n' "${PRISM_CLANG_TIDY_REAL:-未找到}"
 printf 'clang++:      %s\n' "${PRISM_CLANGXX_REAL:-未找到}"
 if [ -z "${PRISM_CLANG_FORMAT_REAL}" ]; then
-    printf '错误：找不到 clang-format，无法自测（见 docs/markdown/项目框架.md 7.1）。\n' >&2
+    printf '错误：找不到 clang-format，无法自测（见 AGENTS.md「构建（前置条件与可复现边界）」）。\n' >&2
     exit 1
 fi
 

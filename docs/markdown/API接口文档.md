@@ -1,15 +1,16 @@
 # PrismPlayer API 接口文档
 
-> 基于项目实际代码生成，最后更新：2026-10-23
-> 版本：0.0.1
->
-> **本文档记录的是「接口的形状」，每个接口的实现状态见各节标题下的「实现状态」行。** 完整的实现状态汇总见 `项目计划书.md` §11；术语以根目录 `GLOSSARY.md` 为准。
->
-> 修复说明：§1 与 §6 原先都写「27 个 C API」，实测 `client/service/include/Player.h` 中 `PRISM_API` 宏出现 **32** 次，与 `Player.cpp:135-572` 的 32 个 `extern "C"` 定义一一对应，已改为 32。本文档的 API 覆盖是完整的：32 个函数名与头文件逐一比对后**无遗漏、无多余**。
+_接口形状的唯一真源 · 版本 0.0.1 · 基线 `75ba727` · 2026-11-17_
 
 ---
 
-## 1. Service 层 — 公开 C API
+**本文档只给签名与语义。** 各节的「实现状态」行只在两种情况保留：该节的实现边界会影响调用方写代码（例如 `get_metadata()` 只填三项、`open()` 会新建文件），或该接口有已知偏差。完整的实现状态汇总见 `项目计划书.md` § 当前状态；层与边界见 `项目框架.md`；术语以 `GLOSSARY.md` 为准。
+
+32 个 C API 与 `client/service/include/Player.h` 逐一比对过：`PRISM_API` 出现 32 次，`Player.cpp:135-572` 有 32 个 `extern "C"` 定义，**无遗漏、无多余**。
+
+---
+
+## ⚙️ 1. Service 层 — 公开 C API
 
 > **头文件**：`client/service/include/Player.h`、`client/service/include/Types.h`
 >
@@ -296,7 +297,7 @@ sequenceDiagram
 
 ---
 
-## 2. Engine 层 API
+## 🔧 2. Engine 层 API
 
 > **命名空间**：`Prism::Engine`
 >
@@ -404,7 +405,7 @@ sequenceDiagram
 
 ---
 
-## 3. Business 层 API
+## ⚡ 3. Business 层 API
 
 > **命名空间**：`Prism::Business`
 >
@@ -625,7 +626,7 @@ AV Sync 与 Network 两个模块的接口。
 
 ---
 
-## 4. Adapter 层 API
+## 📦 4. Adapter 层 API
 
 > **命名空间**：`Prism::Adapter`
 >
@@ -633,7 +634,7 @@ AV Sync 与 Network 两个模块的接口。
 >
 > **构建产物**：静态库 (`client-adapter`)
 >
-> **实现状态**：🟡 **部分实现** —— `FileAdapter`（`WinFileAdapter`）与 `ConfigAdapter`（`JSONConfigAdapter`）已落地真实实现，`libclient-adapter.a` 不再是空归档；`DBAdapter` / `NetworkAdapter` / `CryptoAdapter` 三个接口及其实现仍只有类声明。两处 `// TODO` 原样保留：`internal/OpenSSLCryptoAdapter.h:36`、`internal/SQLiteDBAdapter.h:40`。
+> **实现状态**：✅ **五个接口都有实现**（`WinFileAdapter` 187 / `JSONConfigAdapter` 223 / `ASIONetworkAdapter` 313 / `OpenSSLCryptoAdapter` 375 / `SQLiteDBAdapter` 608 行，`libclient-adapter.a` 1,706 行）。`include/` 下**没有 Adapter 工厂头** —— 上层目前自己 `new` 具体实现，是临时状态。
 >
 > ⚠️ 本节各接口的签名取自 `include/` 下的抽象接口；`internal/` 下的实现类与之一一对应，命名更具体（如 `DBAdapter` 的实现叫 `SQLiteDBAdapter`）。对照表见根目录 `GLOSSARY.md`。
 
@@ -679,18 +680,20 @@ AV Sync 与 Network 两个模块的接口。
 
 > **`get_metadata()` 的当前实现边界**：只填 `file_path`（`weakly_canonical` 规范化后的路径）、`file_size`、`format`（扩展名去掉点、转大写）。`duration` / `bit_rate` / `sample_rate` / 分辨率 / `codec_name` 等必须解封装容器才能拿到，保持零值，等 Engine 层 FFmpeg Demuxer 接入后补齐。
 >
-> **`open()` 的语义**：路径先规范化；文件已存在则原样以二进制读写方式打开（**不清空**），不存在则新建空文件并记 info 日志。
+> **`open()` 的语义（当前实现）**：路径先规范化；文件已存在则原样以二进制读写方式打开（**不清空**），**不存在则新建空文件**并记 info 日志。
+>
+> ⚠️ 这与 spec #117 决策 8「只对已存在的文件成功、绝不创建空文件」相反 —— `WinFileAdapter.cpp:91-98` 在 `exists` 为假时显式补 `std::ios::trunc` 并创建。属待修偏差，登记在 #118；修之前调用方必须自己先判存在性。
 
 ### 4.2 DBAdapter — SQLite 数据库操作
 
-提供表级 CRUD 操作。
+表结构（四张表的 DDL、列类型、约束与两处 spec 偏差）**只在 `项目计划书.md` § 数据库设计 维护**，此处不复制。结构体与列一一对应，不出现「库里没人读的列」。
 
-| 表 | 结构体 | 主要字段 |
-|---|---|---|
-| `accounts` | `AccountInfo` | `id`、`username`、`email`、`password_hash` |
-| `audio_files` | `AudioFileInfo` | `title`、`file_path`、`duration`、`sample_rate`、`cover_path`、`lyrics_path`... |
-| `video_files` | `VideoFileInfo` | `filename`、`file_path`、`resolution`、`frame_rate`、`codec_name`... |
-| `settings` | 键值对 | `key`、`value` |
+| 表 | 结构体 |
+|---|---|
+| **`accounts`** | `AccountInfo` |
+| `audio_files` | `AudioFileInfo` |
+| `video_files` | `VideoFileInfo` |
+| `settings` | 键值对（不走结构体） |
 
 **接口方法**
 
@@ -786,7 +789,7 @@ AV Sync 与 Network 两个模块的接口。
 
 ---
 
-## 5. Service 内部接口 — IServiceNetwork
+## 🔗 5. Service 内部接口 — IServiceNetwork
 
 > **命名空间**：`Prism::Service`
 >
@@ -807,7 +810,7 @@ Service 层依赖的网络能力抽象接口：登录/登出、房间进出与�
 
 ---
 
-## 6. 接口索引
+## 📍 6. 接口索引
 
 按层级汇总：命名空间、接口数与头文件目录。
 
@@ -820,8 +823,4 @@ Service 层依赖的网络能力抽象接口：登录/登出、房间进出与�
 | Engine | `Prism::Engine` | 2 个接口 + 4 个工厂 + 3 个结构体 | `client/engine/include/` |
 | Adapter | `Prism::Adapter` | 5 个接口（+ 5 个平台实现） | `client/adapter/include/` |
 
-> ⚠️ 本表旧版有四处计数错误，已按 `include/` 下的实际文件重数：
-> - Service (C API)：27 → **32**；
-> - Business (AV Sync)：写成「4 个接口 + 4 个工厂」，实际 `include/` 下是 4 个接口 + `SyncFactory.h` + `SyncTypes.h`；
-> - Business (Network)：写成「3 个接口 + 1 个观察者 + 3 个工厂」，实际 `include/` 下是 4 个接口（`ISignalingClient` / `IRoomManager` / `IAccountManager` / `INetworkObserver`）+ `NetworkFactory.h` + `NetworkTypes.h`（§3.2 正文内容本身是对的，错的只是本表这一行）；
-> - Engine：写成「2 个接口 + 2 个工厂」，实际 `include/` 下是 2 个抽象接口 + 4 个工厂（2 个抽象工厂 + 2 个具体工厂）；
+> 📌 Engine 的 4 个工厂 = 2 个抽象工厂（`AudioEngineFactory` / `VideoEngineFactory`）+ 2 个具体工厂（`AudioEngineWasapiSharedFactory` / `VideoEngineVulkanFactory`），后者在 `src/` 里但头文件同样落在 `include/`。
