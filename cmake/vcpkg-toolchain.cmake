@@ -3,7 +3,7 @@ if(DEFINED PRISM_VCPKG_TOOLCHAIN_INCLUDED)
 endif()
 set(PRISM_VCPKG_TOOLCHAIN_INCLUDED TRUE)
 
-set(_prism_doc "docs/markdown/项目框架.md 7.1（环境与依赖基线）")
+set(_prism_doc "AGENTS.md「构建（前置条件与可复现边界）」")
 
 if(CMAKE_HOST_WIN32)
   set(_prism_missing "")
