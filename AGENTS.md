@@ -32,7 +32,7 @@ Windows 侧**必须用 mingw64 的 clang**，不能用已卸载的 clang64：vcp
 | 变量 | Windows | WSL / Linux |
 |------|---------|-------------|
 | `CLANG_ROOT` | `D:\Program\Dev\msys64\mingw64\bin`（机器级） | 不使用（走 `/usr/bin/clang`） |
-| `VCPKG_ROOT` | `D:\Program\Dev\Vcpkg\vcpkg`（机器级） | `$HOME/vcpkg`；非交互 shell 下由 `cmake/vcpkg-toolchain.cmake` 与 `scripts/wsl-env.sh` 自动探测 |
+| `VCPKG_ROOT` | `D:\Program\Dev\Vcpkg\vcpkg`（机器级） | `$HOME/vcpkg`；非交互 shell 下由 `cmake/vcpkg-toolchain.cmake` 与 `scripts/tool/wsl-env.sh` 自动探测 |
 
 两个变量缺失时，配置阶段会给出可读报错并指出前置条件写在上面的环境变量表（由仓库内 `cmake/vcpkg-toolchain.cmake` 提供，不需要在预设里展开 `$env{VCPKG_ROOT}`）。
 
@@ -45,6 +45,20 @@ vcpkg baseline（`vcpkg-configuration.json` 的 `default-registry`）固定为 `
 明确**不**保证：跨机器逐字节一致（路径、时间戳、缓存命中都会改变二进制）；容器化 / 隔离环境；`.vcpkg-cache`（仓库内、已 gitignore）在别的机器上可复用。
 
 已实测的机器 / 环境：Windows（MSYS2 mingw64 + 本机 vcpkg checkout）与 WSL2 Ubuntu 24.04.5（同一台机器）。
+
+### UI / FFI 绑定生成
+
+`ui/lib/ffi/ffi_bridge.dart` 是 ffigen 从 `client/service/include/Player.h` 生成的，**不要手改**。C ABI 变动后重跑：
+
+```powershell
+pwsh -File scripts/tool/ffigen.ps1   # 需要 CLANG_ROOT 指向含 clang 与 libclang.dll 的目录
+```
+
+```bash
+bash scripts/tool/ffigen.sh          # 需要 clang + libclang.so（llvm-dev / libclang-dev）
+```
+
+两个脚本都读取 `ui/ffigen.yaml`，把本机 libclang 路径注入临时配置后执行 `dart run ffigen`，产物写回 `ui/lib/ffi/ffi_bridge.dart`，临时配置在退出时删除。
 
 ## 代码门禁（本地 Git hooks + 服务端 CI，#64 / #96）
 
