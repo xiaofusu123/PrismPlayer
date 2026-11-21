@@ -112,13 +112,13 @@ prism_check_build_prerequisites() {
             return 1
         fi
     else
-        if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${_prism_pre_root}/scripts/wsl-env.sh" ]; then
+        if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${_prism_pre_root}/scripts/tool/wsl-env.sh" ]; then
             # shellcheck source=/dev/null
-            . "${_prism_pre_root}/scripts/wsl-env.sh"
+            . "${_prism_pre_root}/scripts/tool/wsl-env.sh"
         fi
         if [ -z "${VCPKG_ROOT:-}" ] || [ ! -f "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" ]; then
             prism_error "前置条件不满足：VCPKG_ROOT 未设置或无效（当前 '${VCPKG_ROOT:-未设置}'）。"
-            prism_error "WSL 侧可先 . scripts/wsl-env.sh（本次已尝试自动探测），设置方式见 ${PRISM_PREREQUISITE_DOC}。"
+            prism_error "WSL 侧可先 . scripts/tool/wsl-env.sh（本次已尝试自动探测），设置方式见 ${PRISM_PREREQUISITE_DOC}。"
             return 1
         fi
     fi

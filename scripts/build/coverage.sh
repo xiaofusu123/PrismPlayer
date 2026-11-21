@@ -40,11 +40,11 @@ fi
 
 # ---- 前置条件（与 scripts/build/build.sh 同一口径）----
 
-if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${PROJECT_ROOT}/scripts/wsl-env.sh" ]; then
-    . "${PROJECT_ROOT}/scripts/wsl-env.sh"
+if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${PROJECT_ROOT}/scripts/tool/wsl-env.sh" ]; then
+    . "${PROJECT_ROOT}/scripts/tool/wsl-env.sh"
 fi
 if [ -z "${VCPKG_ROOT:-}" ] || [ ! -f "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" ]; then
-    fail "环境变量 VCPKG_ROOT 未设置或无效（当前值：'${VCPKG_ROOT:-}'），未找到 vcpkg checkout。前置条件与设置方式见 ${PREREQUISITE_DOC}；WSL 侧可用 scripts/wsl-env.sh。"
+    fail "环境变量 VCPKG_ROOT 未设置或无效（当前值：'${VCPKG_ROOT:-}'），未找到 vcpkg checkout。前置条件与设置方式见 ${PREREQUISITE_DOC}；WSL 侧可用 scripts/tool/wsl-env.sh。"
 fi
 echo "vcpkg root: ${VCPKG_ROOT}"
 
