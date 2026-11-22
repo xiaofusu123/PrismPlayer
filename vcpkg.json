@@ -21,16 +21,6 @@
         "vulkan"
       ]
     },
-    "server": {
-      "description": "服务端依赖",
-      "dependencies": [
-        "asio",
-        "ixwebsocket",
-        "nlohmann-json",
-        "openssl",
-        "spdlog"
-      ]
-    },
     "test": {
       "description": "单元测试 (GTest)",
       "dependencies": [

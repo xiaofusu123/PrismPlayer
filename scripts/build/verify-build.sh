@@ -103,15 +103,13 @@ for config in "${selected[@]}"; do
             test_config "linux:debug" "${PROJECT_ROOT}/build/Linux/debug" x64-linux 25 \
                 client/engine/libclient-engine.so:36000 \
                 client/service/libclient-service.so:2000000 \
-                client/business/av_sync/libclient-av_sync.a:6000000 \
-                server/Prism-server:4000
+                client/business/av_sync/libclient-av_sync.a:6000000
             ;;
         release)
             test_config "linux:release" "${PROJECT_ROOT}/build/Linux/release" x64-linux 25 \
                 client/engine/libclient-engine.so:6000 \
                 client/service/libclient-service.so:120000 \
-                client/business/av_sync/libclient-av_sync.a:490000 \
-                server/Prism-server:4000
+                client/business/av_sync/libclient-av_sync.a:490000
             ;;
     esac
 done

@@ -40,7 +40,7 @@ vcpkg baseline（`vcpkg-configuration.json` 的 `default-registry`）固定为 `
 
 ### 本阶段「可复现」的边界
 
-到此为止：**同一工具链 + 同一 vcpkg baseline + 同一预设名 ⇒ 同一组产物**（2026-11-02 实测 Debug 下共 9 个链接目标：`client-engine`、`client-service`、`client-adapter`、`client-av_sync`、`server-adapter`、`server-business`、`server-network`、`Prism-server`，以及仅 Debug 的 `test-engine`）；其中 4 个业务产物 `client-engine`、`client-av_sync`、`client-service`、`Prism-server` 由 `scripts/build/verify-build.*` 断言存在与体积。
+到此为止：**同一工具链 + 同一 vcpkg baseline + 同一预设名 ⇒ 同一组产物**（2026-11-02 实测 Debug 下共 9 个链接目标；2026-11-23 移除服务端实现后为 5 个：`client-engine`、`client-service`、`client-adapter`、`client-av_sync`，以及仅 Debug 的 `test-engine`）；其中 3 个业务产物 `client-engine`、`client-av_sync`、`client-service` 由 `scripts/build/verify-build.*` 断言存在与体积。服务端（`server/**`、`server-adapter`、`server-business`、`server-network`、`Prism-server`）已于 2026-11-23 整体移除，重写时目标重新计入（`docs/adr/0008-服务端实现移除与重写.md`）。
 
 明确**不**保证：跨机器逐字节一致（路径、时间戳、缓存命中都会改变二进制）；容器化 / 隔离环境；`.vcpkg-cache`（仓库内、已 gitignore）在别的机器上可复用。
 

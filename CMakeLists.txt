@@ -31,7 +31,6 @@ if(PRISM_COVERAGE)
 endif()
 
 add_subdirectory(client)
-add_subdirectory(server)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     enable_testing()
