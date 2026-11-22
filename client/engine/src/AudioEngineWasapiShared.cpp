@@ -22,11 +22,11 @@ bool AudioEngineWasapiShared::close() {
     return true;
 }
 
-bool AudioEngineWasapiShared::set_play_speed() {
+bool AudioEngineWasapiShared::set_play_speed(float speed) {
     return true;
 }
 
-bool AudioEngineWasapiShared::seek(uint64_t pts, int seek_mode) {
+bool AudioEngineWasapiShared::seek(std::chrono::milliseconds pts) {
     return true;
 }
 

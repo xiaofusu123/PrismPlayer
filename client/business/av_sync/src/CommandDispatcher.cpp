@@ -9,8 +9,7 @@ namespace Prism::Business {
 
 CommandDispatcher::CommandDispatcher() = default;
 
-bool CommandDispatcher::dispatch_play()
-{
+bool CommandDispatcher::dispatch_play() {
     bool ok = true;
     if (audio_engine_) {
         if (!audio_engine_->play()) {
@@ -28,8 +27,7 @@ bool CommandDispatcher::dispatch_play()
     return ok;
 }
 
-bool CommandDispatcher::dispatch_pause()
-{
+bool CommandDispatcher::dispatch_pause() {
     bool ok = true;
     if (audio_engine_) {
         if (!audio_engine_->pause()) {
@@ -47,30 +45,28 @@ bool CommandDispatcher::dispatch_pause()
     return ok;
 }
 
-bool CommandDispatcher::dispatch_seek(uint64_t pts, int seek_mode)
-{
+bool CommandDispatcher::dispatch_seek(std::chrono::milliseconds pts) {
     bool ok = true;
     if (audio_engine_) {
-        if (!audio_engine_->seek(pts, seek_mode)) {
-            spdlog::warn("[CommandDispatcher] audio seek to {} failed", pts);
+        if (!audio_engine_->seek(pts)) {
+            spdlog::warn("[CommandDispatcher] audio seek to {}ms failed", pts.count());
             ok = false;
         }
     }
     if (video_engine_) {
-        if (!video_engine_->seek(pts, seek_mode)) {
-            spdlog::warn("[CommandDispatcher] video seek to {} failed", pts);
+        if (!video_engine_->seek(pts)) {
+            spdlog::warn("[CommandDispatcher] video seek to {}ms failed", pts.count());
             ok = false;
         }
     }
-    spdlog::debug("[CommandDispatcher] dispatch_seek: pts={} mode={} ok={}", pts, seek_mode, ok);
+    spdlog::debug("[CommandDispatcher] dispatch_seek: pts={}ms ok={}", pts.count(), ok);
     return ok;
 }
 
-bool CommandDispatcher::dispatch_speed(float speed)
-{
+bool CommandDispatcher::dispatch_speed(float speed) {
     bool ok = true;
     if (audio_engine_) {
-        if (!audio_engine_->set_play_speed()) {
+        if (!audio_engine_->set_play_speed(speed)) {
             spdlog::warn("[CommandDispatcher] audio speed change failed");
             ok = false;
         }
@@ -85,18 +81,16 @@ bool CommandDispatcher::dispatch_speed(float speed)
     return ok;
 }
 
-void CommandDispatcher::set_audio_engine(Prism::Engine::AudioEngine* engine)
-{
+void CommandDispatcher::set_audio_engine(Prism::Engine::AudioEngine* engine) {
     audio_engine_ = engine;
 }
 
-void CommandDispatcher::set_video_engine(Prism::Engine::VideoEngine* engine)
-{
+void CommandDispatcher::set_video_engine(Prism::Engine::VideoEngine* engine) {
     video_engine_ = engine;
 }
 
-bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_factory, bool enable_video)
-{
+bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_factory,
+                                           bool enable_video) {
     auto* audio_fac = static_cast<Prism::Engine::AudioEngineFactory*>(audio_factory);
     if (audio_fac) {
         audio_owned_ = audio_fac->create_audio_engine();
@@ -126,8 +120,7 @@ bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_fact
     return true;
 }
 
-void CommandDispatcher::shutdown_engines()
-{
+void CommandDispatcher::shutdown_engines() {
     if (audio_engine_) {
         audio_engine_->close();
         audio_owned_.reset();

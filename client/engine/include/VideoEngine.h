@@ -1,9 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 
 #ifdef _WIN32
-#include <windows.h>
+    #include <windows.h>
 typedef HANDLE RenderResultHandle;
 #else
 typedef int32_t RenderResultHandle;
@@ -13,13 +14,21 @@ namespace Prism::Engine {
 
 /**
  * @struct VideoSyncInfo
- * @brief 视频同步信息
+ * @brief 视频同步信息，由视频引擎写、AV Sync 层读，跨线程交换
+ *
+ * 成员都是 atomic：只在同一进程内的线程之间使用，不序列化、不发给其它进程，
+ * 也不构成任何 ABI 稳定性承诺。因为含 atomic，本结构不可拷贝、不可移动。
+ *
+ * 单位统一为 std::chrono::milliseconds：
+ * - current_pts / next_pts：相对流起点的播放位置，绝对时间轴上的毫秒数；
+ * - start_time：流开始时刻相对文件起点的偏移；
+ * - duration：视频总时长（旧字段名 draution 是笔误，已按 #128 改正）。
  */
 struct VideoSyncInfo {
-    std::atomic<uint64_t> current_pts{0}; /**< 当前视频帧解码时间戳（ms） */
-    std::atomic<uint64_t> next_pts{0};    /**< 下一帧视频解码时间戳（ms） */
-    std::atomic<uint32_t> start_time{0};  /**< 流开始的时间 */
-    std::atomic<uint64_t> draution{0};    /**< 视频总时长 */
+    std::atomic<std::chrono::milliseconds> current_pts{}; /**< 当前视频帧的解码时间戳 */
+    std::atomic<std::chrono::milliseconds> next_pts{};    /**< 下一帧视频帧的解码时间戳 */
+    std::atomic<std::chrono::milliseconds> start_time{};  /**< 流开始时刻相对文件起点的偏移 */
+    std::atomic<std::chrono::milliseconds> duration{};    /**< 视频总时长 */
 };
 
 /**
@@ -62,17 +71,17 @@ class VideoEngine {
 
     /**
      * @brief 设置播放速度（倍速播放）
-     * @param speed 设置的速度
+     * @param speed 播放速率，1.0 为原速，>1 加速、<1 减速；必须为正数
      */
     virtual bool set_play_speed(float speed) = 0;
 
     /**
      * @brief 视频跳转
-     * @param pts 跳转的时间戳
-     * @param seek_mode
-     * 跳转模式。0为绝对模式，直接跳转到视频对应的时间，此时pts为非负值；1为相对时间，快进或倒退对应时间
+     * @param pts 跳转目标位置（绝对位置，相对流起点）
+     *
+     * 只接受绝对位置：相对快进/倒退由上层（Service / AV Sync）换算成绝对位置后再调用。
      */
-    virtual bool seek(uint64_t pts, int seek_mode) = 0;
+    virtual bool seek(std::chrono::milliseconds pts) = 0;
 
     /**
      * @brief 获取视频同步信息

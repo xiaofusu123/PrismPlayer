@@ -6,9 +6,8 @@ namespace Prism::Business {
 
 EngineObserver::EngineObserver() = default;
 
-void EngineObserver::on_audio_frame(const Prism::Engine::AudioSyncInfo& info)
-{
-    uint64_t pts = info.current_pts.load();
+void EngineObserver::on_audio_frame(const Prism::Engine::AudioSyncInfo& info) {
+    uint64_t pts = static_cast<uint64_t>(info.current_pts.load().count());
     last_audio_pts_ = pts;
     spdlog::trace("[EngineObserver] audio frame pts={}", pts);
 
@@ -20,15 +19,14 @@ void EngineObserver::on_audio_frame(const Prism::Engine::AudioSyncInfo& info)
     }
 }
 
-void EngineObserver::on_video_frame(const Prism::Engine::VideoSyncInfo& info)
-{
-    uint64_t video_pts = info.current_pts.load();
+void EngineObserver::on_video_frame(const Prism::Engine::VideoSyncInfo& info) {
+    uint64_t video_pts = static_cast<uint64_t>(info.current_pts.load().count());
     spdlog::trace("[EngineObserver] video frame pts={}", video_pts);
 
     if (sync_algo_ && state_machine_) {
         SyncState s = state_machine_->get_state();
-        if (s == SyncState::CALIBATING || s == SyncState::SYNCHRONIZED ||
-            s == SyncState::AHEAD || s == SyncState::BEHIND) {
+        if (s == SyncState::CALIBATING || s == SyncState::SYNCHRONIZED || s == SyncState::AHEAD ||
+            s == SyncState::BEHIND) {
 
             SyncAction action = sync_algo_->calibrate(last_audio_pts_, video_pts);
 
@@ -52,19 +50,16 @@ void EngineObserver::on_video_frame(const Prism::Engine::VideoSyncInfo& info)
     }
 }
 
-void EngineObserver::on_render_ready(const Prism::Engine::RenderMetadata& metadata)
-{
-    spdlog::trace("[EngineObserver] render ready: {}x{} ts={}",
-                  metadata.width, metadata.height, metadata.timestamp);
+void EngineObserver::on_render_ready(const Prism::Engine::RenderMetadata& metadata) {
+    spdlog::trace("[EngineObserver] render ready: {}x{} ts={}", metadata.width, metadata.height,
+                  metadata.timestamp);
 }
 
-void EngineObserver::set_sync_algorithm(ISyncAlgorithm* algo)
-{
+void EngineObserver::set_sync_algorithm(ISyncAlgorithm* algo) {
     sync_algo_ = algo;
 }
 
-void EngineObserver::set_state_machine(IPlaybackStateMachine* sm)
-{
+void EngineObserver::set_state_machine(IPlaybackStateMachine* sm) {
     state_machine_ = sm;
 }
 

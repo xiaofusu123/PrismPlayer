@@ -26,7 +26,7 @@ bool VideoEngineVulkan::set_play_speed(float speed) {
     return true;
 }
 
-bool VideoEngineVulkan::seek(uint64_t pts, int seek_mode) {
+bool VideoEngineVulkan::seek(std::chrono::milliseconds pts) {
     return true;
 }
 
