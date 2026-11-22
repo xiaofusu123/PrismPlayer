@@ -5,8 +5,10 @@ info:
   version: 0.1.0
   description: |
     PrismPlayer 客户端与服务端之间的 WebSocket 信令协议（JSON 文本帧）。
-    消息类型真源为 `server/business/include/ServerTypes.h`，处理入口为
-    `server/network/src/IxWebSocketServer.cpp` 与 `server/business/src/MessageRouter.cpp`。
+    服务端实现已于 2026-11-23 整体移除（`docs/adr/0008-服务端实现移除与重写.md`），
+    本契约保留为重写目标：原实现真源 `server/business/include/ServerTypes.h`、
+    `server/network/src/IxWebSocketServer.cpp`、`server/business/src/MessageRouter.cpp`
+    均已删除，重写时以本契约为准落位。
     本契约只描述跨进程/跨网络的异步消息，不描述进程内 C++ 接口或 C ABI。
   contact:
     name: PrismPlayer
@@ -16,7 +18,7 @@ servers:
   local:
     host: 'localhost:8080'
     protocol: ws
-    description: 本地开发服务器（`server/main.cpp` 监听 `0.0.0.0:8080`）。
+    description: 本地开发服务器（重写后监听 `0.0.0.0:8080`；原 `server/main.cpp` 已删除）。
 channels:
   clientMessages:
     address: /

@@ -22,8 +22,7 @@ $SPECS = @{
         Artifacts   = @(
             @{ Path = "client/engine/libclient-engine.dll"; MinSize = 50000 },
             @{ Path = "client/service/libclient-service.dll"; MinSize = 5000000 },
-            @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 7500000 },
-            @{ Path = "server/Prism-server.exe"; MinSize = 8000 }
+            @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 7500000 }
         )
     }
     "windows:release" = @{
@@ -33,8 +32,7 @@ $SPECS = @{
         Artifacts   = @(
             @{ Path = "client/engine/libclient-engine.dll"; MinSize = 9000 },
             @{ Path = "client/service/libclient-service.dll"; MinSize = 120000 },
-            @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 400000 },
-            @{ Path = "server/Prism-server.exe"; MinSize = 8000 }
+            @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 400000 }
         )
     }
     "linux:debug" = @{
@@ -44,8 +42,7 @@ $SPECS = @{
         Artifacts   = @(
             @{ Path = "client/engine/libclient-engine.so"; MinSize = 36000 },
             @{ Path = "client/service/libclient-service.so"; MinSize = 2000000 },
-            @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 6000000 },
-            @{ Path = "server/Prism-server"; MinSize = 4000 }
+            @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 6000000 }
         )
     }
     "linux:release" = @{
@@ -55,8 +52,7 @@ $SPECS = @{
         Artifacts   = @(
             @{ Path = "client/engine/libclient-engine.so"; MinSize = 6000 },
             @{ Path = "client/service/libclient-service.so"; MinSize = 120000 },
-            @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 490000 },
-            @{ Path = "server/Prism-server"; MinSize = 4000 }
+            @{ Path = "client/business/av_sync/libclient-av_sync.a"; MinSize = 490000 }
         )
     }
 }

@@ -20,13 +20,13 @@ _术语与命名的唯一真源 · 2026-11-17_
 | 适配器层（Adapter） | `Adapter层`、`基础设施层`、`adapter层` | `client/adapter/` |
 | AV Sync | `av_sync`（说模块时）、`音视频同步`、`同步模块`、`sync` | 模块目录确实是 `av_sync`（下划线），但**说这个概念时写 AV Sync** |
 | Network | `network`、`网络模块`、`net` | 模块目录是 `network` |
-| Server | `服务端`、`prism-server`（小写）、`服务端程序` | 目标名是 `Prism-server` |
+| Server | `服务端`、`prism-server`（小写）、`服务端程序` | 目标名是 `Prism-server`；实现 2026-11-23 移除，重写后恢复（ADR 0008） |
 
 ## CMake 目标与目录
 
 | 用这个 | 不要写成 | 说明 |
 |---|---|---|
-| `client-service` | `Prism-client`、`client` | **`Prism-client` 这个目标不存在**，`项目框架.md` 曾把它写成主目标，实际有 5 个 `client-*` + 1 个 `Prism-server` |
+| `client-service` | `Prism-client`、`client` | **`Prism-client` 这个目标不存在**，`项目框架.md` 曾把它写成主目标，实际有 5 个 `client-*` 目标（`Prism-server` 随服务端实现于 2026-11-23 移除） |
 | `client-engine` | `engine`、`PrismEngine` | |
 | `client-av_sync` | `client-avsync`、`client-av-sync`、`av_sync` 目标 | 下划线，与目录名一致 |
 | `client-network` | `client-net`、`network` 目标 | |

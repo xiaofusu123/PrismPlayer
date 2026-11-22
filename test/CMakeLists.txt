@@ -9,5 +9,3 @@ add_subdirectory(adapter)
 add_subdirectory(engine)
 add_subdirectory(business)
 add_subdirectory(service)
-
-add_subdirectory(server)
