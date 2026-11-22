@@ -16,7 +16,6 @@ class OpenSSLCryptoAdapter : public CryptoAdapter {
     HashResult hash_password(const std::string& password) override;
     bool verify_password(const std::string& password, const std::string& hash,
                          const std::string& salt) override;
-    std::string generate_token() override;
 };
 
 } // namespace Prism::Server::Adapter

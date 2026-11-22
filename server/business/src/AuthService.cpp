@@ -7,13 +7,6 @@
 
 namespace Prism::Server::Business {
 
-namespace {
-
-// 会话令牌有效期：24 小时
-constexpr auto TOKEN_TTL = std::chrono::hours(24);
-
-} // namespace
-
 AuthService::AuthService(Adapter::DBAdapter* db, Adapter::CryptoAdapter* crypto)
     : db_(db), crypto_(crypto) {}
 
@@ -41,65 +34,21 @@ bool AuthService::register_user(const std::string& username, const std::string& 
     return ok;
 }
 
-AuthResult AuthService::login(const std::string& username, const std::string& password) {
+std::optional<int64_t> AuthService::login(const std::string& username,
+                                          const std::string& password) {
     auto user = db_->query_user_by_username(username);
     if (!user.has_value()) {
         spdlog::warn("login: username '{}' not found", username);
-        AuthResult result;
-        result.error = AuthError::INVALID_CREDENTIALS;
-        return result;
+        return std::nullopt;
     }
 
     if (!crypto_->verify_password(password, user->password_hash, user->salt)) {
         spdlog::warn("login: password mismatch for '{}'", username);
-        AuthResult result;
-        result.error = AuthError::INVALID_CREDENTIALS;
-        return result;
-    }
-
-    std::string token = crypto_->generate_token();
-    if (token.empty()) {
-        spdlog::error("login: generate_token failed for '{}'", username);
-        AuthResult result;
-        result.error = AuthError::INVALID_CREDENTIALS;
-        return result;
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(token_mutex_);
-        tokens_[token] = TokenEntry{user->id, std::chrono::steady_clock::now() + TOKEN_TTL};
+        return std::nullopt;
     }
 
     spdlog::info("login: '{}' logged in (id={})", username, user->id);
-    AuthResult result;
-    result.user_id = user->id;
-    result.token = std::move(token);
-    return result;
-}
-
-AuthResult AuthService::verify_token(const std::string& token) {
-    std::lock_guard<std::mutex> lock(token_mutex_);
-    auto it = tokens_.find(token);
-    if (it == tokens_.end()) {
-        AuthResult result;
-        result.error = AuthError::NOT_AUTHENTICATED;
-        return result;
-    }
-    if (std::chrono::steady_clock::now() >= it->second.expires_at) {
-        tokens_.erase(it);
-        AuthResult result;
-        result.error = AuthError::TOKEN_EXPIRED;
-        return result;
-    }
-    AuthResult result;
-    result.user_id = it->second.user_id;
-    return result;
-}
-
-void AuthService::logout(const std::string& token) {
-    std::lock_guard<std::mutex> lock(token_mutex_);
-    tokens_.erase(token);
-    spdlog::info("logout: token revoked");
+    return user->id;
 }
 
 } // namespace Prism::Server::Business
