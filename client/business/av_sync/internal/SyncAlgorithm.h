@@ -18,6 +18,8 @@ class SyncAlgorithm : public ISyncAlgorithm {
 
     SyncAction calibrate(uint64_t audio_pts, uint64_t video_pts) override;
     void configure(const SyncConfig& config) override;
+    [[nodiscard]] SyncConfig get_config() const override;
+    void update_audio_pts(uint64_t audio_pts) override;
     [[nodiscard]] DriftInfo get_drift_info() const override;
     void reset() override;
 
