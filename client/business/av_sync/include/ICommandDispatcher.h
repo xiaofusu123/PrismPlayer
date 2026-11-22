@@ -1,8 +1,9 @@
 #pragma once
 
-#include <cstdint>
 #include "AudioEngine.h"
+#include "IEngineObserver.h"
 #include "VideoEngine.h"
+#include <cstdint>
 
 namespace Prism::Business {
 
@@ -14,7 +15,7 @@ namespace Prism::Business {
  * 使上层（Service）不需要直接操作 Engine。
  */
 class ICommandDispatcher {
-public:
+  public:
     virtual ~ICommandDispatcher() = default;
 
     /**
@@ -63,7 +64,14 @@ public:
      * @param enable_video 是否启用视频引擎
      * @return 成功返回 true
      */
-    virtual bool initialize_engines(void* audio_factory, void* video_factory, bool enable_video) = 0;
+    virtual bool initialize_engines(void* audio_factory, void* video_factory,
+                                    bool enable_video) = 0;
+
+    /**
+     * @brief 绑定帧观察者，供引擎初始化时注册（不持有所有权）
+     * @param observer 观察者指针；nullptr 表示注销
+     */
+    virtual void set_frame_observer(IEngineObserver* observer) = 0;
 
     /**
      * @brief 关闭并销毁所有引擎实例

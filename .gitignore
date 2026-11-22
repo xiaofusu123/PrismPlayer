@@ -11,7 +11,7 @@ vendor/*/bin
 vendor/*/lib
 .vcpkg-cache
 task-current
-# 本机 agent 工具目录（不是项目内容）
+vcpkg_installed
 .claude/
 .codegraph/
 .scratch/
