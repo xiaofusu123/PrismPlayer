@@ -12,3 +12,8 @@ vendor/*/lib
 .vcpkg-cache
 task-current
 vcpkg_installed
+.claude/
+.codegraph/
+.scratch/
+.token-pilot/
+.serena/

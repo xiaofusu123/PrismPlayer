@@ -1,0 +1,9 @@
+headers:
+  entry-points:
+    - '../client/service/include/Player.h'
+
+output: 'lib/ffi/ffi_bridge.dart'
+
+compiler-opts:
+  - '-I../client/common'
+  - '-I../client/service/include'

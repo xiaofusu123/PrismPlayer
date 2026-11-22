@@ -46,7 +46,7 @@ if [ -z "${PRISM_CLANG_TIDY_REAL}" ]; then
 fi
 
 if [ -z "${PRISM_CLANG_FORMAT_REAL}" ]; then
-    printf '错误：找不到 clang-format，无法自测（见 docs/markdown/项目框架.md 7.1）。\n' >&2
+    printf '错误：找不到 clang-format，无法自测（见 AGENTS.md「构建（前置条件与可复现边界）」）。\n' >&2
     exit 1
 fi
 
@@ -313,7 +313,7 @@ PRISM_OUT=$(cd "${PRISM_REPO}" && env CLANG_ROOT="${PRISM_REPO}/fake-clang/bin" 
 PRISM_STATUS=$?
 expect_status_nonzero "前置条件不满足时拒绝推送"
 expect_out_has "前置条件不满足" "明确说是前置条件问题"
-expect_out_has "项目框架.md" "指向文档"
+expect_out_has "AGENTS.md" "指向文档"
 expect_out_lacks "CMake Error" "没有把 CMake 的原始报错倒给用户"
 
 start_case "pre-push：clang-tidy 版本不匹配时在动手之前就报错退出"

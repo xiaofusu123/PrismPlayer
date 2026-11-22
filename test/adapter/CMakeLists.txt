@@ -14,6 +14,12 @@ if(SRC)
 
     add_executable(${PROJECT_NAME} ${SRC})
 
+    # 测的是具体实现（SQLiteDBAdapter / OpenSSLCryptoAdapter），它们的头在 internal/ 下，
+    # 属于 client-adapter 的 PRIVATE include 目录，测试目标要自己补一次。
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_SOURCE_DIR}/client/adapter/internal
+    )
+
     target_link_libraries(${PROJECT_NAME}
         PUBLIC
             GTest::gtest_main

@@ -12,7 +12,7 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
     throw "The target platform isn't compatible"
 }
 
-$PREREQUISITE_DOC = "docs/markdown/项目框架.md 7.1（环境与依赖基线）"
+$PREREQUISITE_DOC = "AGENTS.md「构建（前置条件与可复现边界）」"
 
 $SPECS = @{
     "windows:debug" = @{

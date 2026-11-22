@@ -20,23 +20,23 @@ bash scripts/build/verify-build.sh
 
 | 平台 | 工具链 | 依赖管理器 |
 |------|--------|-----------|
-| Windows | MSYS2 **mingw64** 环境的 clang / clang++ 23.1.x、ninja 1.13.x、GCC 16.2.x（vcpkg 用它编译依赖）；cmake 用独立安装的 4.4.x（`D:\Program\App\CMake\bin\cmake.exe`）；覆盖率另需 `mingw-w64-x86_64-llvm-tools`（`llvm-cov` / `llvm-profdata` / `lld`）与 `mingw-w64-x86_64-compiler-rt`（profile 运行时） | vcpkg checkout（`D:\Program\App\Vcpkg\vcpkg`） |
+| Windows | MSYS2 **mingw64** 环境的 clang / clang++ 23.1.x、ninja 1.13.x、GCC 16.2.x（vcpkg 用它编译依赖）；cmake 用独立安装的 4.4.x（`D:\Program\Dev\CMake\bin\cmake.exe`）；覆盖率另需 `mingw-w64-x86_64-llvm-tools`（`llvm-cov` / `llvm-profdata` / `lld`）与 `mingw-w64-x86_64-compiler-rt`（profile 运行时） | vcpkg checkout（`D:\Program\Dev\Vcpkg\vcpkg`） |
 | WSL / Linux | clang / clang++ / clang-format / clang-tidy 23.1.x（Ubuntu 包）、cmake 4.x、ninja 1.11.x；覆盖率另需 `llvm-23`（`llvm-cov` / `llvm-profdata`） | vcpkg checkout（Linux 可执行文件，`$HOME/vcpkg`） |
 
-> 版本一律写到次版本并以 `x` 结尾（补丁位随安装更新；本机 2026-11-02 实测 clang 23.1.4、cmake 4.4.4、ninja 1.13.2、Flutter 3.44.1，见 `docs/markdown/项目计划书.md` §3）。门禁只比对前缀 `23.1`。
+> 版本一律写到次版本并以 `x` 结尾（补丁位随安装更新；本机 2026-11-17 实测 clang 23.1.4、cmake 4.4.4、ninja 1.13.2、Flutter 3.44.1（WSL 侧 clang 23.1.5），见 `docs/markdown/项目计划书.md` §3）。门禁只比对前缀 `23.1`。
 
-Windows 侧**必须用 mingw64 的 clang**，不能用已卸载的 clang64：vcpkg 的 `x64-mingw-dynamic` 依赖由同环境 GCC / libstdc++ 编译，clang64 的 clang 默认 libc++，跨标准库会让 `fmt` / `spdlog` 符号解析成两套 ABI，`libclient-service.dll` 链接失败（完整报错见 `docs/markdown/项目框架.md` 7.1）。
+Windows 侧**必须用 mingw64 的 clang**，不能用已卸载的 clang64：vcpkg 的 `x64-mingw-dynamic` 依赖由同环境 GCC / libstdc++ 编译，clang64 的 clang 默认 libc++，跨标准库会让 `fmt` / `spdlog` 符号解析成两套 ABI，`libclient-service.dll` 链接失败（报错形如 `undefined symbol: _ZN3fmt...` / `spdlog::...`，两侧各一套标准库）。
 
 ### 环境变量
 
 | 变量 | Windows | WSL / Linux |
 |------|---------|-------------|
-| `CLANG_ROOT` | `D:\Program\App\msys64\mingw64\bin`（机器级） | 不使用（走 `/usr/bin/clang`） |
-| `VCPKG_ROOT` | `D:\Program\App\Vcpkg\vcpkg`（机器级） | `$HOME/vcpkg`；非交互 shell 下由 `cmake/vcpkg-toolchain.cmake` 与 `scripts/wsl-env.sh` 自动探测 |
+| `CLANG_ROOT` | `D:\Program\Dev\msys64\mingw64\bin`（机器级） | 不使用（走 `/usr/bin/clang`） |
+| `VCPKG_ROOT` | `D:\Program\Dev\Vcpkg\vcpkg`（机器级） | `$HOME/vcpkg`；非交互 shell 下由 `cmake/vcpkg-toolchain.cmake` 与 `scripts/tool/wsl-env.sh` 自动探测 |
 
-两个变量缺失时，配置阶段会给出可读报错并指出前置条件写在 `docs/markdown/项目框架.md` 7.1（由仓库内 `cmake/vcpkg-toolchain.cmake` 提供，不需要在预设里展开 `$env{VCPKG_ROOT}`）。
+两个变量缺失时，配置阶段会给出可读报错并指出前置条件写在上面的环境变量表（由仓库内 `cmake/vcpkg-toolchain.cmake` 提供，不需要在预设里展开 `$env{VCPKG_ROOT}`）。
 
-vcpkg baseline（`vcpkg-configuration.json` 的 `default-registry`）固定为 `e456309491fd875487bf02b8a0dca76c1b1b00cc`；重装后的完整依赖清单、文件数与实测产物体积见 `docs/markdown/项目框架.md` 7.1。
+vcpkg baseline（`vcpkg-configuration.json` 的 `default-registry`）固定为 `e456309491fd875487bf02b8a0dca76c1b1b00cc`；重装后的完整依赖清单与版本见 `docs/markdown/项目计划书.md` § 第三方库，产物体积阈值见 `scripts/build/verify-build.*`。
 
 ### 本阶段「可复现」的边界
 
@@ -45,6 +45,20 @@ vcpkg baseline（`vcpkg-configuration.json` 的 `default-registry`）固定为 `
 明确**不**保证：跨机器逐字节一致（路径、时间戳、缓存命中都会改变二进制）；容器化 / 隔离环境；`.vcpkg-cache`（仓库内、已 gitignore）在别的机器上可复用。
 
 已实测的机器 / 环境：Windows（MSYS2 mingw64 + 本机 vcpkg checkout）与 WSL2 Ubuntu 24.04.5（同一台机器）。
+
+### UI / FFI 绑定生成
+
+`ui/lib/ffi/ffi_bridge.dart` 是 ffigen 从 `client/service/include/Player.h` 生成的，**不要手改**。C ABI 变动后重跑：
+
+```powershell
+pwsh -File scripts/tool/ffigen.ps1   # 需要 CLANG_ROOT 指向含 clang 与 libclang.dll 的目录
+```
+
+```bash
+bash scripts/tool/ffigen.sh          # 需要 clang + libclang.so（llvm-dev / libclang-dev）
+```
+
+两个脚本都读取 `ui/ffigen.yaml`，把本机 libclang 路径注入临时配置后执行 `dart run ffigen`，产物写回 `ui/lib/ffi/ffi_bridge.dart`，临时配置在退出时删除。
 
 ## 代码门禁（本地 Git hooks + 服务端 CI，#64 / #96）
 
@@ -73,7 +87,7 @@ bash scripts/hooks/install-hooks.sh
 
 ### 版本要求
 
-钩子第一件事比对工具版本前缀，必须是 **`23.1`**（Windows 23.1.3、WSL / Linux 23.1.2），不符合或找不到就立刻退出并说明原因。编译数据库由两个基预设的 `CMAKE_EXPORT_COMPILE_COMMANDS=ON` 产出；缺失时钩子自己跑一次配置。
+钩子第一件事比对工具版本前缀，必须是 **`23.1`**（Windows 23.1.4、WSL / Linux 23.1.5），不符合或找不到就立刻退出并说明原因。编译数据库由两个基预设的 `CMAKE_EXPORT_COMPILE_COMMANDS=ON` 产出；缺失时钩子自己跑一次配置。
 
 ### 实测耗时（#70 / #85）
 
@@ -86,7 +100,7 @@ bash scripts/hooks/install-hooks.sh
 | 没有 C/C++ 改动 | clang-tidy 直接跳过（连编译数据库都不要求），只剩构建增量；`ninja: no work to do.` 时 1 秒内 |
 | 全仓 clang-tidy（76 个文件、11 个编译单元） | 62 秒（旧：43 秒） |
 
-构建失败时钩子以非零码退出并明确说是「代码编译不过，不是钩子故障」，附日志路径与本地复现命令；前置条件不满足（缺 `CLANG_ROOT` / `VCPKG_ROOT` / cmake）时给可读提示并指向 `docs/markdown/项目框架.md` 7.1，不倒 CMake 原始报错。
+构建失败时钩子以非零码退出并明确说是「代码编译不过，不是钩子故障」，附日志路径与本地复现命令；前置条件不满足（缺 `CLANG_ROOT` / `VCPKG_ROOT` / cmake）时给可读提示并指向本文档「构建」一节，不倒 CMake 原始报错。
 
 ### 未整理的文件与唯一允许的绕过
 
@@ -105,7 +119,7 @@ bash scripts/hooks/install-hooks.sh
 | `format` | **本次变更范围**内 C/C++ 文件的格式（判定对象等价于 staged 内容） | `sh scripts/checks/format.sh ci` |
 | `build-linux-debug` | Ubuntu 24.04 + `linux-clang-x64-Debug` 从零配置 + 构建 + 产物契约（体积阈值、≥32 个 `prism_player_*` 导出、不含 libc++） | `scripts/ci/preset-linux-debug.sh configure` / `build` / `verify` |
 | `tidy` | 本次变更范围内的 clang-tidy（与 `pre-push` 同一份判定） | `sh scripts/checks/tidy.sh build/Linux/debug ci` |
-| `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿（当前 `test/engine` 6 个用例） | `sh scripts/checks/ctest.sh build/Linux/debug` |
+| `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿（当前 28 个用例：`test/engine` 6 + `test/adapter` 22） | `sh scripts/checks/ctest.sh build/Linux/debug` |
 | `coverage` | LLVM source-based 覆盖率报告（只出数字，不设阈值、不阻断；#84） | `bash scripts/build/coverage.sh` |
 
 上表六个 job（`hooks-self-test`、`checks-self-test`、`format`、`build-linux-debug`、`tidy`、`ctest`）**全部**是 `main` 规则集里的**必需状态检查**；`coverage` 是表中的第七行，**只上传报告、不是必需检查**（原因：batch ① 的 AV Sync 还没有测试、数字没有代表性，见 `docs/adr/0002-代码门禁.md` 决策 7）；`cache-key` 只是内部步骤，不是契约的一部分。**必需检查的改名 / 增删必须同步规则集**；非必需的附加 job 不参与合并判定，不受这条约束，但新增时要登记进本表。

@@ -16,7 +16,7 @@ $ErrorActionPreference = "Stop"
 $PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Set-Location $PROJECT_ROOT
 
-$PREREQUISITE_DOC = "docs/markdown/项目框架.md 7.1（环境与依赖基线）"
+$PREREQUISITE_DOC = "AGENTS.md「构建（前置条件与可复现边界）」"
 
 if (-not ($IsWindows -or $env:OS -eq "Windows_NT")) {
     Write-Host "错误：coverage.ps1 只覆盖 Windows；WSL / Linux 请用 bash scripts/build/coverage.sh。" -ForegroundColor Red

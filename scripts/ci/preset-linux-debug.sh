@@ -32,7 +32,7 @@ on_error() {
     printf '本地复现（WSL / Linux，仓库根）：\n' >&2
     printf '  bash scripts/ci/setup-linux.sh llvm cmake system vcpkg\n' >&2
     printf '  bash scripts/build/build.sh 1 && bash scripts/build/verify-build.sh 1\n' >&2
-    printf '前置条件与依赖基线：docs/markdown/项目框架.md 7.1\n' >&2
+    printf '前置条件与依赖基线：AGENTS.md「构建（前置条件与可复现边界）」\n' >&2
 }
 trap 'on_error' ERR
 

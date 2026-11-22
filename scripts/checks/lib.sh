@@ -5,7 +5,7 @@
 
 # clang 工具链版本前缀。ADR 决策 6：Windows 23.1.3 / WSL 23.1.2，只比前缀不比补丁号。
 PRISM_CLANG_VERSION_PREFIX="23.1"
-PRISM_PREREQUISITE_DOC="docs/markdown/项目框架.md 7.1（环境与依赖基线）"
+PRISM_PREREQUISITE_DOC="AGENTS.md「构建（前置条件与可复现边界）」"
 PRISM_NO_VERIFY_RULE='--no-verify 只允许用于「一次性格式批量整理」，并且必须在 PR 描述里说明'
 
 # 提示一律走 stderr，保证 `path=$(prism_require_tool ...)` 这类取返回值的写法不被日志污染。
@@ -112,13 +112,13 @@ prism_check_build_prerequisites() {
             return 1
         fi
     else
-        if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${_prism_pre_root}/scripts/wsl-env.sh" ]; then
+        if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${_prism_pre_root}/scripts/tool/wsl-env.sh" ]; then
             # shellcheck source=/dev/null
-            . "${_prism_pre_root}/scripts/wsl-env.sh"
+            . "${_prism_pre_root}/scripts/tool/wsl-env.sh"
         fi
         if [ -z "${VCPKG_ROOT:-}" ] || [ ! -f "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" ]; then
             prism_error "前置条件不满足：VCPKG_ROOT 未设置或无效（当前 '${VCPKG_ROOT:-未设置}'）。"
-            prism_error "WSL 侧可先 . scripts/wsl-env.sh（本次已尝试自动探测），设置方式见 ${PRISM_PREREQUISITE_DOC}。"
+            prism_error "WSL 侧可先 . scripts/tool/wsl-env.sh（本次已尝试自动探测），设置方式见 ${PRISM_PREREQUISITE_DOC}。"
             return 1
         fi
     fi

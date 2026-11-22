@@ -16,7 +16,7 @@ set -euo pipefail
 PROJECT_ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 cd "${PROJECT_ROOT}"
 
-PREREQUISITE_DOC="docs/markdown/项目框架.md 7.1（环境与依赖基线）"
+PREREQUISITE_DOC="AGENTS.md「构建（前置条件与可复现边界）」"
 PLATFORM_DIR="Linux"
 PRESET="linux-clang-x64-Coverage"
 # 不重复钉版本：从 clang 自己的版本号推主版本，退回 23（与门禁的 23.1 前缀一致）。
@@ -40,11 +40,11 @@ fi
 
 # ---- 前置条件（与 scripts/build/build.sh 同一口径）----
 
-if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${PROJECT_ROOT}/scripts/wsl-env.sh" ]; then
-    . "${PROJECT_ROOT}/scripts/wsl-env.sh"
+if [ -z "${VCPKG_ROOT:-}" ] && [ -f "${PROJECT_ROOT}/scripts/tool/wsl-env.sh" ]; then
+    . "${PROJECT_ROOT}/scripts/tool/wsl-env.sh"
 fi
 if [ -z "${VCPKG_ROOT:-}" ] || [ ! -f "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" ]; then
-    fail "环境变量 VCPKG_ROOT 未设置或无效（当前值：'${VCPKG_ROOT:-}'），未找到 vcpkg checkout。前置条件与设置方式见 ${PREREQUISITE_DOC}；WSL 侧可用 scripts/wsl-env.sh。"
+    fail "环境变量 VCPKG_ROOT 未设置或无效（当前值：'${VCPKG_ROOT:-}'），未找到 vcpkg checkout。前置条件与设置方式见 ${PREREQUISITE_DOC}；WSL 侧可用 scripts/tool/wsl-env.sh。"
 fi
 echo "vcpkg root: ${VCPKG_ROOT}"
 

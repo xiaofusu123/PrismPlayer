@@ -7,7 +7,7 @@ echo project root: %PROJECT_ROOT%
 
 cd "%PROJECT_ROOT%"
 
-set "PREREQUISITE_DOC=docs\markdown\项目框架.md 7.1（环境与依赖基线）"
+set "PREREQUISITE_DOC=AGENTS.md「构建（前置条件与可复现边界）」"
 
 if not defined CLANG_ROOT (
     echo 错误：环境变量 CLANG_ROOT 未设置。前置条件与设置方式见 %PREREQUISITE_DOC%。
