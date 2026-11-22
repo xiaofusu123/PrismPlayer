@@ -317,19 +317,19 @@ sequenceDiagram
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `current_pts` | `std::atomic<uint64_t>` | 当前音频帧解码时间戳（ms） |
-| `next_pts` | `std::atomic<uint64_t>` | 下一帧音频解码时间戳（ms） |
-| `start_time` | `std::atomic<uint32_t>` | 流开始的时间 |
-| `duration` | `std::atomic<uint64_t>` | 音频总时长 |
+| `current_pts` | `std::atomic<std::chrono::milliseconds>` | 当前音频帧的解码时间戳（相对流起点） |
+| `next_pts` | `std::atomic<std::chrono::milliseconds>` | 下一帧音频帧的解码时间戳 |
+| `start_time` | `std::atomic<std::chrono::milliseconds>` | 流开始时刻相对文件起点的偏移 |
+| `duration` | `std::atomic<std::chrono::milliseconds>` | 音频总时长 |
 
 **VideoSyncInfo — 视频同步信息**
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `current_pts` | `std::atomic<uint64_t>` | 当前视频帧解码时间戳（ms） |
-| `next_pts` | `std::atomic<uint64_t>` | 下一帧视频解码时间戳（ms） |
-| `start_time` | `std::atomic<uint32_t>` | 流开始的时间 |
-| `duration` | `std::atomic<uint64_t>` | 视频总时长 |
+| `current_pts` | `std::atomic<std::chrono::milliseconds>` | 当前视频帧的解码时间戳（相对流起点） |
+| `next_pts` | `std::atomic<std::chrono::milliseconds>` | 下一帧视频帧的解码时间戳 |
+| `start_time` | `std::atomic<std::chrono::milliseconds>` | 流开始时刻相对文件起点的偏移 |
+| `duration` | `std::atomic<std::chrono::milliseconds>` | 视频总时长（旧字段名 `draution` 是笔误，已改正） |
 
 **RenderMetadata — 渲染元数据**
 
@@ -342,7 +342,9 @@ sequenceDiagram
 | `format` | `uint32_t` | 像素格式 |
 | `timestamp` | `uint64_t` | 时间戳 |
 
-> **注意**：只有 `AudioSyncInfo` 与 `VideoSyncInfo` 的字段是 `std::atomic`（默认值 0），用于跨线程读写；`RenderMetadata` 是普通类型（`RenderResultHandle`、`bool`、`uint32_t`、`uint64_t`），作为一次渲染结果的只读快照。另：`VideoEngine.h` 里视频结构体最后一个字段拼作 `draution`（代码侧笔误），语义即上表的 `duration`。
+> **注意（同进程约定）**：`AudioSyncInfo` 与 `VideoSyncInfo` 的字段都是 `std::atomic<std::chrono::milliseconds>`（默认零值），用于同一进程内的线程间交换 —— **不序列化、不跨进程传递，也不构成 ABI 稳定性承诺**，增删字段或换表示不需要兼容旧二进制。因为含 `std::atomic`，两个结构体不可拷贝、不可移动；取用时按成员 `load()` 后 `.count()` 换算成毫秒整数（AV Sync 的 `calibrate(uint64_t, uint64_t)` 仍以 `uint64_t` 毫秒为契约）。
+>
+> **单位与溢出**：四个字段的单位都是毫秒，表示相对流起点的偏移。旧实现里 `start_time` 是 `uint32_t`（约 49.7 天回绕）、`duration` 是 `uint64_t`；本次统一为 `std::chrono::milliseconds`，由 64 位计数承载，实际媒体时长不可能触到上限。`RenderMetadata` 仍是普通聚合类型（`RenderResultHandle`、`bool`、`uint32_t`、`uint64_t`），作为一次渲染结果的只读快照。
 
 ### 2.2 AudioEngine — 音频引擎抽象接口
 
@@ -354,8 +356,8 @@ sequenceDiagram
 | `play()` | `bool` | 播放音频 |
 | `pause()` | `bool` | 暂停音频 |
 | `close()` | `bool` | 关闭音频，释放资源 |
-| `set_play_speed()` | `bool` | 设置播放速度（倍速播放） |
-| `seek(uint64_t pts, int seek_mode)` | `bool` | 音频跳转。`seek_mode`：0=绝对模式（`pts` 为非负目标位置），1=相对模式（快进/倒退） |
+| `set_play_speed(float speed)` | `bool` | 设置播放速度（倍速播放），`1.0` 为原速，必须为正数 |
+| `seek(std::chrono::milliseconds pts)` | `bool` | 音频跳转，只收绝对位置（相对快进/倒退由 Service 换算后传入） |
 | `get_sync_info()` | `AudioSyncInfo` | 获取音频同步信息 |
 
 ### 2.3 AudioEngineFactory — 音频引擎工厂
@@ -384,8 +386,8 @@ sequenceDiagram
 | `play()` | `bool` | 播放视频 |
 | `pause()` | `bool` | 暂停视频 |
 | `close()` | `bool` | 关闭视频 |
-| `set_play_speed(float speed)` | `bool` | 设置播放速度（倍速播放） |
-| `seek(uint64_t pts, int seek_mode)` | `bool` | 视频跳转。`seek_mode`：0=绝对模式，1=相对模式 |
+| `set_play_speed(float speed)` | `bool` | 设置播放速度（倍速播放），`1.0` 为原速，必须为正数 |
+| `seek(std::chrono::milliseconds pts)` | `bool` | 视频跳转，只收绝对位置（相对快进/倒退由 Service 换算后传入） |
 | `get_sync_info()` | `VideoSyncInfo` | 获取视频同步信息 |
 | `get_render_result()` | `RenderMetadata` | 获取视频渲染结果（纹理句柄+元数据） |
 
@@ -496,7 +498,7 @@ AV Sync 与 Network 两个模块的接口。
 |---|---|---|
 | `dispatch_play()` | `bool` | 下发播放指令 |
 | `dispatch_pause()` | `bool` | 下发暂停指令 |
-| `dispatch_seek(uint64_t pts, int seek_mode)` | `bool` | 下发跳转指令。`mode`：0=绝对，1=相对 |
+| `dispatch_seek(std::chrono::milliseconds pts)` | `bool` | 下发跳转指令（绝对位置）。相对快进/倒退由 `Player.cpp` 按音频时钟换算 |
 | `dispatch_speed(float speed)` | `bool` | 下发倍速指令 |
 | `set_audio_engine(AudioEngine* engine)` | `void` | 绑定音频引擎（不持有所有权） |
 | `set_video_engine(VideoEngine* engine)` | `void` | 绑定视频引擎（不持有所有权） |

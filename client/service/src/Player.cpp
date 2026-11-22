@@ -6,6 +6,7 @@
 #include "SyncFactory.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <spdlog/spdlog.h>
 #include <string>
@@ -386,19 +387,18 @@ PRISM_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms, P
         return PRISM_ERROR_INVALID_PARAM;
     }
 
-    int seek_flag = (mode == PRISM_SEEK_ABSOLUTE) ? 0 : 1;
-    uint64_t target_pts = static_cast<uint64_t>(position_ms);
-
+    // 引擎接口只接受绝对位置：相对模式先按当前音频时钟换算成绝对位置
+    int64_t target_ms = position_ms;
     if (mode == PRISM_SEEK_RELATIVE) {
         auto drift = p->sync_algo_->get_drift_info();
         int64_t cur = static_cast<int64_t>(drift.audio_pts);
-        target_pts = static_cast<uint64_t>(std::max<int64_t>(0, cur + position_ms));
+        target_ms = std::max<int64_t>(0, cur + position_ms);
     }
 
-    p->cmd_dispatcher_->dispatch_seek(target_pts, seek_flag);
+    p->cmd_dispatcher_->dispatch_seek(std::chrono::milliseconds{target_ms});
     p->sync_algo_->reset();
     p->fire_event(PRISM_EVENT_SEEK_COMPLETED);
-    spdlog::info("[PrismPlayer] seek to {}ms", target_pts);
+    spdlog::info("[PrismPlayer] seek to {}ms", target_ms);
     return PRISM_OK;
 }
 

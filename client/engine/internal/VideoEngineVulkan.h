@@ -5,7 +5,7 @@
 namespace Prism::Engine {
 
 class VideoEngineVulkan : public VideoEngine {
-public:
+  public:
     VideoEngineVulkan();
     ~VideoEngineVulkan() override;
 
@@ -14,10 +14,11 @@ public:
     bool pause() override;
     bool close() override;
     bool set_play_speed(float speed) override;
-    bool seek(uint64_t pts, int seek_mode) override;
+    bool seek(std::chrono::milliseconds pts) override;
     VideoSyncInfo get_sync_info() override;
     RenderMetadata get_render_result() override;
-private:
+
+  private:
 };
 
 } // namespace Prism::Engine

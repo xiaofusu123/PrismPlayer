@@ -22,8 +22,8 @@ TEST(AudioEngineWasapiShared, LifecycleReturnsTrue) {
     EXPECT_TRUE(engine->init());
     EXPECT_TRUE(engine->play());
     EXPECT_TRUE(engine->pause());
-    EXPECT_TRUE(engine->set_play_speed());
-    EXPECT_TRUE(engine->seek(0, 0));
+    EXPECT_TRUE(engine->set_play_speed(1.0F));
+    EXPECT_TRUE(engine->seek(std::chrono::milliseconds{0}));
     EXPECT_TRUE(engine->close());
 }
 
@@ -33,10 +33,10 @@ TEST(AudioEngineWasapiShared, SyncInfoStartsAtZero) {
     ASSERT_NE(engine, nullptr);
 
     Prism::Engine::AudioSyncInfo info = engine->get_sync_info();
-    EXPECT_EQ(info.current_pts.load(), 0U);
-    EXPECT_EQ(info.next_pts.load(), 0U);
-    EXPECT_EQ(info.start_time.load(), 0U);
-    EXPECT_EQ(info.duration.load(), 0U);
+    EXPECT_EQ(info.current_pts.load().count(), 0);
+    EXPECT_EQ(info.next_pts.load().count(), 0);
+    EXPECT_EQ(info.start_time.load().count(), 0);
+    EXPECT_EQ(info.duration.load().count(), 0);
 }
 
 } // namespace

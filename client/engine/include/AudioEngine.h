@@ -1,23 +1,33 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 
 namespace Prism::Engine {
 
 /**
  * @struct AudioSyncInfo
- * @brief 音频同步信息
+ * @brief 音频同步信息，由音频引擎写、AV Sync 层读，跨线程交换
+ *
+ * 成员都是 atomic：只在同一进程内的线程之间使用，不序列化、不发给其它进程，
+ * 也不构成任何 ABI 稳定性承诺（改类型/加字段不需要兼容旧二进制）。
+ * 因为含 atomic，本结构不可拷贝、不可移动；取用时只读需要的成员。
+ *
+ * 单位统一为 std::chrono::milliseconds：
+ * - current_pts / next_pts：相对流起点的播放位置，绝对时间轴上的毫秒数；
+ * - start_time：流开始时刻相对文件起点的偏移（旧实现用 uint32_t 存毫秒，
+ *   超过约 49.7 天会回绕；改成 milliseconds 后由 64 位计数承载，见 #128）；
+ * - duration：音频总时长（旧实现为 uint64_t 毫秒，语义不变）。
  */
 struct AudioSyncInfo {
-    std::atomic<uint64_t> current_pts{0};  /**< 当前音频帧解码时间戳（ms） */
-    std::atomic<uint64_t> next_pts{0};     /**< 下一帧音频解码时间戳（ms） */
-    std::atomic<uint32_t> start_time{0};   /**< 流开始的时间 */
-    std::atomic<uint64_t> duration{0};     /**< 音频总时长 */
+    std::atomic<std::chrono::milliseconds> current_pts{}; /**< 当前音频帧的解码时间戳 */
+    std::atomic<std::chrono::milliseconds> next_pts{};    /**< 下一帧音频帧的解码时间戳 */
+    std::atomic<std::chrono::milliseconds> start_time{};  /**< 流开始时刻相对文件起点的偏移 */
+    std::atomic<std::chrono::milliseconds> duration{};    /**< 音频总时长 */
 };
 
-
 class AudioEngine {
-public:
+  public:
     virtual ~AudioEngine() = default;
 
     /**
@@ -42,16 +52,17 @@ public:
 
     /**
      * @brief 设置播放速度（倍速播放）
+     * @param speed 播放速率，1.0 为原速，>1 加速、<1 减速；必须为正数
      */
-    virtual bool set_play_speed() = 0;
+    virtual bool set_play_speed(float speed) = 0;
 
     /**
      * @brief 音频跳转
-     * @param pts 跳转的时间戳
-     * @param seek_mode 跳转模式。0为绝对模式，直接跳转到音频对应的时间，此时pts为非负值；1为相对时间，快进或倒退对应时间
+     * @param pts 跳转目标位置（绝对位置，相对流起点）
+     *
+     * 只接受绝对位置：相对快进/倒退由上层（Service / AV Sync）换算成绝对位置后再调用。
      */
-    virtual bool seek(uint64_t pts, int seek_mode) = 0;
-
+    virtual bool seek(std::chrono::milliseconds pts) = 0;
 
     /**
      * @brief 获取音频同步信息

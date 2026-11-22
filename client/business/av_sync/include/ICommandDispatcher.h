@@ -1,8 +1,9 @@
 #pragma once
 
-#include <cstdint>
 #include "AudioEngine.h"
 #include "VideoEngine.h"
+#include <chrono>
+#include <cstdint>
 
 namespace Prism::Business {
 
@@ -14,7 +15,7 @@ namespace Prism::Business {
  * 使上层（Service）不需要直接操作 Engine。
  */
 class ICommandDispatcher {
-public:
+  public:
     virtual ~ICommandDispatcher() = default;
 
     /**
@@ -30,12 +31,13 @@ public:
     virtual bool dispatch_pause() = 0;
 
     /**
-     * @brief 下发跳转指令
-     * @param pts 目标时间戳（ms）
-     * @param seek_mode 跳转模式，0=绝对，1=相对
+     * @brief 下发跳转指令（只收绝对位置）
+     * @param pts 目标位置，相对流起点
+     *
+     * 相对快进/倒退由 Service 层换算成绝对位置后再调用，引擎不持有 seek 模式。
      * @return 成功返回 true
      */
-    virtual bool dispatch_seek(uint64_t pts, int seek_mode) = 0;
+    virtual bool dispatch_seek(std::chrono::milliseconds pts) = 0;
 
     /**
      * @brief 下发倍速指令
@@ -63,7 +65,8 @@ public:
      * @param enable_video 是否启用视频引擎
      * @return 成功返回 true
      */
-    virtual bool initialize_engines(void* audio_factory, void* video_factory, bool enable_video) = 0;
+    virtual bool initialize_engines(void* audio_factory, void* video_factory,
+                                    bool enable_video) = 0;
 
     /**
      * @brief 关闭并销毁所有引擎实例
