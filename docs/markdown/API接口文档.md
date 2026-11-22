@@ -18,7 +18,7 @@ _接口形状的唯一真源 · 版本 0.0.1 · 基线 `75ba727` · 2026-11-17_
 >
 > **构建产物**：动态库 (`client-service`)
 >
-> **实现状态**：✅ **完整实现**（**32** 个 C API + 6 个结构体 + 5 个枚举；`Player.cpp` 436 行，全仓最大实现文件）
+> **实现状态**：✅ **完整实现**（**32** 个 C API + 6 个结构体 + 5 个枚举；`Player.cpp` 437 行，全仓最大实现文件）
 >
 > ⚠️ 其中涉及网络/认证/房间的 API（§1.5 用户认证、§1.6 房间管理）当前由 `IServiceNetwork` 的**默认桩实现**兜底，返回成功但无真实网络行为 —— 见 §5。
 
@@ -413,7 +413,7 @@ sequenceDiagram
 >
 > **头文件**：`client/business/{av_sync,network}/include/`
 >
-> **实现状态**：§3.1 AV Sync ✅ **完整实现**（`src/` 5 个 `.cpp` 共 323 行）；§3.2 Network ⛔ **占位（接口已定义，无实现）**（`internal/NetImpl.h` 是 0 字节，`src/tmp.cpp` 已于 2026-10-11 删除，`client-network` 目标不再生成）
+> **实现状态**：§3.1 AV Sync ✅ **完整实现**（`src/` 5 个 `.cpp` 共 311 行）；§3.2 Network ⛔ **占位（接口已定义，无实现）**（`internal/NetImpl.h` 是 0 字节，`src/tmp.cpp` 已于 2026-10-11 删除，`client-network` 目标不再生成）
 >
 > **调用方**：Service 层
 
@@ -636,7 +636,7 @@ AV Sync 与 Network 两个模块的接口。
 >
 > **构建产物**：静态库 (`client-adapter`)
 >
-> **实现状态**：✅ **五个接口都有实现**（`WinFileAdapter` 187 / `JSONConfigAdapter` 223 / `ASIONetworkAdapter` 313 / `OpenSSLCryptoAdapter` 375 / `SQLiteDBAdapter` 608 行，`libclient-adapter.a` 1,706 行）。`include/` 下**没有 Adapter 工厂头** —— 上层目前自己 `new` 具体实现，是临时状态。
+> **实现状态**：✅ **五个接口都有实现**（`WinFileAdapter` 187 / `JSONConfigAdapter` 346 / `ASIONetworkAdapter` 313 / `OpenSSLCryptoAdapter` 375 / `SQLiteDBAdapter` 608 行，`libclient-adapter.a` 1,829 行）。`include/` 下**没有 Adapter 工厂头** —— 上层目前自己 `new` 具体实现，是临时状态。
 >
 > ⚠️ 本节各接口的签名取自 `include/` 下的抽象接口；`internal/` 下的实现类与之一一对应，命名更具体（如 `DBAdapter` 的实现叫 `SQLiteDBAdapter`）。对照表见根目录 `GLOSSARY.md`。
 
