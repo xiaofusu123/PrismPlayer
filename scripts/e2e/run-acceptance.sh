@@ -5,6 +5,11 @@
 #   --preset <name>   构建/测试预设，默认 linux-clang-x64-Debug
 #   --mode a|b        验收模式，默认 a（in-process）；b 目前只会记录“未交付”的 skip
 #   --perf            请求性能用例（当前只会记录“未交付”的 skip）
+#   --coverage-report <path>
+#                     覆盖率报告路径，默认 build/<Platform>/coverage/coverage-report.txt
+#                     （#84 的产物；相对路径按仓库根解析）。文件不存在时报告里写“待 #84”，不判红。
+#
+# 同轮次证据的顺序：先跑 scripts/build/coverage.sh 产出报告，再跑本脚本把它接进 report.json。
 #
 # 退出码：报告 verdict=passed → 0；verdict=failed / 报告缺失 / 二进制缺失 → 1；参数错误 → 2。
 # 缺 GPU / 声卡 / Server 二进制 / 覆盖率工具时，用例自行 skip（带原因），不算失败。
@@ -31,6 +36,7 @@ esac
 PRESET="linux-clang-x64-Debug"
 MODE="a"
 PERF_REQUESTED=0
+COVERAGE_REPORT=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -52,12 +58,21 @@ while [ $# -gt 0 ]; do
         MODE="${1#*=}"
         shift
         ;;
+    --coverage-report)
+        [ $# -ge 2 ] || fail "--coverage-report 缺少取值"
+        COVERAGE_REPORT="$2"
+        shift 2
+        ;;
+    --coverage-report=*)
+        COVERAGE_REPORT="${1#*=}"
+        shift
+        ;;
     --perf)
         PERF_REQUESTED=1
         shift
         ;;
     -h | --help)
-        echo "用法：bash scripts/e2e/run-acceptance.sh [--preset <name>] [--mode a|b] [--perf]"
+        echo "用法：bash scripts/e2e/run-acceptance.sh [--preset <name>] [--mode a|b] [--perf] [--coverage-report <path>]"
         exit 0
         ;;
     *)
@@ -121,6 +136,17 @@ export PRISM_E2E_COMMIT="$COMMIT"
 export PRISM_E2E_LOG="$LOG_PATH"
 export PRISM_E2E_PERF="$PERF_REQUESTED"
 
+# 覆盖率报告（#84 的产物）：默认放 build/<Platform>/coverage/，与验收预设的 config 目录无关。
+if [ -z "$COVERAGE_REPORT" ]; then
+    COVERAGE_REPORT="$PROJECT_ROOT/build/$PLATFORM_DIR/coverage/coverage-report.txt"
+else
+    case "$COVERAGE_REPORT" in
+    /*) ;;
+    *) COVERAGE_REPORT="$PROJECT_ROOT/$COVERAGE_REPORT" ;;
+    esac
+fi
+export PRISM_E2E_COVERAGE_REPORT="$COVERAGE_REPORT"
+
 if [ "$CONFIG_DIR" = "coverage" ]; then
     PROFILE_DIR="$RUN_DIR/coverage-data"
     mkdir -p "$PROFILE_DIR"
@@ -129,6 +155,11 @@ fi
 
 echo "==> 预设 $PRESET（$BUILD_DIR）"
 echo "==> 模式 $MODE，perf=$PERF_REQUESTED，运行目录 $RUN_DIR"
+if [ -f "$COVERAGE_REPORT" ]; then
+    echo "==> 覆盖率来源 $COVERAGE_REPORT（#84）"
+else
+    echo "==> 覆盖率报告缺失：$COVERAGE_REPORT（报告里标“待 #84”，不判红）"
+fi
 echo "==> 执行 $BINARY"
 
 set +e

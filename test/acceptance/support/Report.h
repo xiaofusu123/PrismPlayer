@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "support/Coverage.h"
+
 #include <chrono>
 #include <string>
 #include <vector>
@@ -46,6 +48,7 @@ struct ReportContext {
     std::string log_path;       /**< PRISM_E2E_LOG */
     bool perf_requested{false}; /**< PRISM_E2E_PERF=1 */
     std::string started_utc;
+    CoverageSummary coverage; /**< PRISM_E2E_COVERAGE_REPORT：消费 #84 的覆盖率报告 */
 };
 
 /**
