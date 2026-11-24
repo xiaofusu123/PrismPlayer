@@ -99,3 +99,74 @@ TEST(ReportContract, SkippedCaseCarriesReasonAndKeepsverdict_passed) {
 
     std::filesystem::remove(path);
 }
+
+TEST(ReportContract, DefaultContextWritesNamedPendingBatches) {
+    // 没有覆盖率来源时（旧调用方、只关心用例结果的运行），coverage 仍必须是三个具名
+    // pending 批次：不能写出三个空 key，也不能把「没读过报告」伪装成 measured。
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / "prism-acceptance-coverage-default.json";
+    Prism::Qa::ReportContext context = make_context(path);
+
+    std::vector<Prism::Qa::CaseResult> cases = {
+        {"Sample.Passes", "passed", "", 1},
+    };
+    ASSERT_TRUE(Prism::Qa::write_report(context, cases, std::chrono::milliseconds{5}));
+
+    std::string json = read_all(path);
+    EXPECT_EQ(json.find("\"\": {"), std::string::npos);
+    EXPECT_NE(json.find("\"av_sync\": {"), std::string::npos);
+    EXPECT_NE(json.find("\"service\": {"), std::string::npos);
+    EXPECT_NE(json.find("\"threadpool\": {"), std::string::npos);
+    EXPECT_EQ(json.find("\"status\": \"measured\""), std::string::npos);
+    EXPECT_NE(json.find("待 #84"), std::string::npos);
+
+    std::filesystem::remove(path);
+}
+
+TEST(ReportContract, CoverageSectionCarriesMeasuredBatchesAndExpectation) {
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / "prism-acceptance-coverage.json";
+    Prism::Qa::ReportContext context = make_context(path);
+    context.coverage = Prism::Qa::parse_coverage_report(
+        "business/av_sync/src/SyncAlgorithm.cpp  16 8 50.00% 5 5 0.00% 38 19 50.00% 8 8 0.00%\n"
+        "service/src/Player.cpp  252 252 0.00% 44 44 0.00% 399 399 0.00% 148 148 0.00%\n");
+
+    std::vector<Prism::Qa::CaseResult> cases = {
+        {"Sample.Passes", "passed", "", 1},
+    };
+    ASSERT_TRUE(Prism::Qa::write_report(context, cases, std::chrono::milliseconds{5}));
+
+    std::string json = read_all(path);
+    EXPECT_NE(json.find("\"coverage\": {"), std::string::npos);
+    EXPECT_NE(json.find("\"av_sync\": {"), std::string::npos);
+    EXPECT_NE(json.find("\"status\": \"measured\""), std::string::npos);
+    // 38 行中 19 行未覆盖 → 恰好 50.00%。
+    EXPECT_NE(json.find("\"line_percent\": 50.00"), std::string::npos);
+    EXPECT_NE(json.find("\"covered_lines\": 19"), std::string::npos);
+    EXPECT_NE(json.find("\"total_lines\": 38"), std::string::npos);
+    // 80% 只是标注，不做阈值判定。
+    EXPECT_NE(json.find("\"expected_percent\": 80"), std::string::npos);
+    EXPECT_NE(json.find("\"verdict\": \"passed\""), std::string::npos);
+
+    std::filesystem::remove(path);
+}
+
+TEST(ReportContract, CoverageSectionPendingSaysWaitFor84AndNeverFailsVerdict) {
+    std::filesystem::path path =
+        std::filesystem::temp_directory_path() / "prism-acceptance-coverage-pending.json";
+    Prism::Qa::ReportContext context = make_context(path);
+    context.coverage = Prism::Qa::load_coverage_summary("missing-coverage-report.txt");
+
+    std::vector<Prism::Qa::CaseResult> cases = {
+        {"Sample.Passes", "passed", "", 1},
+    };
+    ASSERT_TRUE(Prism::Qa::write_report(context, cases, std::chrono::milliseconds{5}));
+
+    std::string json = read_all(path);
+    EXPECT_NE(json.find("\"status\": \"pending\""), std::string::npos);
+    EXPECT_NE(json.find("\"line_percent\": null"), std::string::npos);
+    EXPECT_NE(json.find("待 #84"), std::string::npos);
+    EXPECT_NE(json.find("\"verdict\": \"passed\""), std::string::npos);
+
+    std::filesystem::remove(path);
+}

@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 namespace Prism::Qa {
 
@@ -101,6 +102,82 @@ std::string nullable_string(const std::string& value) {
     return value.empty() ? "null" : "\"" + json_escape(value) + "\"";
 }
 
+std::string format_percent(double value) {
+    std::ostringstream out;
+    out.setf(std::ios::fixed);
+    out.precision(2);
+    out << value;
+    return out.str();
+}
+
+/**
+ * @struct BatchView
+ * @brief 一个批次在 JSON 与终端输出里的公共视图：两处渲染共用同一份取数逻辑。
+ */
+struct BatchView {
+    std::string name;           /**< 批次名 */
+    bool measured{false};       /**< 是否测得 */
+    std::string percent;        /**< 两位小数，或 "null" */
+    long long covered_lines{0}; /**< 覆盖行数 */
+    long long total_lines{0};   /**< 总行数 */
+    int expected_percent{0};    /**< 期望值标注，仅展示 */
+    std::string reason;         /**< 未测得时的原因 */
+};
+
+std::vector<BatchView> batch_views(const CoverageSummary& coverage) {
+    std::vector<BatchView> views;
+    views.reserve(coverage.batches.size());
+    for (const BatchCoverage& batch : coverage.batches) {
+        BatchView view;
+        view.name = batch.name;
+        view.measured = batch.measured;
+        view.percent = batch.measured ? format_percent(batch.line_percent()) : "null";
+        view.covered_lines = batch.covered_lines();
+        view.total_lines = batch.lines;
+        view.expected_percent = static_cast<int>(COVERAGE_EXPECTED_PERCENT);
+        view.reason = batch.reason;
+        views.push_back(std::move(view));
+    }
+    return views;
+}
+
+/// 按 #87 契约写 `coverage` 节：三个批次固定同名，未测到的批次给「待 #84」原因。
+void write_coverage_section(std::ostream& out, const CoverageSummary& coverage) {
+    std::vector<BatchView> views = batch_views(coverage);
+    out << "  \"coverage\": {\n";
+    for (std::size_t index = 0; index < views.size(); ++index) {
+        const BatchView& view = views[index];
+        out << "    \"" << json_escape(view.name) << "\": {\n";
+        out << "      \"status\": \"" << (view.measured ? "measured" : "pending") << "\",\n";
+        out << "      \"line_percent\": " << view.percent << ",\n";
+        out << "      \"covered_lines\": " << view.covered_lines << ",\n";
+        out << "      \"total_lines\": " << view.total_lines << ",\n";
+        out << "      \"expected_percent\": " << view.expected_percent << ",\n";
+        out << "      \"reason\": " << nullable_string(view.reason) << "\n";
+        out << "    }" << (index + 1 == views.size() ? "\n" : ",\n");
+    }
+    out << "  },\n";
+}
+
+std::string coverage_line(const CoverageSummary& coverage) {
+    std::ostringstream out;
+    std::vector<BatchView> views = batch_views(coverage);
+    for (std::size_t index = 0; index < views.size(); ++index) {
+        const BatchView& view = views[index];
+        if (index != 0) {
+            out << " / ";
+        }
+        out << view.name << " ";
+        if (view.measured) {
+            out << view.percent << "%（" << view.covered_lines << "/" << view.total_lines
+                << " 行，期望 " << view.expected_percent << "%）";
+        } else {
+            out << view.reason;
+        }
+    }
+    return out.str();
+}
+
 bool any_failed(const std::vector<CaseResult>& cases) {
     return std::any_of(cases.begin(), cases.end(),
                        [](const CaseResult& item) { return item.status == "failed"; });
@@ -129,6 +206,7 @@ ReportContext load_report_context(int argc, char** argv) {
     context.log_path = read_env("PRISM_E2E_LOG", "");
     context.perf_requested = read_env("PRISM_E2E_PERF", "0") == "1";
     context.started_utc = current_utc();
+    context.coverage = load_coverage_summary(read_env("PRISM_E2E_COVERAGE_REPORT", ""));
     return context;
 }
 
@@ -205,7 +283,7 @@ bool write_report(const ReportContext& context, const std::vector<CaseResult>& c
     }
     out << (cases.empty() ? "],\n" : "\n  ],\n");
 
-    out << "  \"coverage\": { \"av_sync\": null, \"service\": null, \"threadpool\": null },\n";
+    write_coverage_section(out, context.coverage);
     out << "  \"verdict\": \"" << (verdict_passed(cases) ? "passed" : "failed") << "\"\n";
     out << "}\n";
 
@@ -233,6 +311,7 @@ void print_summary(const ReportContext& context, const std::vector<CaseResult>& 
     std::cout << "[acceptance] 用例：跑了 " << (passed + failed) << " 条（通过 " << passed
               << " / 失败 " << failed << "），跳过 " << skipped << " 条，共 " << cases.size()
               << " 条\n";
+    std::cout << "[acceptance] 覆盖率（#84）：" << coverage_line(context.coverage) << "\n";
     std::cout << "[acceptance] verdict：" << (verdict_passed(cases) ? "passed" : "failed") << "\n";
 }
 

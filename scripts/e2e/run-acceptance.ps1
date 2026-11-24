@@ -8,6 +8,11 @@
   --preset <name>   构建/测试预设，默认 windows-clang-x64-Debug
   --mode a|b        验收模式，默认 a（in-process）；b 目前只会记录“未交付”的 skip
   --perf            请求性能用例（当前只会记录“未交付”的 skip）
+  --coverage-report <path>
+                    覆盖率报告路径，默认 build/<Platform>/coverage/coverage-report.txt
+                    （#84 的产物；相对路径按仓库根解析）。文件不存在时报告里写“待 #84”，不判红。
+
+同轮次证据的顺序：先跑 scripts/build/coverage.ps1 产出报告，再跑本脚本把它接进 report.json。
 
 退出码：报告 verdict=passed → 0；verdict=failed / 报告缺失 / 二进制缺失 → 1；参数错误 → 2。
 缺 GPU / 声卡 / Server 二进制 / 覆盖率工具时，用例自行 skip（带原因），不算失败。
@@ -25,6 +30,7 @@ $PROJECT_ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $Preset = "windows-clang-x64-Debug"
 $Mode = "a"
 $PerfRequested = $false
+$CoverageReport = ""
 
 for ($i = 0; $i -lt $args.Count; $i++) {
     $arg = [string]$args[$i]
@@ -42,10 +48,17 @@ for ($i = 0; $i -lt $args.Count; $i++) {
         } else {
             $Mode = $arg.Substring('--mode='.Length)
         }
+    } elseif ($arg -ceq '--coverage-report' -or $arg -clike '--coverage-report=*') {
+        if ($arg -ceq '--coverage-report') {
+            if ($i + 1 -ge $args.Count) { Write-Host "错误：--coverage-report 缺少取值" -ForegroundColor Red; exit 2 }
+            $CoverageReport = [string]$args[++$i]
+        } else {
+            $CoverageReport = $arg.Substring('--coverage-report='.Length)
+        }
     } elseif ($arg -ceq '--perf') {
         $PerfRequested = $true
     } elseif ($arg -ceq '-h' -or $arg -ceq '--help') {
-        Write-Host "用法：pwsh -File scripts/e2e/run-acceptance.ps1 [--preset <name>] [--mode a|b] [--perf]"
+        Write-Host "用法：pwsh -File scripts/e2e/run-acceptance.ps1 [--preset <name>] [--mode a|b] [--perf] [--coverage-report <path>]"
         exit 0
     } else {
         Write-Host "错误：未知参数 $arg" -ForegroundColor Red
@@ -105,6 +118,14 @@ $env:PRISM_E2E_COMMIT = ([string]$commit).Trim()
 $env:PRISM_E2E_LOG = $logPath
 $env:PRISM_E2E_PERF = if ($PerfRequested) { "1" } else { "0" }
 
+# 覆盖率报告（#84 的产物）：默认放 build/<Platform>/coverage/，与验收预设的 config 目录无关。
+if ([string]::IsNullOrEmpty($CoverageReport)) {
+    $CoverageReport = Join-Path $PROJECT_ROOT "build/$platformDir/coverage/coverage-report.txt"
+} elseif (-not [System.IO.Path]::IsPathRooted($CoverageReport)) {
+    $CoverageReport = Join-Path $PROJECT_ROOT $CoverageReport
+}
+$env:PRISM_E2E_COVERAGE_REPORT = $CoverageReport
+
 if ($configDir -eq "coverage") {
     $profileDir = Join-Path $runDir "coverage-data"
     New-Item -ItemType Directory -Force $profileDir | Out-Null
@@ -113,6 +134,11 @@ if ($configDir -eq "coverage") {
 
 Write-Host "==> 预设 $Preset（$buildDir）"
 Write-Host "==> 模式 $Mode，perf=$PerfRequested，运行目录 $runDir"
+if (Test-Path $CoverageReport) {
+    Write-Host "==> 覆盖率来源 $CoverageReport（#84）"
+} else {
+    Write-Host "==> 覆盖率报告缺失：$CoverageReport（报告里标“待 #84”，不判红）" -ForegroundColor Yellow
+}
 Write-Host "==> 执行 $binary"
 
 Push-Location (Split-Path -Parent $binary)
