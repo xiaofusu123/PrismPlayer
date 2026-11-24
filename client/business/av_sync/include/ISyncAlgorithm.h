@@ -30,6 +30,20 @@ class ISyncAlgorithm {
     virtual void configure(const SyncConfig& config) = 0;
 
     /**
+     * @brief 获取当前生效的同步配置（校准时长等语义由此读取，保持配置真源唯一）
+     */
+    [[nodiscard]] virtual SyncConfig get_config() const = 0;
+
+    /**
+     * @brief 更新观测到的音频 PTS（不重算 drift）
+     *
+     * 音频帧到达时即推进播放位置，使服务层 get_position 紧跟音频时钟；
+     * 暂停期间不调用本方法，位置随之冻结。
+     * @param audio_pts 当前音频帧 PTS（ms）
+     */
+    virtual void update_audio_pts(uint64_t audio_pts) = 0;
+
+    /**
      * @brief 获取当前漂移信息
      * @return DriftInfo 漂移信息
      */

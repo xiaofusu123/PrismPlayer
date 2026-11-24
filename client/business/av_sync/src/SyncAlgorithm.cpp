@@ -4,15 +4,13 @@
 
 namespace Prism::Business {
 
-SyncAlgorithm::SyncAlgorithm()
-{
-    drift_info_.drift_ms  = 0;
+SyncAlgorithm::SyncAlgorithm() {
+    drift_info_.drift_ms = 0;
     drift_info_.audio_pts = 0;
     drift_info_.video_pts = 0;
 }
 
-SyncAction SyncAlgorithm::calibrate(uint64_t audio_pts, uint64_t video_pts)
-{
+SyncAction SyncAlgorithm::calibrate(uint64_t audio_pts, uint64_t video_pts) {
     drift_info_.audio_pts = audio_pts;
     drift_info_.video_pts = video_pts;
 
@@ -36,22 +34,27 @@ SyncAction SyncAlgorithm::calibrate(uint64_t audio_pts, uint64_t video_pts)
     return SyncAction::RENDER;
 }
 
-void SyncAlgorithm::configure(const SyncConfig& config)
-{
+void SyncAlgorithm::configure(const SyncConfig& config) {
     config_ = config;
     spdlog::debug("[SyncAlgorithm] configured: ahead={}ms behind={}ms calibrate={}ms",
                   config_.ahead_threshold_ms, config_.behind_threshold_ms,
                   config_.calibrate_duration_ms);
 }
 
-DriftInfo SyncAlgorithm::get_drift_info() const
-{
+SyncConfig SyncAlgorithm::get_config() const {
+    return config_;
+}
+
+void SyncAlgorithm::update_audio_pts(uint64_t audio_pts) {
+    drift_info_.audio_pts = audio_pts;
+}
+
+DriftInfo SyncAlgorithm::get_drift_info() const {
     return drift_info_;
 }
 
-void SyncAlgorithm::reset()
-{
-    drift_info_.drift_ms  = 0;
+void SyncAlgorithm::reset() {
+    drift_info_.drift_ms = 0;
     drift_info_.audio_pts = 0;
     drift_info_.video_pts = 0;
     spdlog::debug("[SyncAlgorithm] reset");
