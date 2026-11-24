@@ -1,6 +1,7 @@
 #include "CommandDispatcher.h"
 
 #include "AudioEngineFactory.h"
+#include "IEngineObserverSink.h"
 #include "VideoEngineFactory.h"
 
 #include <spdlog/spdlog.h>
@@ -83,10 +84,12 @@ bool CommandDispatcher::dispatch_speed(float speed) {
 
 void CommandDispatcher::set_audio_engine(Prism::Engine::AudioEngine* engine) {
     audio_engine_ = engine;
+    attach_observer();
 }
 
 void CommandDispatcher::set_video_engine(Prism::Engine::VideoEngine* engine) {
     video_engine_ = engine;
+    attach_observer();
 }
 
 bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_factory,
@@ -117,10 +120,47 @@ bool CommandDispatcher::initialize_engines(void* audio_factory, void* video_fact
         spdlog::info("[CommandDispatcher] video engine initialized");
     }
 
+    attach_observer();
     return true;
 }
 
+void CommandDispatcher::set_frame_observer(IEngineObserver* observer) {
+    frame_observer_ = observer;
+    attach_observer();
+}
+
+void CommandDispatcher::attach_observer() {
+    if (!frame_observer_) {
+        return;
+    }
+    if (audio_engine_) {
+        if (auto* sink = dynamic_cast<IEngineObserverSink*>(audio_engine_)) {
+            sink->set_frame_observer(frame_observer_);
+        }
+    }
+    if (video_engine_) {
+        if (auto* sink = dynamic_cast<IEngineObserverSink*>(video_engine_)) {
+            sink->set_frame_observer(frame_observer_);
+        }
+    }
+}
+
+void CommandDispatcher::detach_observer() {
+    if (audio_engine_) {
+        if (auto* sink = dynamic_cast<IEngineObserverSink*>(audio_engine_)) {
+            sink->set_frame_observer(nullptr);
+        }
+    }
+    if (video_engine_) {
+        if (auto* sink = dynamic_cast<IEngineObserverSink*>(video_engine_)) {
+            sink->set_frame_observer(nullptr);
+        }
+    }
+}
+
 void CommandDispatcher::shutdown_engines() {
+    detach_observer();
+
     if (audio_engine_) {
         audio_engine_->close();
         audio_owned_.reset();

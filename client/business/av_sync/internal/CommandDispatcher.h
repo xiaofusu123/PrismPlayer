@@ -22,11 +22,16 @@ class CommandDispatcher : public ICommandDispatcher {
     void set_audio_engine(Prism::Engine::AudioEngine* engine) override;
     void set_video_engine(Prism::Engine::VideoEngine* engine) override;
     bool initialize_engines(void* audio_factory, void* video_factory, bool enable_video) override;
+    void set_frame_observer(IEngineObserver* observer) override;
     void shutdown_engines() override;
 
   private:
+    void attach_observer();
+    void detach_observer();
+
     Prism::Engine::AudioEngine* audio_engine_{nullptr};
     Prism::Engine::VideoEngine* video_engine_{nullptr};
+    IEngineObserver* frame_observer_{nullptr};
     std::unique_ptr<Prism::Engine::AudioEngine> audio_owned_;
     std::unique_ptr<Prism::Engine::VideoEngine> video_owned_;
 };

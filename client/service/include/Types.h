@@ -68,7 +68,8 @@ typedef enum {
     PRISM_ERROR_NO_MEDIA = -4,       /**< 未加载媒体 */
     PRISM_ERROR_OPEN_FAILED = -5,    /**< 打开媒体失败 */
     PRISM_ERROR_SEEK_FAILED = -6,    /**< Seek 操作失败 */
-    PRISM_ERROR_NOT_SUPPORTED = -7   /**< 不支持的操作 */
+    PRISM_ERROR_NOT_SUPPORTED = -7,  /**< 不支持的操作 */
+    PRISM_ERROR_NETWORK = -8         /**< 网络操作失败（未登录 / 未在房间 / 连接失败） */
 } PrismErrorCode;
 
 /* ========== Seek 模式 ========== */
