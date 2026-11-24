@@ -17,3 +17,5 @@ task-current
 .scratch/
 .token-pilot/
 .serena/
+# 验收运行产物（scripts/e2e 生成，不入库）
+/acceptance/
