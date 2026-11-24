@@ -119,7 +119,7 @@ bash scripts/hooks/install-hooks.sh
 | `format` | **本次变更范围**内 C/C++ 文件的格式（判定对象等价于 staged 内容） | `sh scripts/checks/format.sh ci` |
 | `build-linux-debug` | Ubuntu 24.04 + `linux-clang-x64-Debug` 从零配置 + 构建 + 产物契约（体积阈值、≥32 个 `prism_player_*` 导出、不含 libc++） | `scripts/ci/preset-linux-debug.sh configure` / `build` / `verify` |
 | `tidy` | 本次变更范围内的 clang-tidy（与 `pre-push` 同一份判定） | `sh scripts/checks/tidy.sh build/Linux/debug ci` |
-| `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿（当前 44 个用例：`test/engine` 6 + `test/adapter` 38） | `sh scripts/checks/ctest.sh build/Linux/debug` |
+| `ctest` | 有没有测试可跑；未注册用例时明确 SKIP，不假装绿（当前 71 个用例：`test/engine` 6 + `test/adapter` 38 + `test/acceptance` 27，其中 3 个按缺件约定 skip） | `sh scripts/checks/ctest.sh build/Linux/debug` |
 | `coverage` | LLVM source-based 覆盖率报告（只出数字，不设阈值、不阻断；#84） | `bash scripts/build/coverage.sh` |
 
 上表六个 job（`hooks-self-test`、`checks-self-test`、`format`、`build-linux-debug`、`tidy`、`ctest`）**全部**是 `main` 规则集里的**必需状态检查**；`coverage` 是表中的第七行，**只上传报告、不是必需检查**（原因：batch ① 的 AV Sync 还没有测试、数字没有代表性，见 `docs/adr/0002-代码门禁.md` 决策 7）；`cache-key` 只是内部步骤，不是契约的一部分。**必需检查的改名 / 增删必须同步规则集**；非必需的附加 job 不参与合并判定，不受这条约束，但新增时要登记进本表。

@@ -129,17 +129,20 @@
     {
       "name": "windows-clang-x64-Debug",
       "configurePreset": "windows-clang-x64-Debug",
+      "filter": { "exclude": { "label": "e2e-multi|perf|perf-long" } },
       "output": { "outputOnFailure": true },
       "execution": { "noTestsAction": "error" }
     },
     {
       "name": "windows-clang-x64-Release",
       "configurePreset": "windows-clang-x64-Release",
+      "filter": { "exclude": { "label": "e2e-multi|perf|perf-long" } },
       "output": { "outputOnFailure": true }
     },
     {
       "name": "windows-clang-x64-Coverage",
       "configurePreset": "windows-clang-x64-Coverage",
+      "filter": { "exclude": { "label": "e2e-multi|perf|perf-long" } },
       "environment": {
         "LLVM_PROFILE_FILE": "${sourceDir}/build/Windows/coverage/coverage-data/test-%p-%m.profraw"
       },
@@ -150,17 +153,20 @@
     {
       "name": "linux-clang-x64-Debug",
       "configurePreset": "linux-clang-x64-Debug",
+      "filter": { "exclude": { "label": "e2e-multi|perf|perf-long" } },
       "output": { "outputOnFailure": true },
       "execution": { "noTestsAction": "error" }
     },
     {
       "name": "linux-clang-x64-Release",
       "configurePreset": "linux-clang-x64-Release",
+      "filter": { "exclude": { "label": "e2e-multi|perf|perf-long" } },
       "output": { "outputOnFailure": true }
     },
     {
       "name": "linux-clang-x64-Coverage",
       "configurePreset": "linux-clang-x64-Coverage",
+      "filter": { "exclude": { "label": "e2e-multi|perf|perf-long" } },
       "environment": {
         "LLVM_PROFILE_FILE": "${sourceDir}/build/Linux/coverage/coverage-data/test-%p-%m.profraw"
       },
