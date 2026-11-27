@@ -3,11 +3,14 @@
 
 #include "PlayerImpl.h"
 
+#include "DefaultNetworkClient.h"
 #include "SyncFactory.h"
+#include "SyncTypes.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <limits>
 #include <spdlog/spdlog.h>
 #include <string>
 
@@ -26,64 +29,6 @@ static PrismConfig default_config() {
     c.log_level = "info";
     return c;
 }
-
-/* ========== 默认网络桩实现 ========== */
-
-class DefaultNetworkClient : public IServiceNetwork {
-  public:
-    int login(const char* username, const char* password, const char* server_url) override {
-        spdlog::info("[DefaultNetwork] login: user={} server={}", username, server_url);
-        logged_in_ = true;
-        return PRISM_OK;
-    }
-    int logout() override {
-        spdlog::info("[DefaultNetwork] logout");
-        logged_in_ = false;
-        in_room_ = false;
-        room_info_ = {};
-        return PRISM_OK;
-    }
-    int join_room(const char* room_id) override {
-        if (!logged_in_) {
-            spdlog::warn("[DefaultNetwork] join_room rejected: not logged in");
-            return PRISM_ERROR_NETWORK;
-        }
-        spdlog::info("[DefaultNetwork] join_room: {}", room_id);
-        in_room_ = true;
-        room_info_ = {};
-        constexpr size_t MAX_ROOM_ID_LENGTH = sizeof(room_info_.room_id) - 1;
-        size_t length = 0;
-        for (; length < MAX_ROOM_ID_LENGTH && room_id[length] != '\0'; ++length) {
-            room_info_.room_id[length] = room_id[length];
-        }
-        room_info_.room_id[length] = '\0';
-        room_info_.member_count = 1;
-        return PRISM_OK;
-    }
-    int leave_room() override {
-        spdlog::info("[DefaultNetwork] leave_room");
-        in_room_ = false;
-        room_info_ = {};
-        return PRISM_OK;
-    }
-    int get_room_info(PrismRoomInfo* info) override {
-        if (!in_room_) {
-            return PRISM_ERROR_NETWORK;
-        }
-        if (info) {
-            *info = room_info_;
-        }
-        return PRISM_OK;
-    }
-    [[nodiscard]] PrismRoomState get_room_state() const override {
-        return in_room_ ? PRISM_ROOM_CONNECTED : PRISM_ROOM_DISCONNECTED;
-    }
-
-  private:
-    bool logged_in_{false};
-    bool in_room_{false};
-    PrismRoomInfo room_info_{};
-};
 
 /* ========== PrismPlayerInternal 实现 ========== */
 
@@ -121,8 +66,14 @@ PrismPlayerInternal::~PrismPlayerInternal() {
 }
 
 void PrismPlayerInternal::fire_event(PrismEventType type, const void* data) const {
-    if (callback_) {
+    if (!callback_) {
+        return;
+    }
+    try {
         callback_(type, data, user_data_);
+    } catch (...) {
+        // C ABI 边界不允许异常逸出；用户回调抛异常只记日志，不影响播放器状态。
+        spdlog::error("[PrismPlayer] event callback threw an exception");
     }
 }
 
@@ -163,6 +114,55 @@ static void enter_playing_sync(PrismPlayerInternal* p) {
 
 } // namespace Prism::Service
 
+/* ========== C API 辅助（全局作用域，供 extern "C" 实现调用） ========== */
+
+namespace {
+
+using InternalPlayer = Prism::Service::PrismPlayerInternal;
+
+/**
+ * @brief 把不透明句柄转换为内部实例（调用方已校验非空）
+ */
+InternalPlayer* as_internal(PrismPlayerHandle player) {
+    return static_cast<InternalPlayer*>(player);
+}
+
+/**
+ * @brief 记录最后一次失败并返回其整数错误码
+ *
+ * 成功后不清空 last_error，便于排查时序问题（见「数据流」§ 回调与错误的传播）。
+ */
+int record_error(InternalPlayer* player, PrismErrorCode code) {
+    player->last_error_.store(code);
+    return static_cast<int>(code);
+}
+
+/**
+ * @brief 用引擎侧媒体属性回填 PrismMediaInfo
+ *
+ * 引擎未提供的属性保持约定值：duration 为 -1（未知/直播流），宽高为 0；
+ * 不用配置值冒充真实媒体属性。
+ */
+void refresh_media_info(InternalPlayer* player) {
+    const Prism::Business::MediaSnapshot MEDIA_SNAPSHOT =
+        player->cmd_dispatcher_->get_media_snapshot();
+    PrismMediaInfo& info = player->media_info_;
+    info = {};
+    info.duration_ms = -1;
+
+    if (MEDIA_SNAPSHOT.video_width > 0 && MEDIA_SNAPSHOT.video_height > 0) {
+        info.video_width = static_cast<int>(MEDIA_SNAPSHOT.video_width);
+        info.video_height = static_cast<int>(MEDIA_SNAPSHOT.video_height);
+    }
+    if (MEDIA_SNAPSHOT.audio_duration_ms > 0) {
+        info.duration_ms = MEDIA_SNAPSHOT.audio_duration_ms;
+    } else if (MEDIA_SNAPSHOT.video_duration_ms > 0) {
+        info.duration_ms = MEDIA_SNAPSHOT.video_duration_ms;
+    }
+}
+
+} // namespace
+
 /* ========================================================================
  *  C API 实现
  * ======================================================================== */
@@ -175,21 +175,26 @@ PRISM_API PrismPlayerHandle prism_player_create(const PrismConfig* config,
                                                 PrismEventCallback callback, void* user_data) {
     PrismConfig cfg = config ? *config : Prism::Service::default_config();
 
-    auto* p = new (std::nothrow) Prism::Service::PrismPlayerInternal(cfg, callback, user_data);
-    if (!p) {
-        spdlog::error("[PrismPlayer] failed to allocate instance");
+    try {
+        auto* p = new (std::nothrow) Prism::Service::PrismPlayerInternal(cfg, callback, user_data);
+        if (!p) {
+            spdlog::error("[PrismPlayer] failed to allocate instance");
+            return nullptr;
+        }
+        spdlog::info("[PrismPlayer] handle created");
+        return static_cast<PrismPlayerHandle>(p);
+    } catch (...) {
+        // 构造过程可能抛异常；C ABI 边界统一吞掉并返回 NULL。
+        spdlog::error("[PrismPlayer] failed to construct instance");
         return nullptr;
     }
-
-    spdlog::info("[PrismPlayer] handle created");
-    return static_cast<PrismPlayerHandle>(p);
 }
 
 PRISM_API void prism_player_destroy(PrismPlayerHandle player) {
     if (!player)
         return;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     p->network_->leave_room();
 
@@ -203,11 +208,10 @@ PRISM_API int prism_player_set_audio_factory(PrismPlayerHandle player, void* fac
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!factory) {
-        static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.store(
-            PRISM_ERROR_INVALID_PARAM);
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
     p->audio_factory_ = factory;
     spdlog::info("[PrismPlayer] audio factory injected");
     return PRISM_OK;
@@ -217,11 +221,10 @@ PRISM_API int prism_player_set_video_factory(PrismPlayerHandle player, void* fac
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!factory) {
-        static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.store(
-            PRISM_ERROR_INVALID_PARAM);
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
     p->video_factory_ = factory;
     spdlog::info("[PrismPlayer] video factory injected");
     return PRISM_OK;
@@ -231,11 +234,10 @@ PRISM_API int prism_player_set_network_client(PrismPlayerHandle player, void* ne
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!network) {
-        static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.store(
-            PRISM_ERROR_INVALID_PARAM);
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
     p->network_.reset(static_cast<Prism::Service::IServiceNetwork*>(network));
 
     spdlog::info("[PrismPlayer] network client injected");
@@ -249,12 +251,11 @@ PRISM_API int prism_player_login(PrismPlayerHandle player, const PrismLoginParam
         return PRISM_ERROR_INVALID_HANDLE;
     if (!params || !params->username || !params->password || !params->server_url) {
         spdlog::warn("[PrismPlayer] login failed: invalid parameters");
-        static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.store(
-            PRISM_ERROR_INVALID_PARAM);
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     int ret = p->network_->login(params->username, params->password, params->server_url);
     if (ret == PRISM_OK) {
@@ -270,7 +271,7 @@ PRISM_API int prism_player_logout(PrismPlayerHandle player) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     // 登出前自动离开房间（若仍在房间内），与接口注释的语义保持一致。
     if (p->network_->get_room_state() == PRISM_ROOM_CONNECTED) {
@@ -294,12 +295,11 @@ PRISM_API int prism_player_join_room(PrismPlayerHandle player, const char* room_
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!room_id) {
-        static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.store(
-            PRISM_ERROR_INVALID_PARAM);
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     int ret = p->network_->join_room(room_id);
     if (ret == PRISM_OK) {
@@ -314,7 +314,7 @@ PRISM_API int prism_player_leave_room(PrismPlayerHandle player) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     bool was_in_room = p->network_->get_room_state() == PRISM_ROOM_CONNECTED;
     int ret = p->network_->leave_room();
@@ -332,12 +332,11 @@ PRISM_API int prism_player_get_room_info(PrismPlayerHandle player, PrismRoomInfo
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!info) {
-        static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.store(
-            PRISM_ERROR_INVALID_PARAM);
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
     int ret = p->network_->get_room_info(info);
     if (ret != PRISM_OK) {
         p->last_error_.store(static_cast<PrismErrorCode>(ret));
@@ -348,7 +347,7 @@ PRISM_API int prism_player_get_room_info(PrismPlayerHandle player, PrismRoomInfo
 PRISM_API PrismRoomState prism_player_get_room_state(PrismPlayerHandle player) {
     if (!player)
         return PRISM_ROOM_DISCONNECTED;
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
     return p->network_->get_room_state();
 }
 
@@ -358,12 +357,11 @@ PRISM_API int prism_player_open(PrismPlayerHandle player, const char* uri) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!uri) {
-        static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.store(
-            PRISM_ERROR_INVALID_PARAM);
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     p->state_.store(PRISM_STATE_LOADING);
     p->media_uri_ = uri;
@@ -381,6 +379,7 @@ PRISM_API int prism_player_open(PrismPlayerHandle player, const char* uri) {
 
     p->state_.store(PRISM_STATE_PAUSED);
     p->sync_sm_->transition(Prism::Business::SyncState::CALIBATING);
+    refresh_media_info(p);
     p->fire_event(PRISM_EVENT_MEDIA_LOADED);
     spdlog::info("[PrismPlayer] media loaded: {}", uri);
     return PRISM_OK;
@@ -390,7 +389,7 @@ PRISM_API int prism_player_close(PrismPlayerHandle player) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     p->cmd_dispatcher_->shutdown_engines();
 
@@ -412,7 +411,7 @@ PRISM_API int prism_player_play(PrismPlayerHandle player) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
     PrismState s = p->state_.load();
 
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) {
@@ -449,7 +448,7 @@ PRISM_API int prism_player_pause(PrismPlayerHandle player) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     if (p->state_.load() != PRISM_STATE_PLAYING)
         return PRISM_OK;
@@ -470,11 +469,14 @@ PRISM_API int prism_player_stop(PrismPlayerHandle player) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     spdlog::info("[PrismPlayer] stopping");
 
-    p->cmd_dispatcher_->dispatch_pause();
+    // 命令是同步的：Engine 返回 false 时整体失败并写 last_error（见「数据流」§ 播放控制）。
+    if (!p->cmd_dispatcher_->dispatch_pause()) {
+        return record_error(p, PRISM_ERROR_UNKNOWN);
+    }
     p->cmd_dispatcher_->shutdown_engines();
 
     p->engines_initialized_ = false;
@@ -489,7 +491,7 @@ PRISM_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms, P
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     PrismState s = p->state_.load();
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) {
@@ -508,9 +510,18 @@ PRISM_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms, P
     // 引擎接口只接受绝对位置：相对模式先按当前音频时钟换算成绝对位置。
     int64_t target_ms = position_ms;
     if (mode == PRISM_SEEK_RELATIVE) {
-        auto drift = p->sync_algo_->get_drift_info();
-        int64_t cur = static_cast<int64_t>(drift.audio_pts);
-        target_ms = std::max<int64_t>(0, cur + position_ms);
+        // 括号阻止 Windows SDK minwindef.h 的 max/min 函数式宏展开（同 clamp 处的处理）。
+        constexpr int64_t MAX_POSITION = (std::numeric_limits<int64_t>::max)();
+        int64_t current = static_cast<int64_t>(std::min<uint64_t>(
+            p->sync_algo_->get_drift_info().audio_pts, static_cast<uint64_t>(MAX_POSITION)));
+        if (position_ms > 0 && current > MAX_POSITION - position_ms) {
+            target_ms = MAX_POSITION;
+        } else if (position_ms < 0 &&
+                   current < (std::numeric_limits<int64_t>::min)() - position_ms) {
+            target_ms = 0;
+        } else {
+            target_ms = std::max<int64_t>(0, current + position_ms);
+        }
     }
 
     if (!p->cmd_dispatcher_->dispatch_seek(std::chrono::milliseconds{target_ms})) {
@@ -536,13 +547,13 @@ PRISM_API int prism_player_seek(PrismPlayerHandle player, int64_t position_ms, P
 PRISM_API PrismState prism_player_get_state(PrismPlayerHandle player) {
     if (!player)
         return PRISM_STATE_ERROR;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->state_.load();
+    return as_internal(player)->state_.load();
 }
 
 PRISM_API int64_t prism_player_get_position(PrismPlayerHandle player) {
     if (!player)
         return -1;
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     PrismState s = p->state_.load();
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR)
@@ -555,7 +566,7 @@ PRISM_API int64_t prism_player_get_position(PrismPlayerHandle player) {
 PRISM_API int64_t prism_player_get_duration(PrismPlayerHandle player) {
     if (!player)
         return -1;
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     PrismState s = p->state_.load();
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR)
@@ -570,7 +581,7 @@ PRISM_API int prism_player_set_volume(PrismPlayerHandle player, float volume) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
     float clamped = Prism::Service::clamp(volume, 0.0f, 1.0f);
     p->volume_.store(clamped);
     spdlog::debug("[PrismPlayer] volume set to {:.2f}", clamped);
@@ -580,14 +591,14 @@ PRISM_API int prism_player_set_volume(PrismPlayerHandle player, float volume) {
 PRISM_API float prism_player_get_volume(PrismPlayerHandle player) {
     if (!player)
         return 0.0f;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->volume_.load();
+    return as_internal(player)->volume_.load();
 }
 
 PRISM_API int prism_player_set_mute(PrismPlayerHandle player, bool mute) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     bool was_muted = p->mute_.exchange(mute);
     if (mute && !was_muted) {
@@ -604,7 +615,7 @@ PRISM_API int prism_player_set_mute(PrismPlayerHandle player, bool mute) {
 PRISM_API bool prism_player_get_mute(PrismPlayerHandle player) {
     if (!player)
         return false;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->mute_.load();
+    return as_internal(player)->mute_.load();
 }
 
 /* ========== 播放属性 ========== */
@@ -613,7 +624,7 @@ PRISM_API int prism_player_set_playback_speed(PrismPlayerHandle player, float sp
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
     float clamped = Prism::Service::clamp(speed, 0.5f, 2.0f);
     p->speed_.store(clamped);
 
@@ -630,13 +641,13 @@ PRISM_API int prism_player_set_playback_speed(PrismPlayerHandle player, float sp
 PRISM_API float prism_player_get_playback_speed(PrismPlayerHandle player) {
     if (!player)
         return 1.0f;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->speed_.load();
+    return as_internal(player)->speed_.load();
 }
 
 PRISM_API int prism_player_set_loop(PrismPlayerHandle player, bool loop) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
-    static_cast<Prism::Service::PrismPlayerInternal*>(player)->loop_.store(loop);
+    as_internal(player)->loop_.store(loop);
     spdlog::debug("[PrismPlayer] loop set to {}", loop);
     return PRISM_OK;
 }
@@ -644,7 +655,7 @@ PRISM_API int prism_player_set_loop(PrismPlayerHandle player, bool loop) {
 PRISM_API bool prism_player_get_loop(PrismPlayerHandle player) {
     if (!player)
         return false;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->loop_.load();
+    return as_internal(player)->loop_.load();
 }
 
 /* ========== 视频窗口 ========== */
@@ -652,7 +663,7 @@ PRISM_API bool prism_player_get_loop(PrismPlayerHandle player) {
 PRISM_API int prism_player_set_video_window(PrismPlayerHandle player, void* native_window) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
-    static_cast<Prism::Service::PrismPlayerInternal*>(player)->video_window_.store(native_window);
+    as_internal(player)->video_window_.store(native_window);
     spdlog::debug("[PrismPlayer] video window set to {}", native_window);
     return PRISM_OK;
 }
@@ -663,12 +674,11 @@ PRISM_API int prism_player_get_media_info(PrismPlayerHandle player, PrismMediaIn
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!info) {
-        static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.store(
-            PRISM_ERROR_INVALID_PARAM);
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
         return PRISM_ERROR_INVALID_PARAM;
     }
 
-    auto* p = static_cast<Prism::Service::PrismPlayerInternal*>(player);
+    auto* p = as_internal(player);
 
     PrismState s = p->state_.load();
     if (s == PRISM_STATE_IDLE || s == PRISM_STATE_ERROR) {
@@ -685,7 +695,7 @@ PRISM_API int prism_player_get_media_info(PrismPlayerHandle player, PrismMediaIn
 PRISM_API PrismErrorCode prism_player_get_last_error(PrismPlayerHandle player) {
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
-    return static_cast<Prism::Service::PrismPlayerInternal*>(player)->last_error_.load();
+    return as_internal(player)->last_error_.load();
 }
 
 PRISM_API const char* prism_player_get_version(void) {

@@ -129,6 +129,26 @@ void CommandDispatcher::set_frame_observer(IEngineObserver* observer) {
     attach_observer();
 }
 
+MediaSnapshot CommandDispatcher::get_media_snapshot() const {
+    MediaSnapshot snapshot;
+
+    // AudioSyncInfo / VideoSyncInfo 含 atomic，不可拷贝；只读取需要的成员。
+    if (audio_engine_) {
+        snapshot.audio_duration_ms = audio_engine_->get_sync_info().duration.load().count();
+    }
+    if (video_engine_) {
+        snapshot.video_duration_ms = video_engine_->get_sync_info().duration.load().count();
+        const Prism::Engine::RenderMetadata RENDER_METADATA = video_engine_->get_render_result();
+        snapshot.video_width = RENDER_METADATA.width;
+        snapshot.video_height = RENDER_METADATA.height;
+    }
+
+    spdlog::debug("[CommandDispatcher] media snapshot: audio={}ms video={}ms {}x{}",
+                  snapshot.audio_duration_ms, snapshot.video_duration_ms, snapshot.video_width,
+                  snapshot.video_height);
+    return snapshot;
+}
+
 void CommandDispatcher::attach_observer() {
     if (!frame_observer_) {
         return;

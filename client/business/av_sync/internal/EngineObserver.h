@@ -49,9 +49,9 @@ class EngineObserver : public IEngineObserver {
     std::atomic<uint64_t> last_audio_pts_{0};
     std::atomic<SyncAction> last_action_{SyncAction::RENDER};
     std::atomic<bool> paused_{false};
-    uint64_t calibration_start_ms_{0};
-    uint64_t pause_start_ms_{0};
-    bool calibration_started_{false};
+    std::atomic<uint64_t> calibration_start_ms_{0};
+    std::atomic<uint64_t> pause_start_ms_{0};
+    std::atomic<bool> calibration_started_{false};
 };
 
 } // namespace Prism::Business

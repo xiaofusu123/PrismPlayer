@@ -4,13 +4,7 @@
 
 namespace Prism::Business {
 
-PlaybackStateMachine::PlaybackStateMachine()
-{
-    state_.store(SyncState::UNINIT);
-}
-
-bool PlaybackStateMachine::transition(SyncState target)
-{
+bool PlaybackStateMachine::transition(SyncState target) {
     SyncState current = state_.load();
 
     if (current == target) {
@@ -24,37 +18,32 @@ bool PlaybackStateMachine::transition(SyncState target)
     }
 
     state_.store(target);
-    spdlog::debug("[PlaybackStateMachine] state: {} -> {}",
-                  static_cast<int>(current), static_cast<int>(target));
+    spdlog::debug("[PlaybackStateMachine] state: {} -> {}", static_cast<int>(current),
+                  static_cast<int>(target));
     return true;
 }
 
-SyncState PlaybackStateMachine::get_state() const
-{
+SyncState PlaybackStateMachine::get_state() const {
     return state_.load();
 }
 
-bool PlaybackStateMachine::can_play() const
-{
+bool PlaybackStateMachine::can_play() const {
     SyncState s = state_.load();
-    return s == SyncState::SYNCHRONIZED || s == SyncState::AHEAD ||
-           s == SyncState::BEHIND || s == SyncState::DISABLE;
+    return s == SyncState::SYNCHRONIZED || s == SyncState::AHEAD || s == SyncState::BEHIND ||
+           s == SyncState::DISABLE;
 }
 
-bool PlaybackStateMachine::can_seek() const
-{
+bool PlaybackStateMachine::can_seek() const {
     SyncState s = state_.load();
     return s != SyncState::UNINIT && s != SyncState::SYNC_ERROR;
 }
 
-void PlaybackStateMachine::reset()
-{
+void PlaybackStateMachine::reset() {
     state_.store(SyncState::UNINIT);
     spdlog::debug("[PlaybackStateMachine] reset to UNINIT");
 }
 
-bool PlaybackStateMachine::is_valid_transition(SyncState from, SyncState to) const
-{
+bool PlaybackStateMachine::is_valid_transition(SyncState from, SyncState to) const {
     switch (to) {
     case SyncState::UNINIT:
         return true;

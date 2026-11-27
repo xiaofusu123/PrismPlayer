@@ -23,6 +23,7 @@ class CommandDispatcher : public ICommandDispatcher {
     void set_video_engine(Prism::Engine::VideoEngine* engine) override;
     bool initialize_engines(void* audio_factory, void* video_factory, bool enable_video) override;
     void set_frame_observer(IEngineObserver* observer) override;
+    [[nodiscard]] MediaSnapshot get_media_snapshot() const override;
     void shutdown_engines() override;
 
   private:

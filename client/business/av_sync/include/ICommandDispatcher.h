@@ -2,6 +2,7 @@
 
 #include "AudioEngine.h"
 #include "IEngineObserver.h"
+#include "SyncTypes.h"
 #include "VideoEngine.h"
 #include <chrono>
 #include <cstdint>
@@ -74,6 +75,14 @@ class ICommandDispatcher {
      * @param observer 观察者指针；nullptr 表示注销。注册/注销不在帧回调内执行。
      */
     virtual void set_frame_observer(IEngineObserver* observer) = 0;
+
+    /**
+     * @brief 采集引擎侧媒体属性快照，供上层回填媒体信息
+     * @return MediaSnapshot 各字段为 0 表示引擎尚未提供该属性
+     *
+     * 只读查询：不触发回调、不改变播放状态，可在 open 成功后调用。
+     */
+    [[nodiscard]] virtual MediaSnapshot get_media_snapshot() const = 0;
 
     /**
      * @brief 关闭并销毁所有引擎实例（先注销观察者，之后再无帧回调）

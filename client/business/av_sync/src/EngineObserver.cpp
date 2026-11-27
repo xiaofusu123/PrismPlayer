@@ -7,26 +7,25 @@ namespace Prism::Business {
 EngineObserver::EngineObserver() : owned_clock_(std::make_unique<SystemSyncClock>()) {}
 
 void EngineObserver::on_audio_frame(const Prism::Engine::AudioSyncInfo& info) {
-    if (paused_) {
+    if (paused_.load()) {
         return;
     }
 
     uint64_t pts = static_cast<uint64_t>(info.current_pts.load().count());
-    last_audio_pts_ = pts;
+    last_audio_pts_.store(pts);
     if (sync_algo_) {
         sync_algo_->update_audio_pts(pts);
     }
     spdlog::trace("[EngineObserver] audio frame pts={}", pts);
 
     if (state_machine_ && state_machine_->get_state() == SyncState::UNINIT &&
-        state_machine_->transition(SyncState::CALIBATING)) {
-        calibration_start_ms_ = now_ms();
-        calibration_started_ = true;
+        state_machine_->transition(SyncState::CALIBATING) && !calibration_started_.exchange(true)) {
+        calibration_start_ms_.store(now_ms());
     }
 }
 
 void EngineObserver::on_video_frame(const Prism::Engine::VideoSyncInfo& info) {
-    if (paused_ || !sync_algo_ || !state_machine_) {
+    if (paused_.load() || !sync_algo_ || !state_machine_) {
         return;
     }
 
@@ -43,9 +42,8 @@ void EngineObserver::on_video_frame(const Prism::Engine::VideoSyncInfo& info) {
     SyncAction action = sync_algo_->calibrate(last_audio_pts_, video_pts);
 
     if (state == SyncState::CALIBATING) {
-        if (!calibration_started_) {
-            calibration_start_ms_ = now_ms();
-            calibration_started_ = true;
+        if (!calibration_started_.exchange(true)) {
+            calibration_start_ms_.store(now_ms());
         }
         last_action_ = SyncAction::RENDER;
         if (calibration_elapsed()) {
@@ -88,26 +86,25 @@ void EngineObserver::set_clock(ISyncClock* clock) {
 }
 
 void EngineObserver::set_paused(bool paused) {
-    if (paused_ == paused) {
+    if (paused_.exchange(paused) == paused) {
         return;
     }
-    paused_ = paused;
     if (paused) {
-        pause_start_ms_ = now_ms();
-    } else {
+        pause_start_ms_.store(now_ms());
+    } else if (calibration_started_.load()) {
         // 把暂停期间经过的墙钟时间补偿出校准窗口，避免恢复后立即退出校准。
-        if (calibration_started_) {
-            calibration_start_ms_ += now_ms() - pause_start_ms_;
-        }
+        calibration_start_ms_.store(calibration_start_ms_.load() + now_ms() -
+                                    pause_start_ms_.load());
     }
 }
 
 void EngineObserver::reset() {
-    last_audio_pts_ = 0;
-    last_action_ = SyncAction::RENDER;
-    paused_ = false;
-    calibration_start_ms_ = 0;
-    calibration_started_ = false;
+    last_audio_pts_.store(0);
+    last_action_.store(SyncAction::RENDER);
+    paused_.store(false);
+    calibration_start_ms_.store(0);
+    pause_start_ms_.store(0);
+    calibration_started_.store(false);
     if (sync_algo_) {
         sync_algo_->reset();
     }
@@ -122,11 +119,13 @@ uint64_t EngineObserver::now_ms() const {
 }
 
 bool EngineObserver::calibration_elapsed() const {
-    if (!calibration_started_ || !sync_algo_) {
+    if (!calibration_started_.load() || !sync_algo_) {
         return false;
     }
     uint64_t duration = sync_algo_->get_config().calibrate_duration_ms;
-    return now_ms() >= calibration_start_ms_ && now_ms() - calibration_start_ms_ >= duration;
+    uint64_t start = calibration_start_ms_.load();
+    uint64_t current = now_ms();
+    return current >= start && current - start >= duration;
 }
 
 } // namespace Prism::Business
