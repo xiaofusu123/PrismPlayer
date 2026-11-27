@@ -12,7 +12,7 @@ namespace Prism::Business {
  */
 class PlaybackStateMachine : public IPlaybackStateMachine {
   public:
-    PlaybackStateMachine();
+    PlaybackStateMachine() = default;
     ~PlaybackStateMachine() override = default;
 
     bool transition(SyncState target) override;
