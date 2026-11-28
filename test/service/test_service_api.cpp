@@ -47,9 +47,9 @@ TEST(PlayerHandle, InvalidParamDistinguishedFromInvalidHandle) {
     PrismPlayerHandle player = prism_player_create(nullptr, nullptr, nullptr);
     ASSERT_NE(player, nullptr);
 
-    EXPECT_EQ(prism_player_set_audio_factory(player, nullptr), PRISM_ERROR_INVALID_HANDLE);
-    EXPECT_EQ(prism_player_set_video_factory(player, nullptr), PRISM_ERROR_INVALID_HANDLE);
-    EXPECT_EQ(prism_player_set_network_client(player, nullptr), PRISM_ERROR_INVALID_HANDLE);
+    EXPECT_EQ(prism_player_set_audio_factory(player, nullptr), PRISM_ERROR_INVALID_PARAM);
+    EXPECT_EQ(prism_player_set_video_factory(player, nullptr), PRISM_ERROR_INVALID_PARAM);
+    EXPECT_EQ(prism_player_set_network_client(player, nullptr), PRISM_ERROR_INVALID_PARAM);
     EXPECT_EQ(prism_player_login(player, nullptr), PRISM_ERROR_INVALID_PARAM);
     EXPECT_EQ(prism_player_join_room(player, nullptr), PRISM_ERROR_INVALID_PARAM);
 
