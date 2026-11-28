@@ -208,8 +208,8 @@ PRISM_API int prism_player_set_audio_factory(PrismPlayerHandle player, void* fac
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!factory) {
-        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_HANDLE);
-        return PRISM_ERROR_INVALID_HANDLE;
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
+        return PRISM_ERROR_INVALID_PARAM;
     }
     auto* p = as_internal(player);
     p->audio_factory_ = factory;
@@ -221,8 +221,8 @@ PRISM_API int prism_player_set_video_factory(PrismPlayerHandle player, void* fac
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!factory) {
-        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_HANDLE);
-        return PRISM_ERROR_INVALID_HANDLE;
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
+        return PRISM_ERROR_INVALID_PARAM;
     }
     auto* p = as_internal(player);
     p->video_factory_ = factory;
@@ -234,8 +234,8 @@ PRISM_API int prism_player_set_network_client(PrismPlayerHandle player, void* ne
     if (!player)
         return PRISM_ERROR_INVALID_HANDLE;
     if (!network) {
-        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_HANDLE);
-        return PRISM_ERROR_INVALID_HANDLE;
+        as_internal(player)->last_error_.store(PRISM_ERROR_INVALID_PARAM);
+        return PRISM_ERROR_INVALID_PARAM;
     }
     auto* p = as_internal(player);
     p->network_.reset(static_cast<Prism::Service::IServiceNetwork*>(network));
