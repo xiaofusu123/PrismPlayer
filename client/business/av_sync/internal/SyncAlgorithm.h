@@ -2,6 +2,8 @@
 
 #include "ISyncAlgorithm.h"
 
+#include <atomic>
+
 namespace Prism::Business {
 
 /**
@@ -13,17 +15,21 @@ namespace Prism::Business {
  */
 class SyncAlgorithm : public ISyncAlgorithm {
   public:
-    SyncAlgorithm();
+    SyncAlgorithm() = default;
     ~SyncAlgorithm() override = default;
 
     SyncAction calibrate(uint64_t audio_pts, uint64_t video_pts) override;
     void configure(const SyncConfig& config) override;
+    [[nodiscard]] SyncConfig get_config() const override;
+    void update_audio_pts(uint64_t audio_pts) override;
     [[nodiscard]] DriftInfo get_drift_info() const override;
     void reset() override;
 
   private:
     SyncConfig config_;
-    DriftInfo drift_info_;
+    std::atomic<int64_t> drift_ms_{0};   /**< 供 get_drift_info 读取的最新漂移 */
+    std::atomic<uint64_t> audio_pts_{0}; /**< 供 get_position 读取的音频时钟 */
+    std::atomic<uint64_t> video_pts_{0}; /**< 最近一次视频帧 PTS */
 };
 
 } // namespace Prism::Business

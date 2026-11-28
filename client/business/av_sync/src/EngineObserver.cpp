@@ -4,49 +4,67 @@
 
 namespace Prism::Business {
 
-EngineObserver::EngineObserver() = default;
+EngineObserver::EngineObserver() : owned_clock_(std::make_unique<SystemSyncClock>()) {}
 
 void EngineObserver::on_audio_frame(const Prism::Engine::AudioSyncInfo& info) {
+    if (paused_.load()) {
+        return;
+    }
+
     uint64_t pts = static_cast<uint64_t>(info.current_pts.load().count());
-    last_audio_pts_ = pts;
+    last_audio_pts_.store(pts);
+    if (sync_algo_) {
+        sync_algo_->update_audio_pts(pts);
+    }
     spdlog::trace("[EngineObserver] audio frame pts={}", pts);
 
-    if (state_machine_) {
-        SyncState s = state_machine_->get_state();
-        if (s == SyncState::UNINIT) {
-            state_machine_->transition(SyncState::CALIBATING);
-        }
+    if (state_machine_ && state_machine_->get_state() == SyncState::UNINIT &&
+        state_machine_->transition(SyncState::CALIBATING) && !calibration_started_.exchange(true)) {
+        calibration_start_ms_.store(now_ms());
     }
 }
 
 void EngineObserver::on_video_frame(const Prism::Engine::VideoSyncInfo& info) {
+    if (paused_.load() || !sync_algo_ || !state_machine_) {
+        return;
+    }
+
     uint64_t video_pts = static_cast<uint64_t>(info.current_pts.load().count());
     spdlog::trace("[EngineObserver] video frame pts={}", video_pts);
 
-    if (sync_algo_ && state_machine_) {
-        SyncState s = state_machine_->get_state();
-        if (s == SyncState::CALIBATING || s == SyncState::SYNCHRONIZED || s == SyncState::AHEAD ||
-            s == SyncState::BEHIND) {
+    SyncState state = state_machine_->get_state();
+    if (state != SyncState::CALIBATING && state != SyncState::SYNCHRONIZED &&
+        state != SyncState::AHEAD && state != SyncState::BEHIND) {
+        return;
+    }
 
-            SyncAction action = sync_algo_->calibrate(last_audio_pts_, video_pts);
+    // 始终用真实 PTS 计算 drift，保证偏差可观测；校准期强制 RENDER，不丢帧。
+    SyncAction action = sync_algo_->calibrate(last_audio_pts_, video_pts);
 
-            if (s == SyncState::CALIBATING) {
-                // First sync point: always route through SYNCHRONIZED per state machine design
-                state_machine_->transition(SyncState::SYNCHRONIZED);
-            } else {
-                switch (action) {
-                case SyncAction::RENDER:
-                    state_machine_->transition(SyncState::SYNCHRONIZED);
-                    break;
-                case SyncAction::WAIT:
-                    state_machine_->transition(SyncState::AHEAD);
-                    break;
-                case SyncAction::DROP:
-                    state_machine_->transition(SyncState::BEHIND);
-                    break;
-                }
-            }
+    if (state == SyncState::CALIBATING) {
+        if (!calibration_started_.exchange(true)) {
+            calibration_start_ms_.store(now_ms());
         }
+        last_action_ = SyncAction::RENDER;
+        if (calibration_elapsed()) {
+            state_machine_->transition(SyncState::SYNCHRONIZED);
+            spdlog::debug("[EngineObserver] calibration finished after {}ms",
+                          sync_algo_->get_config().calibrate_duration_ms);
+        }
+        return;
+    }
+
+    last_action_ = action;
+    switch (action) {
+    case SyncAction::RENDER:
+        state_machine_->transition(SyncState::SYNCHRONIZED);
+        break;
+    case SyncAction::WAIT:
+        state_machine_->transition(SyncState::AHEAD);
+        break;
+    case SyncAction::DROP:
+        state_machine_->transition(SyncState::BEHIND);
+        break;
     }
 }
 
@@ -61,6 +79,53 @@ void EngineObserver::set_sync_algorithm(ISyncAlgorithm* algo) {
 
 void EngineObserver::set_state_machine(IPlaybackStateMachine* sm) {
     state_machine_ = sm;
+}
+
+void EngineObserver::set_clock(ISyncClock* clock) {
+    clock_ = clock;
+}
+
+void EngineObserver::set_paused(bool paused) {
+    if (paused_.exchange(paused) == paused) {
+        return;
+    }
+    if (paused) {
+        pause_start_ms_.store(now_ms());
+    } else if (calibration_started_.load()) {
+        // 把暂停期间经过的墙钟时间补偿出校准窗口，避免恢复后立即退出校准。
+        calibration_start_ms_.store(calibration_start_ms_.load() + now_ms() -
+                                    pause_start_ms_.load());
+    }
+}
+
+void EngineObserver::reset() {
+    last_audio_pts_.store(0);
+    last_action_.store(SyncAction::RENDER);
+    paused_.store(false);
+    calibration_start_ms_.store(0);
+    pause_start_ms_.store(0);
+    calibration_started_.store(false);
+    if (sync_algo_) {
+        sync_algo_->reset();
+    }
+}
+
+SyncAction EngineObserver::get_last_action() const {
+    return last_action_;
+}
+
+uint64_t EngineObserver::now_ms() const {
+    return (clock_ ? clock_ : owned_clock_.get())->now_ms();
+}
+
+bool EngineObserver::calibration_elapsed() const {
+    if (!calibration_started_.load() || !sync_algo_) {
+        return false;
+    }
+    uint64_t duration = sync_algo_->get_config().calibrate_duration_ms;
+    uint64_t start = calibration_start_ms_.load();
+    uint64_t current = now_ms();
+    return current >= start && current - start >= duration;
 }
 
 } // namespace Prism::Business

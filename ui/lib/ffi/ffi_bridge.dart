@@ -18,95 +18,57 @@ class NativeLibrary {
     ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) lookup,
   ) : _lookup = lookup;
 
-  void __debugbreak() {
-    return ___debugbreak();
+  void __report_gsfailure(int _StackCookie) {
+    return ___report_gsfailure(_StackCookie);
   }
 
-  late final ___debugbreakPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>('__debugbreak');
-  late final ___debugbreak = ___debugbreakPtr.asFunction<void Function()>();
-
-  void __fastfail(int _Code) {
-    return ___fastfail(_Code);
-  }
-
-  late final ___fastfailPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.UnsignedInt)>>(
-        '__fastfail',
+  late final ___report_gsfailurePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.UintPtr)>>(
+        '__report_gsfailure',
       );
-  late final ___fastfail = ___fastfailPtr.asFunction<void Function(int)>();
+  late final ___report_gsfailure = ___report_gsfailurePtr
+      .asFunction<void Function(int)>();
 
-  ffi.Pointer<ffi.Char> __mingw_get_crt_info() {
-    return ___mingw_get_crt_info();
+  void __security_check_cookie(int _StackCookie) {
+    return ___security_check_cookie(_StackCookie);
   }
 
-  late final ___mingw_get_crt_infoPtr =
-      _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Char> Function()>>(
-        '__mingw_get_crt_info',
+  late final ___security_check_cookiePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.UintPtr)>>(
+        '__security_check_cookie',
       );
-  late final ___mingw_get_crt_info = ___mingw_get_crt_infoPtr
-      .asFunction<ffi.Pointer<ffi.Char> Function()>();
+  late final ___security_check_cookie = ___security_check_cookiePtr
+      .asFunction<void Function(int)>();
 
-  void _invalid_parameter_noinfo() {
-    return __invalid_parameter_noinfo();
+  late final ffi.Pointer<ffi.UintPtr> ___security_cookie = _lookup<ffi.UintPtr>(
+    '__security_cookie',
+  );
+
+  int get __security_cookie => ___security_cookie.value;
+
+  set __security_cookie(int value) => ___security_cookie.value = value;
+
+  void __security_init_cookie() {
+    return ___security_init_cookie();
   }
 
-  late final __invalid_parameter_noinfoPtr =
+  late final ___security_init_cookiePtr =
       _lookup<ffi.NativeFunction<ffi.Void Function()>>(
-        '_invalid_parameter_noinfo',
+        '__security_init_cookie',
       );
-  late final __invalid_parameter_noinfo = __invalid_parameter_noinfoPtr
+  late final ___security_init_cookie = ___security_init_cookiePtr
       .asFunction<void Function()>();
 
-  void _invalid_parameter_noinfo_noreturn() {
-    return __invalid_parameter_noinfo_noreturn();
+  void __va_start(ffi.Pointer<va_list> arg0) {
+    return ___va_start(arg0);
   }
 
-  late final __invalid_parameter_noinfo_noreturnPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>(
-        '_invalid_parameter_noinfo_noreturn',
+  late final ___va_startPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<va_list>)>>(
+        '__va_start',
       );
-  late final __invalid_parameter_noinfo_noreturn =
-      __invalid_parameter_noinfo_noreturnPtr.asFunction<void Function()>();
-
-  void _invoke_watson(
-    ffi.Pointer<ffi.WChar> expression,
-    ffi.Pointer<ffi.WChar> function_name,
-    ffi.Pointer<ffi.WChar> file_name,
-    int line_number,
-    int reserved,
-  ) {
-    return __invoke_watson(
-      expression,
-      function_name,
-      file_name,
-      line_number,
-      reserved,
-    );
-  }
-
-  late final __invoke_watsonPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(
-            ffi.Pointer<ffi.WChar>,
-            ffi.Pointer<ffi.WChar>,
-            ffi.Pointer<ffi.WChar>,
-            ffi.UnsignedInt,
-            ffi.UnsignedLongLong,
-          )
-        >
-      >('_invoke_watson');
-  late final __invoke_watson = __invoke_watsonPtr
-      .asFunction<
-        void Function(
-          ffi.Pointer<ffi.WChar>,
-          ffi.Pointer<ffi.WChar>,
-          ffi.Pointer<ffi.WChar>,
-          int,
-          int,
-        )
-      >();
+  late final ___va_start = ___va_startPtr
+      .asFunction<void Function(ffi.Pointer<va_list>)>();
 
   /// @brief 关闭当前媒体，释放解码资源
   /// 状态回到 PRISM_STATE_IDLE
@@ -693,9 +655,9 @@ const int INTPTR_MAX = 9223372036854775807;
 
 const int INTPTR_MIN = -9223372036854775808;
 
-const int INT_FAST16_MAX = 32767;
+const int INT_FAST16_MAX = 2147483647;
 
-const int INT_FAST16_MIN = -32768;
+const int INT_FAST16_MIN = -2147483648;
 
 const int INT_FAST32_MAX = 2147483647;
 
@@ -724,9 +686,6 @@ const int INT_LEAST64_MIN = -9223372036854775808;
 const int INT_LEAST8_MAX = 127;
 
 const int INT_LEAST8_MIN = -128;
-
-typedef LC_ID = tagLC_ID;
-typedef LPLC_ID = ffi.Pointer<tagLC_ID>;
 
 const int NULL = 0;
 
@@ -815,7 +774,10 @@ enum PrismErrorCode {
   PRISM_ERROR_SEEK_FAILED(-6),
 
   /// < 不支持的操作
-  PRISM_ERROR_NOT_SUPPORTED(-7);
+  PRISM_ERROR_NOT_SUPPORTED(-7),
+
+  /// < 网络操作失败（未登录 / 未在房间 / 连接失败）
+  PRISM_ERROR_NETWORK(-8);
 
   final int value;
   const PrismErrorCode(this.value);
@@ -829,6 +791,7 @@ enum PrismErrorCode {
     -5 => PRISM_ERROR_OPEN_FAILED,
     -6 => PRISM_ERROR_SEEK_FAILED,
     -7 => PRISM_ERROR_NOT_SUPPORTED,
+    -8 => PRISM_ERROR_NETWORK,
     _ => throw ArgumentError('Unknown value for PrismErrorCode: $value'),
   };
 }
@@ -1073,7 +1036,7 @@ const int UINTMAX_MAX = -1;
 
 const int UINTPTR_MAX = -1;
 
-const int UINT_FAST16_MAX = 65535;
+const int UINT_FAST16_MAX = 4294967295;
 
 const int UINT_FAST32_MAX = 4294967295;
 
@@ -1089,8 +1052,6 @@ const int UINT_LEAST64_MAX = -1;
 
 const int UINT_LEAST8_MAX = 255;
 
-const int USE___UUIDOF = 0;
-
 const int WCHAR_MAX = 65535;
 
 const int WCHAR_MIN = 0;
@@ -1099,105 +1060,37 @@ const int WINT_MAX = 65535;
 
 const int WINT_MIN = 0;
 
-const int _ARGMAX = 100;
-
 const int _CRT_PACKING = 8;
 
-const int _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES = 1;
+const int _HAS_CXX17 = 0;
 
-const int _CRT_SECURE_CPP_OVERLOAD_SECURE_NAMES_MEMORY = 0;
+const int _HAS_CXX20 = 0;
 
-const int _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES = 0;
+const int _HAS_CXX23 = 0;
 
-const int _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT = 0;
+const int _HAS_CXX26 = 0;
 
-const int _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_MEMORY = 0;
+const int _HAS_EXCEPTIONS = 1;
 
-const int _M_AMD64 = 100;
+const int _SAL_VERSION = 20;
 
-const int _M_X64 = 100;
+const int _USE_ATTRIBUTES_FOR_SAL = 0;
 
-const int _SECURECRT_FILL_BUFFER_PATTERN = 253;
+const int _USE_DECLSPECS_FOR_SAL = 0;
 
-const int _TRUNCATE = -1;
+const int _VCRT_COMPILER_PREPROCESSOR = 1;
 
-const int _WIN32_WINNT = 1537;
+const int _VCRUNTIME_DISABLED_WARNINGS = 4514;
 
-const int __CRT__NO_INLINE = 1;
+const int _WCHAR_T_DEFINED = 1;
 
-const int __GOT_SECURE_LIB__ = 200411;
-
-const int __MINGW32_MAJOR_VERSION = 3;
-
-const int __MINGW32_MINOR_VERSION = 11;
-
-const int __MINGW64_VERSION_BUGFIX = 0;
-
-const int __MINGW64_VERSION_MAJOR = 15;
-
-const int __MINGW64_VERSION_MINOR = 0;
-
-const int __MINGW64_VERSION_RC = 0;
-
-const String __MINGW64_VERSION_STATE = 'alpha';
-
-const String __MINGW64_VERSION_STR = '15.0.0';
-
-const int __MINGW_DEBUGBREAK_IMPL = 1;
-
-const int __MINGW_FASTFAIL_IMPL = 1;
-
-const int __MINGW_FORTIFY_LEVEL = 0;
-
-const int __MINGW_FORTIFY_VA_ARG = 0;
-
-const int __MINGW_GCC_VERSION = 40201;
-
-const int __MINGW_HAVE_ANSI_C99_PRINTF = 1;
-
-const int __MINGW_HAVE_ANSI_C99_SCANF = 1;
-
-const int __MINGW_HAVE_WIDE_C99_PRINTF = 1;
-
-const int __MINGW_HAVE_WIDE_C99_SCANF = 1;
-
-const String __MINGW_MSVC2005_DEPREC_STR =
-    'This POSIX function is deprecated beginning in Visual C++ 2005, use _CRT_NONSTDC_NO_DEPRECATE to disable deprecation';
-
-const int __MINGW_PREFETCH_IMPL = 1;
-
-const String __MINGW_SEC_WARN_STR =
-    'This function or variable may be unsafe, use _CRT_SECURE_NO_WARNINGS to disable deprecation';
-
-const int __MINGW_USE_UNDERSCORE_PREFIX = 0;
-
-const int __MSVCRT_VERSION__ = 1536;
-
-const int __STDC_SECURE_LIB__ = 200411;
-
-const int __USE_CRTIMP = 1;
-
-const int __USE_MINGW_ANSI_STDIO = 1;
+const int __SAL_H_VERSION = 180000000;
 
 const int __bool_true_false_are_defined = 1;
 
-typedef __builtin_va_list = ffi.Pointer<ffi.Char>;
-typedef __gnuc_va_list = __builtin_va_list;
-
-final class __lc_time_data extends ffi.Opaque {}
-
-typedef __time32_t = ffi.Long;
-typedef Dart__time32_t = int;
-typedef __time64_t = ffi.LongLong;
-typedef Dart__time64_t = int;
-typedef _locale_t = ffi.Pointer<localeinfo_struct>;
-typedef _locale_tstruct = localeinfo_struct;
-typedef errno_t = ffi.Int;
-typedef Darterrno_t = int;
-
 const int false$ = 0;
 
-typedef int_fast16_t = ffi.Short;
+typedef int_fast16_t = ffi.Int;
 typedef Dartint_fast16_t = int;
 typedef int_fast32_t = ffi.Int;
 typedef Dartint_fast32_t = int;
@@ -1215,64 +1108,14 @@ typedef int_least8_t = ffi.SignedChar;
 typedef Dartint_least8_t = int;
 typedef intmax_t = ffi.LongLong;
 typedef Dartintmax_t = int;
-
-final class localeinfo_struct extends ffi.Struct {
-  external pthreadlocinfo locinfo;
-
-  external pthreadmbcinfo mbcinfo;
-
-  static ffi.Pointer<localeinfo_struct> $allocate(
-    ffi.Allocator $allocator, {
-    required pthreadlocinfo locinfo,
-    required pthreadmbcinfo mbcinfo,
-  }) => $allocator<localeinfo_struct>()
-    ..ref.locinfo = locinfo
-    ..ref.mbcinfo = mbcinfo;
-}
-
-final class max_align_t extends ffi.Opaque {}
-
-typedef mbstate_t = ffi.Int;
-typedef Dartmbstate_t = int;
-typedef pthreadlocinfo = ffi.Pointer<threadlocaleinfostruct>;
-typedef pthreadmbcinfo = ffi.Pointer<threadmbcinfostruct>;
+typedef max_align_t = ffi.Double;
+typedef Dartmax_align_t = double;
 typedef ptrdiff_t = ffi.LongLong;
 typedef Dartptrdiff_t = int;
-typedef rsize_t = ffi.Size;
-typedef Dartrsize_t = int;
-typedef ssize_t = ffi.LongLong;
-typedef Dartssize_t = int;
-
-final class tagLC_ID extends ffi.Struct {
-  @ffi.UnsignedShort()
-  external int wLanguage;
-
-  @ffi.UnsignedShort()
-  external int wCountry;
-
-  @ffi.UnsignedShort()
-  external int wCodePage;
-
-  static ffi.Pointer<tagLC_ID> $allocate(
-    ffi.Allocator $allocator, {
-    required int wLanguage,
-    required int wCountry,
-    required int wCodePage,
-  }) => $allocator<tagLC_ID>()
-    ..ref.wLanguage = wLanguage
-    ..ref.wCountry = wCountry
-    ..ref.wCodePage = wCodePage;
-}
-
-final class threadlocaleinfostruct extends ffi.Opaque {}
-
-final class threadmbcinfostruct extends ffi.Opaque {}
-
-typedef time_t = __time64_t;
 
 const int true$ = 1;
 
-typedef uint_fast16_t = ffi.UnsignedShort;
+typedef uint_fast16_t = ffi.UnsignedInt;
 typedef Dartuint_fast16_t = int;
 typedef uint_fast32_t = ffi.UnsignedInt;
 typedef Dartuint_fast32_t = int;
@@ -1290,8 +1133,4 @@ typedef uint_least8_t = ffi.UnsignedChar;
 typedef Dartuint_least8_t = int;
 typedef uintmax_t = ffi.UnsignedLongLong;
 typedef Dartuintmax_t = int;
-typedef va_list = __gnuc_va_list;
-typedef wctype_t = ffi.UnsignedShort;
-typedef Dartwctype_t = int;
-typedef wint_t = ffi.UnsignedShort;
-typedef Dartwint_t = int;
+typedef va_list = ffi.Pointer<ffi.Char>;
